@@ -1,0 +1,70 @@
+version: '3.8'
+
+# ─── Traefik Reverse Proxy ──────────────────────────────────────────────────
+# Production-only. Handles TLS termination, domain routing, and auto-certs.
+# Run this BEFORE starting any application services.
+#
+# Usage:
+#   docker compose -f docker-compose.traefik.yml up -d
+#
+# Domains routed:
+#   aivory.id                 → avry-website        :9000
+#   dashboard.aivory.id       → avry-user-dashboard  :9001
+#   admin.aivory.id           → avry-admin-dashboards :9002
+#   console.aivory.id         → avry-console         :8086
+#   api.aivory.id             → avry-zeroclaw        :8090
+#   backend.aivory.id         → avry-backend         :8081
+#   n8n.aivory.id             → avry-n8n             :5678
+#   monitoring.aivory.id      → avry-grafana         :3000
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: avry-traefik
+    restart: unless-stopped
+    command:
+      # API and dashboard
+      - "--api.insecure=false"
+      - "--api.dashboard=false"
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=aivory-network"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Global HTTP → HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      # Let's Encrypt TLS
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?ACME_EMAIL is required}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Logging
+      - "--log.level=WARN"
+      - "--accesslog=false"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik-certs:/letsencrypt"
+    networks:
+      - aivory-network
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  traefik-certs:
+    driver: local
+
+networks:
+  aivory-network:
+    name: aivory-network
+    external: true

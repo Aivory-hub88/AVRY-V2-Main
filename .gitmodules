@@ -1,0 +1,48 @@
+[submodule "backend/avry-backend"]
+	path = backend/avry-backend
+	url = https://github.com/ClementHansel/avry-backend.git
+[submodule "frontend/frontend-nextjs"]
+	path = frontend/frontend-nextjs
+	url = https://github.com/ClementHansel/avry-website.git
+[submodule "frontend/avry-user-dashboard"]
+	path = frontend/avry-user-dashboard
+	url = https://github.com/ClementHansel/avry-user-dashboard.git
+[submodule "frontend/avry-admin-dashboard"]
+	path = frontend/avry-admin-dashboard
+	url = https://github.com/ClementHansel/avry-admin-dashboard.git
+[submodule "services/avry-console"]
+	path = services/avry-console
+	url = https://github.com/ClementHansel/avry-console.git
+[submodule "services/avry-n8n"]
+	path = services/avry-n8n
+	url = https://github.com/ClementHansel/avry-n8n.git
+[submodule "services/avry-zeroclaw"]
+	path = services/avry-zeroclaw
+	url = https://github.com/ClementHansel/avry-zeroclaw.git
+[submodule "services/avry-diagnostics"]
+	path = services/avry-diagnostics
+	url = https://github.com/ClementHansel/avry-diagnostics.git
+[submodule "services/avry-blueprint"]
+	path = services/avry-blueprint
+	url = https://github.com/ClementHansel/avry-blueprint.git
+[submodule "services/avry-workflows"]
+	path = services/avry-workflows
+	url = https://github.com/ClementHansel/avry-workflows.git
+[submodule "services/avry-blog"]
+	path = services/avry-blog
+	url = https://github.com/ClementHansel/avry-blog.git
+[submodule "services/avry-careers"]
+	path = services/avry-careers
+	url = https://github.com/ClementHansel/avry-careers.git
+[submodule "services/avry-payments"]
+	path = services/avry-payments
+	url = https://github.com/ClementHansel/avry-payments.git
+[submodule "services/avry-roadmap"]
+	path = services/avry-roadmap
+	url = https://github.com/ClementHansel/avry-roadmaps.git
+[submodule "services/avry-vps-monitoring"]
+	path = services/avry-vps-monitoring
+	url = https://github.com/ClementHansel/avry-vps-monitoring.git
+[submodule "services/avry-shared-libs"]
+	path = services/avry-shared-libs
+	url = https://github.com/ClementHansel/avry-shared-libs.git

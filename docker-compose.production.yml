@@ -1,0 +1,583 @@
+version: '3.8'
+
+# ─── Aivory Platform — Production Stack ────────────────────────────────────
+# Starts all services on the aivory-network with Traefik routing labels.
+# Requires: docker-compose.traefik.yml running first.
+#
+# Usage:
+#   docker network create aivory-network
+#   docker compose -f docker-compose.traefik.yml up -d
+#   docker compose -f docker-compose.production.yml up -d --build
+#
+# All inter-service communication uses Docker container names (not localhost).
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-python-defaults: &python-defaults
+  restart: unless-stopped
+  networks:
+    - aivory-network
+
+x-common-env: &common-env
+  ENVIRONMENT: production
+  SUPABASE_URL: ${SUPABASE_URL}
+  SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+  JWT_SECRET: ${JWT_SECRET}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+
+services:
+
+  # ── Infrastructure ─────────────────────────────────────────────────────────
+
+  avry-n8n:
+    image: n8nio/n8n:latest
+    container_name: avry-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin@aivory.local}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=n8n.aivory.id
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://n8n.aivory.id/}
+      - N8N_SECURE_COOKIE=true
+      - NODE_FUNCTION_ALLOW_BUILTIN=child_process
+      - NODE_FUNCTION_ALLOW_EXTERNAL=*
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - aivory-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-n8n.rule=Host(`n8n.aivory.id`)"
+      - "traefik.http.routers.avry-n8n.entrypoints=websecure"
+      - "traefik.http.routers.avry-n8n.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-n8n.loadbalancer.server.port=5678"
+      - "traefik.http.middlewares.n8n-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.avry-n8n.middlewares=n8n-headers"
+
+  avry-n8n-mcp:
+    image: ghcr.io/czlonkowski/n8n-mcp:latest
+    container_name: avry-n8n-mcp
+    environment:
+      - MCP_MODE=http
+      - PORT=3020
+      - LOG_LEVEL=error
+      - DISABLE_CONSOLE_OUTPUT=true
+      - N8N_API_URL=http://avry-n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - AUTH_TOKEN=${N8N_MCP_AUTH_TOKEN}
+      - WEBHOOK_SECURITY_MODE=moderate
+      - N8N_MCP_TELEMETRY_DISABLED=true
+    depends_on:
+      avry-n8n:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3020/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - aivory-network
+
+  avry-n8n-as-code:
+    build:
+      context: services/avry-n8n/n8n-as-code-service
+      dockerfile: Dockerfile
+    container_name: avry-n8n-as-code
+    environment:
+      - N8N_HOST=http://avry-n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - N8N_ADMIN_EMAIL=${N8N_BASIC_AUTH_USER:-admin@aivory.local}
+      - N8N_ADMIN_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - WORKFLOW_STORE=/app/workflows-store
+      - ZEROCLAW_URL=http://avry-zeroclaw-daemon:3010
+    volumes:
+      - n8n_as_code_drafts:/app/workflows-store/drafts
+    depends_on:
+      avry-n8n:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3500/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - aivory-network
+
+  avry-zeroclaw-daemon:
+    build:
+      context: services/avry-zeroclaw
+      dockerfile: Dockerfile.zeroclaw
+    container_name: avry-zeroclaw-daemon
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    volumes:
+      # Config, skills, and runtime are bundled inside the avry-zeroclaw submodule
+      - ./services/avry-zeroclaw/config:/home/zeroclaw/.zeroclaw
+      - ./services/avry-zeroclaw/runtime:/home/zeroclaw/workspace
+      - ./services/avry-zeroclaw/skills:/home/zeroclaw/skills
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - aivory-network
+
+  avry-zeroclaw:
+    build:
+      context: services/avry-zeroclaw/vps-bridge
+      dockerfile: Dockerfile
+    container_name: avry-zeroclaw
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - ZEROCLAW_URL=http://avry-zeroclaw-daemon:3010
+      - ZEROCLAW_BASE_URL=http://avry-zeroclaw-daemon:3010
+      - N8N_BASE_URL=http://avry-n8n:5678
+      - N8N_AS_CODE_URL=http://avry-n8n-as-code:3500
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN}
+      - CORS_ORIGIN=https://aivory.id,https://dashboard.aivory.id,https://admin.aivory.id,https://console.aivory.id
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+      - N8N_API_KEY_1=${N8N_API_KEY}
+      - N8N_API_KEY_2=${N8N_API_KEY}
+      - N8N_API_KEY_3=${N8N_API_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - DIAGNOSTIC_MODEL=${DIAGNOSTIC_MODEL:-qwen/qwen3-235b-a22b}
+      - AUTH_BACKEND_URL=http://avry-backend:8081
+    depends_on:
+      avry-zeroclaw-daemon:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - aivory-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-zeroclaw.rule=Host(`api.aivory.id`)"
+      - "traefik.http.routers.avry-zeroclaw.entrypoints=websecure"
+      - "traefik.http.routers.avry-zeroclaw.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-zeroclaw.loadbalancer.server.port=8090"
+      - "traefik.http.middlewares.avry-zeroclaw-buffering.buffering.maxResponseBodyBytes=0"
+      - "traefik.http.routers.avry-zeroclaw.middlewares=avry-zeroclaw-buffering"
+
+  # ── Backend Services ───────────────────────────────────────────────────────
+
+  avry-backend:
+    build:
+      context: backend/avry-backend
+      dockerfile: Dockerfile
+    container_name: avry-backend
+    <<: *python-defaults
+    ports:
+      - "8081:8081"
+    environment:
+      <<: *common-env
+      PORT: 8081
+      DATABASE_URL: ${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-backend.rule=Host(`backend.aivory.id`)"
+      - "traefik.http.routers.avry-backend.entrypoints=websecure"
+      - "traefik.http.routers.avry-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-backend.loadbalancer.server.port=8081"
+
+  avry-diagnostics:
+    build:
+      context: services/avry-diagnostics
+      dockerfile: Dockerfile
+    container_name: avry-diagnostics
+    <<: *python-defaults
+    ports:
+      - "8082:8082"
+    environment:
+      <<: *common-env
+      PORT: 8082
+      DATABASE_URL: ${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-diagnostics.rule=Host(`backend.aivory.id`) && PathPrefix(`/diagnostics`)"
+      - "traefik.http.routers.avry-diagnostics.entrypoints=websecure"
+      - "traefik.http.routers.avry-diagnostics.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-diagnostics.loadbalancer.server.port=8082"
+
+  avry-blueprint:
+    build:
+      context: services/avry-blueprint
+      dockerfile: Dockerfile
+    container_name: avry-blueprint
+    <<: *python-defaults
+    ports:
+      - "8083:8083"
+    environment:
+      <<: *common-env
+      PORT: 8083
+      DATABASE_URL: ${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-blueprint.rule=Host(`backend.aivory.id`) && PathPrefix(`/blueprints`)"
+      - "traefik.http.routers.avry-blueprint.entrypoints=websecure"
+      - "traefik.http.routers.avry-blueprint.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-blueprint.loadbalancer.server.port=8083"
+
+  avry-roadmaps:
+    build:
+      context: services/avry-roadmap
+      dockerfile: Dockerfile
+    container_name: avry-roadmaps
+    <<: *python-defaults
+    ports:
+      - "8084:8084"
+    environment:
+      <<: *common-env
+      PORT: 8084
+      DATABASE_URL: ${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-roadmaps.rule=Host(`backend.aivory.id`) && PathPrefix(`/roadmaps`)"
+      - "traefik.http.routers.avry-roadmaps.entrypoints=websecure"
+      - "traefik.http.routers.avry-roadmaps.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-roadmaps.loadbalancer.server.port=8084"
+
+  avry-payments:
+    build:
+      context: services/avry-payments
+      dockerfile: Dockerfile
+    container_name: avry-payments
+    <<: *python-defaults
+    ports:
+      - "8085:8085"
+    environment:
+      <<: *common-env
+      PORT: 8085
+      DATABASE_URL: ${DATABASE_URL}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-payments.rule=Host(`backend.aivory.id`) && PathPrefix(`/payments`)"
+      - "traefik.http.routers.avry-payments.entrypoints=websecure"
+      - "traefik.http.routers.avry-payments.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-payments.loadbalancer.server.port=8085"
+
+  avry-console:
+    build:
+      context: services/avry-console
+      dockerfile: Dockerfile
+    container_name: avry-console
+    <<: *python-defaults
+    ports:
+      - "8086:8086"
+    environment:
+      - NODE_ENV=production
+      - PORT=8086
+      - NEXT_PUBLIC_API_URL=https://backend.aivory.id
+      - VPS_BRIDGE_URL=http://avry-zeroclaw:8090
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - COMPOSIO_REDIRECT_URL=${COMPOSIO_REDIRECT_URL:-https://dashboard.aivory.id/integrations/callback}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-console.rule=Host(`console.aivory.id`)"
+      - "traefik.http.routers.avry-console.entrypoints=websecure"
+      - "traefik.http.routers.avry-console.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-console.loadbalancer.server.port=8086"
+      - "traefik.http.middlewares.avry-console-buffering.buffering.maxResponseBodyBytes=0"
+      - "traefik.http.routers.avry-console.middlewares=avry-console-buffering"
+
+  avry-workflows:
+    build:
+      context: services/avry-workflows
+      dockerfile: Dockerfile
+    container_name: avry-workflows
+    <<: *python-defaults
+    ports:
+      - "8087:8087"
+    environment:
+      <<: *common-env
+      PORT: 8087
+      DATABASE_URL: ${DATABASE_URL}
+      N8N_AS_CODE_URL: http://avry-n8n-as-code:3500
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-workflows.rule=Host(`backend.aivory.id`) && PathPrefix(`/workflows`)"
+      - "traefik.http.routers.avry-workflows.entrypoints=websecure"
+      - "traefik.http.routers.avry-workflows.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-workflows.loadbalancer.server.port=8087"
+
+  avry-blog:
+    build:
+      context: services/avry-blog
+      dockerfile: Dockerfile
+    container_name: avry-blog
+    <<: *python-defaults
+    ports:
+      - "8088:8088"
+    environment:
+      <<: *common-env
+      PORT: 8088
+      DATABASE_URL: ${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-blog.rule=Host(`backend.aivory.id`) && PathPrefix(`/blog`)"
+      - "traefik.http.routers.avry-blog.entrypoints=websecure"
+      - "traefik.http.routers.avry-blog.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-blog.loadbalancer.server.port=8088"
+
+  avry-careers:
+    build:
+      context: services/avry-careers
+      dockerfile: Dockerfile
+    container_name: avry-careers
+    <<: *python-defaults
+    ports:
+      - "8089:8089"
+    environment:
+      <<: *common-env
+      PORT: 8089
+      DATABASE_URL: ${DATABASE_URL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-careers@aivory.id}
+    volumes:
+      - careers_cv_data:/app/data/cvs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-careers.rule=Host(`backend.aivory.id`) && PathPrefix(`/careers`)"
+      - "traefik.http.routers.avry-careers.entrypoints=websecure"
+      - "traefik.http.routers.avry-careers.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-careers.loadbalancer.server.port=8089"
+
+  # ── Frontend Applications ──────────────────────────────────────────────────
+
+  avry-website:
+    build:
+      context: frontend/frontend-nextjs
+      dockerfile: Dockerfile
+    container_name: avry-website
+    <<: *python-defaults
+    ports:
+      - "9000:9000"
+    environment:
+      - NODE_ENV=production
+      - PORT=9000
+      - NEXT_PUBLIC_API_URL=https://backend.aivory.id
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-website.rule=Host(`aivory.id`) || Host(`www.aivory.id`)"
+      - "traefik.http.routers.avry-website.entrypoints=websecure"
+      - "traefik.http.routers.avry-website.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-website.loadbalancer.server.port=9000"
+
+  avry-user-dashboard:
+    build:
+      context: frontend/avry-user-dashboard
+      dockerfile: Dockerfile
+    container_name: avry-user-dashboard
+    <<: *python-defaults
+    ports:
+      - "9001:9001"
+    environment:
+      - NODE_ENV=production
+      - PORT=9001
+      - NEXT_PUBLIC_API_URL=https://backend.aivory.id
+      - NEXT_PUBLIC_ZEROCLAW_URL=https://api.aivory.id
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-user-dashboard.rule=Host(`dashboard.aivory.id`)"
+      - "traefik.http.routers.avry-user-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.avry-user-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-user-dashboard.loadbalancer.server.port=9001"
+
+  avry-admin-dashboards:
+    build:
+      context: frontend/avry-admin-dashboard
+      dockerfile: Dockerfile
+    container_name: avry-admin-dashboards
+    <<: *python-defaults
+    ports:
+      - "9002:9002"
+    environment:
+      - NODE_ENV=production
+      - PORT=9002
+      - NEXT_PUBLIC_API_URL=https://backend.aivory.id
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9002"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-admin-dashboards.rule=Host(`admin.aivory.id`)"
+      - "traefik.http.routers.avry-admin-dashboards.entrypoints=websecure"
+      - "traefik.http.routers.avry-admin-dashboards.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-admin-dashboards.loadbalancer.server.port=9002"
+
+  # ── Monitoring ─────────────────────────────────────────────────────────────
+
+  avry-prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: avry-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./services/avry-vps-monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-30d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - aivory-network
+
+  avry-grafana:
+    image: grafana/grafana-oss:latest
+    container_name: avry-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL:-https://monitoring.aivory.id}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./services/avry-vps-monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      avry-prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - aivory-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-grafana.rule=Host(`monitoring.aivory.id`)"
+      - "traefik.http.routers.avry-grafana.entrypoints=websecure"
+      - "traefik.http.routers.avry-grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-grafana.loadbalancer.server.port=3000"
+
+volumes:
+  n8n_data:
+  n8n_as_code_drafts:
+  careers_cv_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aivory-network:
+    name: aivory-network
+    external: true

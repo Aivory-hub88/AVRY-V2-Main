@@ -1,55 +1,30 @@
-# ============================================================================
-# Aivory Main Entry Repo — Git Ignore
-# This repo serves as orchestration/entry point. Code lives in individual repos.
-# ============================================================================
+# =============================================================================
+# Aivory Entry Repo — .gitignore
+# =============================================================================
 
-# Environment & Secrets
+# ─── Secrets (never commit) ──────────────────────────────────────────────────
 .env
 .env.local
-.env.*.local
 .env.production
-.env.staging
+*.pem
+*.key
+acme.json
 
-# Node.js
-node_modules/
-.next/
-out/
-dist/
-build/
-*.tsbuildinfo
-next-env.d.ts
-package-lock.json
+# ─── Docker volumes / runtime data ───────────────────────────────────────────
+vps-local/
 
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-*.egg-info/
-htmlcov/
-.coverage
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# ─── OS artifacts ─────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# Docker runtime
-docker-compose.override.yml
+# ─── Editor ───────────────────────────────────────────────────────────────────
+.vscode/
+*.swp
+*.swo
 
-# Kiro workspace
-.kiro/
-
-# Playwright / Testing
-playwright-report/
-test-results/
-
-# Large assets
-*.mp4
-*.zip
+# ─── Node (shouldn't be in root but just in case) ────────────────────────────
+node_modules/
