@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { HomeNavbar } from "@/components/layout/home-navbar"
-import { HomeFooter } from "@/components/layout/home-footer"
+import Navbar from "@/components/home/Navbar";
+import Footer from "@/components/Footer";
 import { getVacancies, type Vacancy } from "@/lib/careers-api"
 
 /**
@@ -189,13 +189,13 @@ export default function CareersPage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: '#050505' }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: '#050505' }}>
+      <Navbar />
       <main className="flex-1 px-6 py-24">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold text-white mb-4">Careers at Aivory</h1>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+          <div className="mb-12 text-center mt-12">
+            <h1 className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90" style={{ fontFamily: "'Manrope', sans-serif" }}>Careers at Aivory</h1>
+            <p className="text-[#c4c9b8] text-lg max-w-2xl mx-auto font-light">
               Join our team and help shape the future of AI readiness. We&apos;re looking for passionate people to build the next generation of intelligent tools.
             </p>
           </div>
@@ -219,7 +219,7 @@ export default function CareersPage() {
           )}
         </div>
       </main>
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }

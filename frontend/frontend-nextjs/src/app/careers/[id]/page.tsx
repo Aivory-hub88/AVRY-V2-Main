@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { HomeNavbar } from "@/components/layout/home-navbar"
-import { HomeFooter } from "@/components/layout/home-footer"
+import Navbar from "@/components/home/Navbar";
+import Footer from "@/components/Footer";
 import { getVacancy, type Vacancy } from "@/lib/careers-api"
 
 /**
@@ -228,8 +228,8 @@ function MetadataBadge({ icon, label }: { icon: React.ReactNode; label: string }
 
 function NotFoundState() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+      <Navbar />
       <main className="flex-1 px-6 py-24">
         <div className="max-w-3xl mx-auto text-center">
           <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.05] flex items-center justify-center">
@@ -243,7 +243,14 @@ function NotFoundState() {
           </p>
           <Link
             href="/careers"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#07D197] text-black font-medium hover:bg-[#07D197]/90 transition-colors"
+            className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+            style={{
+              padding: '0.75rem 1.5rem',
+              fontFamily: "'Manrope', sans-serif",
+              fontWeight: 400,
+              fontSize: '0.75rem',
+              letterSpacing: '0.1em',
+            }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -252,15 +259,15 @@ function NotFoundState() {
           </Link>
         </div>
       </main>
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }
 
 function LoadingState() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+      <Navbar />
       <main className="flex-1 px-6 py-24">
         <div className="max-w-3xl mx-auto animate-pulse">
           <div className="h-4 bg-white/10 rounded w-32 mb-8" />
@@ -279,7 +286,7 @@ function LoadingState() {
           </div>
         </div>
       </main>
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }
@@ -320,8 +327,8 @@ export default function VacancyDetailPage() {
   if (notFound || !vacancy) return <NotFoundState />
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+      <Navbar />
       <main className="flex-1 px-6 py-24">
         <div className="max-w-3xl mx-auto">
           {/* Back link */}
@@ -399,7 +406,14 @@ export default function VacancyDetailPage() {
               </div>
               <Link
                 href={`/careers/${vacancy.id}/apply`}
-                className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-[#07D197] text-black font-semibold hover:bg-[#07D197]/90 transition-colors shadow-lg shadow-[#07D197]/20"
+                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  fontFamily: "'Manrope', sans-serif",
+                  fontWeight: 400,
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.1em',
+                }}
               >
                 Apply Now
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -410,7 +424,7 @@ export default function VacancyDetailPage() {
           </div>
         </div>
       </main>
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }

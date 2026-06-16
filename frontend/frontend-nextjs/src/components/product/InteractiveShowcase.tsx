@@ -8,8 +8,11 @@ const showcaseProducts = [
     id: 'diagnostic',
     step: '01. DISCOVER',
     title: 'Deep Diagnostic',
-    description:
-      'We audit your current operations, constraints, and data accessibility. Rather than offering templates, we map out a customized assessment to establish a realistic readiness baseline before you write code or deploy models.',
+    description: (
+      <>
+        In this stage, Aivory runs a deep diagnostic across your current operations, constraints, and data environment to understand where AI can create the most impact. <span className="font-semibold text-white">Using a high-intelligence deterministic engine</span>, it maps readiness, surfaces execution gaps, and identifies the conditions needed to move forward faster without relying on long traditional consulting cycles.
+      </>
+    ),
     features: ['Operational Gaps Audit', 'Infrastructure Readiness', 'Constraint & Risk Check'],
   },
   {
@@ -49,6 +52,7 @@ const showcaseProducts = [
 const QUESTIONS = [
   { q: 'Define your business goals', a: 'Scale operations without headcount growth.' },
   { q: 'Identify potential risks', a: 'Data privacy compliance, change management.' },
+  { q: 'Assess data infrastructure', a: 'Fragmented databases, manual reporting.' },
 ];
 const DIMS = [
   { label: 'Strategy', val: 80, delay: 0.2 },
@@ -71,15 +75,15 @@ function DiagnosticAnimation() {
     const run = () => {
       setPhase('qa'); setVisibleQ(0); setScoreVal(0); setBarsVisible(false);
       QUESTIONS.forEach((_, i) => t(() => setVisibleQ(i + 1), 0.6 + i * 1.5));
-      t(() => setPhase('thinking'), 3.6);
+      t(() => setPhase('thinking'), 5.1);
       t(() => {
         setPhase('score');
         let v = 0;
         const step = () => { v += 2; setScoreVal(v); if (v < 78) timerRefs.current.push(setTimeout(step, 20)); };
         step();
         timerRefs.current.push(setTimeout(() => setBarsVisible(true), 300));
-      }, 5.5);
-      t(run, 10.0);
+      }, 7.0);
+      t(run, 11.5);
     };
     run();
     return clearAll;
@@ -259,8 +263,9 @@ function ConsoleAnimation() {
   );
 }
 
+// ── 05. Workflow ──
 function WorkflowAnimation() {
-  const [phase, setPhase] = useState<'typing' | 'sent' | 'generating' | 'generated'>('typing');
+  const [phase, setPhase] = useState<'typing' | 'sent' | 'generating' | 'generated' | 'buttons'>('typing');
   const [typedText, setTypedText] = useState('');
   const [dots, setDots] = useState('');
   const timerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -285,7 +290,8 @@ function WorkflowAnimation() {
           t(() => setPhase('sent'), 0.4);
           t(() => setPhase('generating'), 0.8);
           t(() => setPhase('generated'), 2.8);
-          t(run, 10.0);
+          t(() => setPhase('buttons'), 4.0);
+          t(run, 11.0);
         }
       };
       t(() => typeChar(0), 0.5);
@@ -302,11 +308,11 @@ function WorkflowAnimation() {
   }, [phase]);
 
   return (
-    <div className="w-full flex flex-col gap-4 h-full justify-end relative pb-20 p-4 font-light">
-      <div className="flex flex-col gap-6 w-full max-w-[100%] mx-auto mb-4">
+    <div className="w-full flex flex-col gap-4 h-full justify-end relative pb-6 sm:pb-20 p-4 font-light">
+      <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-[100%] mx-auto mb-4">
         {/* User Message */}
         <div className={`flex justify-end transition-all duration-300 ease-out ${phase !== 'typing' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-           <div className="bg-[#2A2A2A] rounded-3xl rounded-tr-md px-5 py-3 text-white/90 text-[14px] max-w-[90%] leading-relaxed shadow-md">
+           <div className="bg-[#2A2A2A] rounded-3xl rounded-tr-md px-4 py-2 sm:px-5 sm:py-3 text-white/90 text-[12px] sm:text-[14px] max-w-[95%] sm:max-w-[90%] leading-relaxed shadow-md">
              {fullText}
            </div>
         </div>
@@ -315,63 +321,74 @@ function WorkflowAnimation() {
         <div className={`flex items-center gap-2.5 transition-all duration-300 ${phase === 'generating' || phase === 'generated' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 hidden'}`}>
            {phase === 'generating' ? (
              <>
-               <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-[#aec99d] animate-spin shrink-0" />
-               <span className="text-white/50 text-[13px] font-medium">Aivory is generating workflow<span className="animate-pulse">{dots}</span></span>
+               <div className="w-4 h-4 rounded-full border-2 border-white/10 border-t-[#c1ccc8] animate-spin shrink-0" />
+               <span className="text-white/50 text-[12px] sm:text-[13px] font-medium">Aivory is generating workflow<span className="animate-pulse">{dots}</span></span>
              </>
            ) : null}
         </div>
 
         {/* Generated Flow */}
-        {phase === 'generated' && (
-          <div className="w-full bg-[#111111] border border-white/5 rounded-2xl p-6 flex flex-col gap-6 relative overflow-hidden shadow-2xl animate-fade-in-up">
-            <div className="text-[10px] text-white uppercase tracking-widest text-center font-light z-10" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>
+        {(phase === 'generated' || phase === 'buttons') && (
+          <div className="w-full bg-[#111111] border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 sm:gap-5 relative overflow-hidden shadow-2xl animate-fade-in-up">
+            <div className="text-[9px] sm:text-[10px] text-white uppercase tracking-widest text-center font-light z-10" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>
               Workflow Generated
             </div>
 
-            <div className="flex items-center justify-between w-full max-w-sm mx-auto z-10 relative">
+            <div className="flex items-center justify-between w-full max-w-[320px] mx-auto z-10 relative">
               {/* Connecting Lines */}
               <div className="absolute top-1/2 left-[15%] right-[15%] h-[1px] bg-white/10 -translate-y-1/2 -z-10" />
-              <div className="absolute top-1/2 left-[15%] right-[50%] h-[1px] bg-[#aec99d] -translate-y-1/2 -z-10 origin-left animate-scale-x" />
-              <div className="absolute top-1/2 left-[50%] right-[15%] h-[1px] bg-[#aec99d] -translate-y-1/2 -z-10 origin-left animate-scale-x" style={{ animationDelay: '0.4s' }} />
+              <div className="absolute top-1/2 left-[15%] right-[50%] h-[1px] bg-[#c1ccc8] -translate-y-1/2 -z-10 origin-left animate-scale-x" />
+              <div className="absolute top-1/2 left-[50%] right-[15%] h-[1px] bg-[#c1ccc8] -translate-y-1/2 -z-10 origin-left animate-scale-x" style={{ animationDelay: '0.4s' }} />
 
               {/* Node 1: Trigger */}
-              <div className="flex flex-col rounded-[16px] border border-white/10 shadow-lg flex-shrink-0 w-[100px] sm:w-[110px] h-[105px] overflow-hidden bg-[#2A2A2A] relative z-10">
-                <div className="h-[32px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]/50">
-                  <span className="text-[9px] text-white/60 uppercase tracking-widest font-medium">Trigger</span>
+              <div className="flex flex-col rounded-[12px] sm:rounded-[14px] border border-white/10 shadow-lg flex-shrink-0 w-[70px] sm:w-[90px] h-[70px] sm:h-[85px] overflow-hidden bg-[#2A2A2A] relative z-10">
+                <div className="h-[24px] sm:h-[28px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]/50">
+                  <span className="text-[7px] sm:text-[8px] text-white/60 uppercase tracking-widest font-medium">Trigger</span>
                 </div>
-                <div className="flex-1 bg-[#aec99d] flex flex-col items-center justify-center gap-1.5">
-                  <img src="/integrations/icons/gmail.svg" alt="Gmail" className="w-5 h-5 drop-shadow-sm" />
-                  <span className="text-xs font-semibold text-[#111111]">Gmail</span>
+                <div className="flex-1 bg-[#c1ccc8] flex flex-col items-center justify-center gap-1.5">
+                  <img src="/integrations/icons/gmail.svg" alt="Gmail" className="w-3.5 h-3.5 sm:w-4 sm:h-4 drop-shadow-sm" />
+                  <span className="text-[9px] sm:text-[11px] font-semibold text-[#111111]">Gmail</span>
                 </div>
               </div>
               
               {/* Node 2: Agent */}
               <div className="relative flex-shrink-0 animate-fade-in-up z-20" style={{ animationDelay: '0.2s' }}>
-                {/* Blinker positioned outside overflow-hidden */}
-                <div className="absolute top-[-4px] right-[-4px] w-3.5 h-3.5 rounded-full bg-white/40 animate-ping z-30" />
-                <div className="absolute top-[-4px] right-[-4px] w-3.5 h-3.5 rounded-full bg-white/60 z-30 border border-[#111]" />
+                <div className="absolute top-[-3px] right-[-3px] w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-white/40 animate-ping z-30" />
+                <div className="absolute top-[-3px] right-[-3px] w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-white/60 z-30 border border-[#111]" />
                 
-                <div className="flex flex-col rounded-[16px] border border-white/10 shadow-lg w-[100px] sm:w-[110px] h-[105px] overflow-hidden bg-[#2A2A2A]">
-                  <div className="h-[32px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]">
-                    <span className="text-[9px] text-white/60 uppercase tracking-widest font-medium">AI Agent</span>
+                <div className="flex flex-col rounded-[12px] sm:rounded-[14px] border border-white/10 shadow-lg w-[70px] sm:w-[90px] h-[70px] sm:h-[85px] overflow-hidden bg-[#2A2A2A]">
+                  <div className="h-[24px] sm:h-[28px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]">
+                    <span className="text-[7px] sm:text-[8px] text-white/60 uppercase tracking-widest font-medium">AI Agent</span>
                   </div>
                   <div className="flex-1 bg-[#111111] flex flex-col items-center justify-center">
-                    <span className="text-xs font-medium text-white/60">Extract</span>
+                    <span className="text-[9px] sm:text-[11px] font-medium text-white/60">Extract</span>
                   </div>
                 </div>
               </div>
 
               {/* Node 3: Action */}
-              <div className="flex flex-col rounded-[16px] border border-white/10 shadow-lg flex-shrink-0 w-[100px] sm:w-[110px] h-[105px] overflow-hidden bg-[#2A2A2A] relative z-10 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
-                <div className="h-[32px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]/50">
-                  <span className="text-[9px] text-white/60 uppercase tracking-widest font-medium">Action</span>
+              <div className="flex flex-col rounded-[12px] sm:rounded-[14px] border border-white/10 shadow-lg flex-shrink-0 w-[70px] sm:w-[90px] h-[70px] sm:h-[85px] overflow-hidden bg-[#2A2A2A] relative z-10 animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+                <div className="h-[24px] sm:h-[28px] flex items-center justify-center bg-[#2A2A2A] border-b border-[#111]/50">
+                  <span className="text-[7px] sm:text-[8px] text-white/60 uppercase tracking-widest font-medium">Action</span>
                 </div>
-                <div className="flex-1 bg-[#aec99d] flex flex-col items-center justify-center gap-1.5">
-                  <img src="/integrations/icons/slack.svg" alt="Slack" className="w-5 h-5 drop-shadow-sm" />
-                  <span className="text-xs font-semibold text-[#111111]">Slack</span>
+                <div className="flex-1 bg-[#c1ccc8] flex flex-col items-center justify-center gap-1.5">
+                  <img src="/integrations/icons/slack.svg" alt="Slack" className="w-3.5 h-3.5 sm:w-4 sm:h-4 drop-shadow-sm" />
+                  <span className="text-[9px] sm:text-[11px] font-semibold text-[#111111]">Slack</span>
                 </div>
               </div>
             </div>
+
+            {/* Buttons sequence */}
+            {(phase === 'buttons' || phase === 'generated') && (
+              <div className={`flex items-center justify-center gap-3 mt-1 opacity-0 ${phase === 'buttons' ? 'animate-fade-in-up opacity-100' : ''}`} style={{ animationFillMode: 'forwards' }}>
+                <button className="bg-transparent border border-white/20 hover:bg-white/10 text-white/80 text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-medium">
+                  Download JSON
+                </button>
+                <button className="bg-[#c1ccc8] hover:bg-[#aab5b1] text-black text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-semibold shadow-[0_0_10px_rgba(193,204,200,0.3)]">
+                  Deploy to n8n
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -537,11 +554,11 @@ function IntroAnimation() {
         if (entry.isIntersecting && step === 0) {
           let timers: NodeJS.Timeout[] = [];
           timers.push(setTimeout(() => setStep(1), 300));
-          timers.push(setTimeout(() => setStep(2), 1000));
-          timers.push(setTimeout(() => setStep(3), 2500));
-          timers.push(setTimeout(() => setStep(4), 4500));
-          timers.push(setTimeout(() => setStep(5), 7000));
-          timers.push(setTimeout(() => setStep(6), 8500));
+          timers.push(setTimeout(() => setStep(2), 800));
+          timers.push(setTimeout(() => setStep(3), 1600));
+          timers.push(setTimeout(() => setStep(4), 2600));
+          timers.push(setTimeout(() => setStep(5), 3800));
+          timers.push(setTimeout(() => setStep(6), 4800));
         }
       },
       { threshold: 0.5 }
@@ -564,9 +581,7 @@ function IntroAnimation() {
     <div ref={containerRef} className="w-full h-full bg-[#151515] border border-white/5 rounded-3xl p-8 relative shadow-2xl flex flex-col justify-center items-center text-center">
       {/* Agent Label */}
       <div className={`transition-all duration-1000 ease-out absolute top-12 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <div className="text-[11px] text-[#c4c9b8] uppercase tracking-[0.25em] font-medium">
-          AIVORY AGENT
-        </div>
+        <img src="/Aivory logo 2026.svg" alt="Aivory Agent" className="h-6 w-auto opacity-80 mx-auto" />
       </div>
 
       {/* Rotating Lines Container */}
@@ -589,14 +604,54 @@ function IntroAnimation() {
 
         {/* Scroll indicator (replaces the text) */}
         <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-1000 ease-out ${step >= 6 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <div className="text-[10px] text-[#c4c9b8] uppercase tracking-widest font-medium mb-3 mt-4">
+          <div className="text-[12px] text-[#c4c9b8] uppercase tracking-widest font-medium mb-3 mt-4">
             SCROLL TO EXPLORE
           </div>
-          <div className="flex flex-col items-center space-y-[-12px]">
-            <svg className="w-5 h-5 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <svg className="w-5 h-5 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.2s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <svg className="w-5 h-5 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.4s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <div className="flex flex-col items-center space-y-[-14px]">
+            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.2s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.4s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BlueprintAnimation() {
+  return (
+    <div className="flex-1 flex flex-col justify-center items-center w-full h-full opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+      <div className="w-full bg-[#111111] border border-white/5 rounded-2xl p-8 relative shadow-lg">
+        <div className="text-[10px] text-white uppercase tracking-widest text-center font-light mb-10 opacity-0 animate-fade-in" style={{ animationDelay: '0.6s', fontFamily: "'Doto', 'Courier New', monospace" }}>
+          System Architecture Pipeline
+        </div>
+        
+        {/* Visual pipeline stages */}
+        <div className="flex justify-between items-center relative w-full px-4 mt-8 opacity-0 animate-fade-in" style={{ animationDelay: '1.2s' }}>
+          <div className="absolute top-[16px] left-[15%] right-[15%] h-[1px] bg-white/10 -z-10" />
+          <div className="absolute top-[16px] left-[15%] right-[15%] h-[2px] bg-[#aec99d] -z-10 origin-left opacity-0 animate-scale-x" style={{ animationDelay: '1.8s' }} />
+          
+          {[
+            { name: 'Ingest', active: true, delay: '1.4s' },
+            { name: 'Process', active: true, delay: '2.0s' },
+            { name: 'Engine', active: true, delay: '2.6s', ping: true },
+            { name: 'Action', active: false, delay: '3.2s' },
+          ].map((node, i) => (
+            <div key={node.name} className="flex flex-col items-center gap-3 opacity-0 animate-fade-in-up relative" style={{ animationDelay: node.delay }}>
+              {node.ping && (
+                <>
+                  <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-[#aec99d] animate-ping opacity-60 z-20" />
+                  <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-[#aec99d] z-20" />
+                </>
+              )}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs relative z-10 ${
+                node.active ? 'bg-[#aec99d] text-black font-medium shadow-[0_0_15px_rgba(174,201,157,0.3)]' : 'bg-[#111111] border border-white/10 text-white/40 font-medium'
+              }`} style={{ fontFamily: "'Manrope', sans-serif" }}>
+                0{i + 1}
+              </div>
+              <span className="text-[10px] text-white/60 font-medium">{node.name}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -674,7 +729,7 @@ export function InteractiveShowcase() {
   }, []);
 
   return (
-    <section id="showcase" className="relative bg-black text-white py-16 md:py-32 border-b border-white/10">
+    <section id="showcase" className="relative bg-black text-white py-16 md:py-32">
       <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-24">
         {/* Sticky Scroll Layout Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 relative">
@@ -734,12 +789,23 @@ export function InteractiveShowcase() {
                     </li>
                   ))}
                 </ul>
+
+                {/* Mobile Inline Visualizer */}
+                <div className="flex lg:hidden w-full aspect-[4/3] sm:aspect-[16/11] bg-[#181818] rounded-3xl mt-10 relative overflow-hidden border border-[#b2cca2]/40 shadow-[0_0_30px_rgba(178,204,162,0.08)]">
+                  <div className="absolute inset-0 p-4 md:p-6 flex flex-col">
+                    {idx === 0 && <div className="flex-1 relative w-full h-full"><DiagnosticAnimation /></div>}
+                    {idx === 1 && <BlueprintAnimation />}
+                    {idx === 2 && <div className="flex-1 w-full h-full relative"><RoadmapAnimation /></div>}
+                    {idx === 3 && <div className="flex-1 w-full h-full relative"><ConsoleAnimation /></div>}
+                    {idx === 4 && <div className="w-full flex flex-col gap-4 h-full justify-center relative"><WorkflowAnimation /></div>}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
           {/* Right Column: Sticky Mockup Visualizer Area */}
-          <div className="lg:col-span-7 lg:sticky lg:top-[12vh] flex items-center justify-center z-20 mx-auto w-full max-w-[850px] aspect-[4/3] lg:aspect-[16/11]">
+          <div className="hidden lg:col-span-7 lg:sticky lg:top-[12vh] lg:flex items-center justify-center z-20 mx-auto w-full max-w-[850px] aspect-[4/3] lg:aspect-[16/11]">
             <div 
               ref={stickyBoxRef}
               className={`w-full h-full bg-[#181818] border transition-all duration-500 rounded-3xl p-6 md:p-8 flex flex-col relative overflow-hidden shadow-2xl ${
@@ -781,40 +847,8 @@ export function InteractiveShowcase() {
                     activeIndex === 1 ? 'opacity-100 pointer-events-auto z-10' : 'opacity-0 pointer-events-none'
                   }`}
                 >
-                  <div key={`blue-${activeIndex === 1 ? 'active' : 'inactive'}`} className="flex-1 flex flex-col justify-center items-center w-full h-full opacity-0 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                    <div className="w-full bg-[#111111] border border-white/5 rounded-2xl p-8 relative shadow-lg">
-                      <div className="text-[10px] text-white uppercase tracking-widest text-center font-light mb-10 opacity-0 animate-fade-in" style={{ animationDelay: '0.6s', fontFamily: "'Doto', 'Courier New', monospace" }}>
-                        System Architecture Pipeline
-                      </div>
-                      
-                      {/* Visual pipeline stages */}
-                      <div className="flex justify-between items-center relative w-full px-4 mt-8 opacity-0 animate-fade-in" style={{ animationDelay: '1.2s' }}>
-                        <div className="absolute top-[16px] left-[15%] right-[15%] h-[1px] bg-white/10 -z-10" />
-                        <div className="absolute top-[16px] left-[15%] right-[15%] h-[2px] bg-[#aec99d] -z-10 origin-left opacity-0 animate-scale-x" style={{ animationDelay: '1.8s' }} />
-                        
-                        {[
-                          { name: 'Ingest', active: true, delay: '1.4s' },
-                          { name: 'Process', active: true, delay: '2.0s' },
-                          { name: 'Engine', active: true, delay: '2.6s', ping: true },
-                          { name: 'Action', active: false, delay: '3.2s' },
-                        ].map((node, i) => (
-                          <div key={node.name} className="flex flex-col items-center gap-3 opacity-0 animate-fade-in-up relative" style={{ animationDelay: node.delay }}>
-                            {node.ping && (
-                              <>
-                                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-[#aec99d] animate-ping opacity-60 z-20" />
-                                <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-[#aec99d] z-20" />
-                              </>
-                            )}
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs relative z-10 ${
-                              node.active ? 'bg-[#aec99d] text-black font-medium shadow-[0_0_15px_rgba(174,201,157,0.3)]' : 'bg-[#111111] border border-white/10 text-white/40 font-medium'
-                            }`} style={{ fontFamily: "'Manrope', sans-serif" }}>
-                              0{i + 1}
-                            </div>
-                            <span className="text-[10px] text-white/60 font-medium">{node.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  <div key={`blue-${activeIndex === 1 ? 'active' : 'inactive'}`} className="flex-1 relative w-full h-full">
+                    {activeIndex === 1 && <BlueprintAnimation />}
                   </div>
                   <div className="text-[10px] text-white/30 text-center uppercase tracking-widest mt-6 pb-6 font-light">
                     * Schematic mapping how databases interface with automation layers.

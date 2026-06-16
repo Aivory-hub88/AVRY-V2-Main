@@ -1,14 +1,12 @@
 node_modules
 .next
 .git
-.gitignore
-.env*.local
-.env
-*.md
-.vscode
-.idea
-coverage
-out
-build
+*.aep
+**/Adobe After Effects Auto-Save/
 .DS_Store
-*.tsbuildinfo
+.env
+.env.local
+.kiro
+public/hero-video/*.aep
+public/hero-video/Adobe After Effects Auto-Save
+public/hero-video/Fills

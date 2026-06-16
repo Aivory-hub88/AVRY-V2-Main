@@ -7,7 +7,7 @@ export async function GET() {
     const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
       next: { revalidate: 7200 },
     });
-
+    
     if (!res.ok) {
       throw new Error(`Failed to fetch exchange rates: ${res.status}`);
     }

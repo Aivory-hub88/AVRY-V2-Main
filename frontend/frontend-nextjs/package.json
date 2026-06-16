@@ -1,11 +1,11 @@
 {
-  "name": "frontend-nextjs",
+  "name": "aivory-landing-site",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 9000",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start -p 9000",
+    "start": "next start -p 3001",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,21 +20,22 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^20",
+    "@types/node": "20.11.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.6",
+    "autoprefixer": "10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.7",
     "fast-check": "^4.8.0",
     "jsdom": "^25.0.1",
+    "postcss": "8.4.49",
     "prettier": "^3.8.3",
-    "tailwindcss": "^4",
-    "typescript": "^5",
+    "tailwindcss": "3.4.15",
+    "typescript": "5.6.3",
     "vitest": "^2.1.1"
   }
 }

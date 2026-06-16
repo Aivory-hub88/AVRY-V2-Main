@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import { HomeNavbar } from "@/components/layout/home-navbar";
-import { HomeFooter } from "@/components/layout/home-footer";
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: 'Cookie Policy — Aivory',
@@ -12,7 +12,7 @@ export default function CookiePolicyPage() {
   return (
     <main className="relative bg-black min-h-screen font-manrope text-white overflow-hidden">
       {/* Sticky navigation bar */}
-      <HomeNavbar />
+      <Navbar />
 
       {/* Hero Header */}
       <section className="relative pt-32 md:pt-48 pb-12 bg-black overflow-hidden">
@@ -147,7 +147,7 @@ export default function CookiePolicyPage() {
         </div>
       </div>
 
-      <HomeFooter />
+      <Footer />
     </main>
   );
 }

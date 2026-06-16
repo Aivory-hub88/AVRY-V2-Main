@@ -1,73 +1,35 @@
-FROM node:20-alpine AS base
+FROM node:18-alpine AS builder
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
 RUN npm ci
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source
 COPY . .
 
-# Public build-time configuration. NEXT_PUBLIC_* values are inlined into the
-# client bundle during `next build`, so they must be provided as build args.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG NEXT_PUBLIC_API_BASE_URL
-ARG NEXT_PUBLIC_BACKEND_URL
-ARG NEXT_PUBLIC_DIAGNOSTICS_URL
-ARG NEXT_PUBLIC_BLUEPRINT_URL
-ARG NEXT_PUBLIC_WORKFLOWS_URL
-ARG NEXT_PUBLIC_PAYMENTS_URL
-ARG NEXT_PUBLIC_ROADMAP_URL
-ARG NEXT_PUBLIC_MIDTRANS_CLIENT_KEY
-ARG NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
-    NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
-    NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL \
-    NEXT_PUBLIC_DIAGNOSTICS_URL=$NEXT_PUBLIC_DIAGNOSTICS_URL \
-    NEXT_PUBLIC_BLUEPRINT_URL=$NEXT_PUBLIC_BLUEPRINT_URL \
-    NEXT_PUBLIC_WORKFLOWS_URL=$NEXT_PUBLIC_WORKFLOWS_URL \
-    NEXT_PUBLIC_PAYMENTS_URL=$NEXT_PUBLIC_PAYMENTS_URL \
-    NEXT_PUBLIC_ROADMAP_URL=$NEXT_PUBLIC_ROADMAP_URL \
-    NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=$NEXT_PUBLIC_MIDTRANS_CLIENT_KEY \
-    NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=$NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION
-
-# Next.js collects completely anonymous telemetry data about general usage.
-ENV NEXT_TELEMETRY_DISABLED=1
-# Force Node to prefer IPv4 — Next.js font loader (undici) defaults to IPv6,
-# which is not routable in the Docker build network and causes font fetch to fail.
-ENV NODE_OPTIONS=--dns-result-order=ipv4first
-
+# Build Next.js
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Production stage
+FROM node:18-alpine AS runner
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy built assets
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 

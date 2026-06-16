@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
-import { HomeNavbar } from "@/components/layout/home-navbar"
-import { HomeFooter } from "@/components/layout/home-footer"
+import Navbar from "@/components/home/Navbar";
+import Footer from "@/components/Footer";
 import { getBlogPosts, BlogPost, BlogPostsResponse } from "@/lib/blog-api"
 
 function formatDate(dateString: string): string {
@@ -192,15 +192,15 @@ export default function BlogPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+      <Navbar />
 
       <main className="flex-1 px-6 py-24">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold text-white mb-3">Blog</h1>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+          <div className="mb-12 text-center mt-12">
+            <h1 className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90" style={{ fontFamily: "'Manrope', sans-serif" }}>Blog</h1>
+            <p className="text-[#c4c9b8] text-lg max-w-2xl mx-auto font-light">
               Insights, updates, and guides on AI readiness and how Aivory can
               transform your business.
             </p>
@@ -214,7 +214,14 @@ export default function BlogPage() {
               <p className="text-red-400 mb-4">{error}</p>
               <button
                 onClick={() => fetchPosts(page)}
-                className="px-6 py-3 bg-[#07D197] text-[#050505] font-semibold rounded-lg hover:bg-[#06B882] transition-colors"
+                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  fontFamily: "'Manrope', sans-serif",
+                  fontWeight: 400,
+                  fontSize: '0.75rem',
+                  letterSpacing: '0.1em',
+                }}
               >
                 Try Again
               </button>
@@ -239,7 +246,7 @@ export default function BlogPage() {
         </div>
       </main>
 
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }

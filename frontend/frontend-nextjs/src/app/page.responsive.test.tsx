@@ -293,10 +293,10 @@ describe('Property 6: Responsive single-column collapse', () => {
       ]);
       expect(banner).not.toBeNull();
       // The banner is the one carrying the legacy black top border + the
-      // "Save $48" copy, distinguishing it from the tier-card columns.
+      // "Save 13%" copy, distinguishing it from the tier-card columns.
       expect(
         within(banner as HTMLElement).getByText(
-          /Save \$48 compare to buying separately/i,
+          /Save 13%/i,
         ),
       ).toBeInTheDocument();
     });
