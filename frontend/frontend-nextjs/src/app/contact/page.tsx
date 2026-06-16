@@ -1,225 +1,192 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import Link from "next/link"
-import { HomeNavbar } from "@/components/layout/home-navbar"
-import { HomeFooter } from "@/components/layout/home-footer"
-import { getServiceUrl } from "@/lib/services"
+import { useState } from 'react';
+import Image from 'next/image';
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
-    name: "",
-    company: "",
-    email: "",
-    message: "",
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+    name: '',
+    company: '',
+    email: '',
+    message: '',
+  });
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // TODO: Implement form submission logic
+    console.log('Form submitted:', formData);
+    setIsSubmitted(true);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-    setSuccess(false)
-
-    try {
-      const response = await fetch(
-        `${getServiceUrl("backend")}/api/v1/contact`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error("Failed to submit contact form")
-      }
-
-      setSuccess(true)
-      setFormData({
-        name: "",
-        company: "",
-        email: "",
-        message: "",
-      })
-
-      // Auto-dismiss success message after 5 seconds
-      setTimeout(() => {
-        setSuccess(false)
-      }, 5000)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "An error occurred"
-      setError(message)
-    } finally {
-      setLoading(false)
-    }
-  }
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: '#050505' }}>
-      <HomeNavbar />
+    <main className="relative bg-black min-h-screen font-manrope text-white overflow-hidden">
+      {/* Sticky navigation bar */}
+      <Navbar />
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="py-20" style={{ background: '#050505' }}>
-          <div className="max-w-3xl mx-auto px-6 text-center">
-            <h1 className="text-5xl font-bold text-white mb-6">Get in Touch</h1>
-            <p className="text-xl text-text-secondary mb-8">
-              Have questions about Aivory? Want to discuss a custom plan? We'd love to hear from you.
-            </p>
+      {/* Hero Header */}
+      <section className="relative pt-32 md:pt-48 pb-12 bg-black overflow-hidden">
+        <div className="relative z-10 px-6 max-w-3xl mx-auto flex flex-col items-start w-full">
+          {/* Eyebrow Logo */}
+          <div className="mb-10">
+            <Image
+              src="/aivory-logo.svg"
+              alt="Aivory Logo"
+              width={90}
+              height={24}
+              className="h-4 w-auto opacity-70"
+            />
           </div>
-        </section>
+          
+          <h1
+            className="text-4xl sm:text-5xl md:text-[56px] font-light text-white mb-12 leading-[1.1] tracking-tight w-full"
+            style={{ fontFamily: "'Manrope', sans-serif" }}
+          >
+            Contact
+          </h1>
+          
+          {/* Divider Line */}
+          <div className="w-full border-b border-white/20"></div>
+        </div>
+      </section>
 
-        {/* Contact Section */}
-        <section className="py-16" style={{ background: '#0a0a0a' }}>
-          <div className="max-w-3xl mx-auto px-6">
-            <div className="rounded-xl border border-white/10 p-8" style={{ background: '#111' }}>
-              {/* Success Message */}
-              {success && (
-                <div className="mb-6 rounded-lg bg-green-500/10 border border-green-500/30 p-4">
-                  <p className="text-sm text-green-300">
-                    ✓ Thank you for your message! We'll get back to you soon.
-                  </p>
-                </div>
-              )}
-
-              {/* Error Message */}
-              {error && (
-                <div className="mb-6 rounded-lg bg-red-500/10 border border-red-500/30 p-4">
-                  <p className="text-sm text-red-300">{error}</p>
-                </div>
-              )}
+      {/* Content */}
+      <div className="bg-black pt-12 pb-32 px-6 md:px-16 lg:px-24 font-manrope">
+        <div className="max-w-3xl mx-auto">
+          
+          {!isSubmitted ? (
+            <div className="w-full bg-[#111111] rounded-xl border border-white/10 p-8 md:p-12 shadow-2xl">
+              <h2 className="text-2xl font-bold tracking-tight mb-3 text-white">
+                Get in Touch
+              </h2>
+              <p className="text-white/60 text-base mb-8 font-light">
+                Have questions about Aivory? Want to discuss a custom plan or partnership? We&apos;d love to hear from you.
+              </p>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Name Field */}
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-white mb-2">
-                    Full Name
+                  <label htmlFor="contact-name" className="block text-sm font-medium mb-2 text-white/80">
+                    Name *
                   </label>
                   <input
                     type="text"
-                    id="name"
+                    id="contact-name"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
+                    placeholder="e.g. John Doe"
                     required
-                    disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-border-subtle text-white placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-mint focus:border-transparent disabled:opacity-50"
-                    placeholder="John Doe"
+                    className="w-full px-4 py-3 bg-black border border-white/20 text-white placeholder-white/30 focus:outline-none focus:border-white transition-colors text-sm font-light"
                   />
                 </div>
 
-                {/* Company Field */}
                 <div>
-                  <label htmlFor="company" className="block text-sm font-medium text-white mb-2">
-                    Company Name
+                  <label htmlFor="contact-company" className="block text-sm font-medium mb-2 text-white/80">
+                    Company *
                   </label>
                   <input
                     type="text"
-                    id="company"
+                    id="contact-company"
                     name="company"
                     value={formData.company}
                     onChange={handleChange}
+                    placeholder="e.g. Acme Corporation"
                     required
-                    disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-border-subtle text-white placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-mint focus:border-transparent disabled:opacity-50"
-                    placeholder="Your Company"
+                    className="w-full px-4 py-3 bg-black border border-white/20 text-white placeholder-white/30 focus:outline-none focus:border-white transition-colors text-sm font-light"
                   />
                 </div>
 
-                {/* Email Field */}
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-white mb-2">
-                    Email Address
+                  <label htmlFor="contact-email" className="block text-sm font-medium mb-2 text-white/80">
+                    Email *
                   </label>
                   <input
                     type="email"
-                    id="email"
+                    id="contact-email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
+                    placeholder="e.g. john@company.com"
                     required
-                    disabled={loading}
-                    className="w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-border-subtle text-white placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-mint focus:border-transparent disabled:opacity-50"
-                    placeholder="john@example.com"
+                    className="w-full px-4 py-3 bg-black border border-white/20 text-white placeholder-white/30 focus:outline-none focus:border-white transition-colors text-sm font-light"
                   />
                 </div>
 
-                {/* Message Field */}
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-white mb-2">
-                    Message
+                  <label htmlFor="contact-message" className="block text-sm font-medium mb-2 text-white/80">
+                    Message *
                   </label>
                   <textarea
-                    id="message"
+                    id="contact-message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
+                    rows={5}
+                    placeholder="How can we help you?"
                     required
-                    disabled={loading}
-                    rows={6}
-                    className="w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-border-subtle text-white placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-brand-mint focus:border-transparent disabled:opacity-50 resize-none"
-                    placeholder="Tell us about your inquiry..."
+                    className="w-full px-4 py-3 bg-black border border-white/20 text-white placeholder-white/30 focus:outline-none focus:border-white transition-colors resize-none text-sm font-light"
                   />
-                  <p className="text-xs text-text-tertiary mt-1">Minimum 10 characters</p>
                 </div>
 
-                {/* Submit Button */}
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 px-6 py-3 bg-brand-mint text-bg-primary font-medium rounded-lg hover:bg-brand-mint/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                <button
+                  type="submit"
+                  className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-black font-semibold hover:bg-black hover:text-white transition-all text-sm border border-white mt-4"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    {loading ? "Sending..." : "Send Message"}
-                  </button>
-                  <Link
-                    href="/"
-                    className="px-6 py-3 bg-white/[0.05] text-white font-medium rounded-lg hover:bg-white/[0.1] transition-colors"
-                  >
-                    Cancel
-                  </Link>
-                </div>
+                    <path d="M7 7l10 10M17 7v10H7" />
+                  </svg>
+                  Send Message
+                </button>
               </form>
-
-              {/* Alternative Contact Info */}
-              <div className="mt-12 pt-8 border-t border-border-subtle">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white mb-2">Email</h3>
-                    <a
-                      href="mailto:contact@aivory.id"
-                      className="text-brand-mint hover:text-brand-mint/80 transition-colors"
-                    >
-                      contact@aivory.id
-                    </a>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white mb-2">Response Time</h3>
-                    <p className="text-text-secondary">
-                      We typically respond within 24 hours
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
-        </section>
-      </main>
+          ) : (
+            <div className="bg-[#111111] rounded-xl border border-white/10 p-12 text-center shadow-2xl">
+              <h3 className="text-2xl font-normal mb-4 text-white">✓ Thank you for your interest!</h3>
+              <p className="text-white/60 text-lg mb-8 font-light">
+                We&apos;ll be in touch soon to discuss your needs.
+              </p>
+              <button
+                onClick={() => setIsSubmitted(false)}
+                className="flex items-center justify-center gap-2 mx-auto px-8 py-3.5 border border-white text-white font-semibold hover:bg-white hover:text-black transition-all text-sm"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="rotate-180"
+                >
+                  <path d="M7 7l10 10M17 7v10H7" />
+                </svg>
+                Return
+              </button>
+            </div>
+          )}
 
-      <HomeFooter />
-    </div>
-  )
+        </div>
+      </div>
+
+      <Footer />
+    </main>
+  );
 }

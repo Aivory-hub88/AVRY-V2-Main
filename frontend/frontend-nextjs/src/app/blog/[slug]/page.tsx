@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { HomeNavbar } from "@/components/layout/home-navbar"
-import { HomeFooter } from "@/components/layout/home-footer"
+import Navbar from "@/components/home/Navbar";
+import Footer from "@/components/Footer";
 import { getBlogPost, BlogPostDetail, BlogContentBlock } from "@/lib/blog-api"
 
 function formatDate(dateString: string): string {
@@ -194,7 +194,14 @@ function NotFoundState() {
       </p>
       <Link
         href="/blog"
-        className="px-6 py-3 bg-[#07D197] text-[#050505] font-semibold rounded-lg hover:bg-[#06B882] transition-colors"
+        className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+        style={{
+          padding: '0.75rem 1.5rem',
+          fontFamily: "'Manrope', sans-serif",
+          fontWeight: 400,
+          fontSize: '0.75rem',
+          letterSpacing: '0.1em',
+        }}
       >
         ← Back to Blog
       </Link>
@@ -236,8 +243,8 @@ export default function BlogPostPage() {
   }, [slug])
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+      <Navbar />
 
       <main className="flex-1 px-6 py-24">
         {loading ? (
@@ -247,7 +254,14 @@ export default function BlogPostPage() {
             <p className="text-red-400 mb-4">{error}</p>
             <Link
               href="/blog"
-              className="px-6 py-3 bg-[#07D197] text-[#050505] font-semibold rounded-lg hover:bg-[#06B882] transition-colors"
+              className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontFamily: "'Manrope', sans-serif",
+                fontWeight: 400,
+                fontSize: '0.75rem',
+                letterSpacing: '0.1em',
+              }}
             >
               ← Back to Blog
             </Link>
@@ -293,7 +307,7 @@ export default function BlogPostPage() {
         ) : null}
       </main>
 
-      <HomeFooter />
+      <Footer />
     </div>
   )
 }

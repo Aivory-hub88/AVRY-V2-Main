@@ -1,0 +1,26 @@
+services:
+  x-aivory-frontend:
+    build: .
+    container_name: x-aivory-frontend
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      # HTTPS router
+      - "traefik.http.routers.x-aivory.rule=Host(`x.aivory.uk`)"
+      - "traefik.http.routers.x-aivory.entrypoints=websecure"
+      - "traefik.http.routers.x-aivory.tls=true"
+      - "traefik.http.routers.x-aivory.tls.certresolver=letsencrypt"
+      - "traefik.http.services.x-aivory.loadbalancer.server.port=3000"
+      # HTTP redirect to HTTPS
+      - "traefik.http.routers.x-aivory-http.rule=Host(`x.aivory.uk`)"
+      - "traefik.http.routers.x-aivory-http.entrypoints=web"
+      - "traefik.http.routers.x-aivory-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+
+networks:
+  traefik-public:
+    external: true

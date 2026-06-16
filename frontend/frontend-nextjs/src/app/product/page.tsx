@@ -1,28 +1,47 @@
-import type { Metadata } from "next";
-import { HomeNavbar } from "@/components/layout/home-navbar";
-import { HomeFooter } from "@/components/layout/home-footer";
-import { ProductHero } from "@/components/layout/product-hero";
-import { InteractiveGridShowcase } from "@/components/product/InteractiveGridShowcase";
-import { InteractiveGrid } from "@/components/product/InteractiveGrid";
-import { ProductCTA } from "@/components/layout/product-cta";
+import type { Metadata } from 'next';
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
+import { HeroSection } from '@/components/product/HeroSection';
+import { InteractiveGridShowcase } from '@/components/product/InteractiveGridShowcase';
+import { InteractiveGrid } from '@/components/product/InteractiveGrid';
+import { TechLabSection } from '@/components/product/TechLabSection';
+import { CTAFooter } from '@/components/product/CTAFooter';
 
 export const metadata: Metadata = {
-  title: "Products — Aivory",
+  title: 'Products — Aivory',
   description:
-    "Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.",
+    'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
 };
 
 export default function ProductPage() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#000" }}>
-      <HomeNavbar />
-      <main className="flex-1">
-        <ProductHero />
-        <InteractiveGridShowcase />
-        <InteractiveGrid />
-        <ProductCTA />
-      </main>
-      <HomeFooter />
-    </div>
+    <main className="relative bg-black min-h-screen">
+      {/* Sticky navigation bar */}
+      <Navbar />
+
+      {/* Hero Header */}
+      <HeroSection
+        title="AI-Powered Business Transformation"
+        subtitle="From diagnostic to deployment — everything you need to integrate AI into your business operations."
+      />
+
+      {/* Grid Showcase (Diagnostic, Blueprint, Roadmap, Console, Workflows) */}
+      <InteractiveGridShowcase />
+
+      {/* Spotlight Hover Utility Grid (Agents, Templates, Connectors, Telemetry) */}
+      <InteractiveGrid />
+
+      {/* Aivory Tech Lab Section */}
+      <TechLabSection />
+
+      {/* Call to Action Conversion Block */}
+      <CTAFooter
+        title="Work directly with Aivory™"
+        primaryCta={{ label: 'Talk to Us', href: '#contact' }}
+      />
+
+      {/* Standard Footer */}
+      <Footer />
+    </main>
   );
 }

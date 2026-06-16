@@ -1,38 +1,49 @@
-import type { Metadata } from "next";
-import { HomeNavbar } from "@/components/layout/home-navbar";
-import { HomeFooter } from "@/components/layout/home-footer";
-import { BrandLogo } from "@/components/layout/brand-logo";
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Aivory",
-  description:
-    "Terms of Service and usage guidelines for Aivory platform.",
+  title: 'Terms of Service — Aivory',
+  description: 'Terms of Service and usage guidelines for Aivory platform.',
 };
 
 export default function TermsPage() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <main className="relative bg-black min-h-screen font-manrope text-white overflow-hidden">
+      {/* Sticky navigation bar */}
+      <Navbar />
 
       {/* Hero Header */}
-      <section className="relative pt-48 pb-12 overflow-hidden">
+      <section className="relative pt-32 md:pt-48 pb-12 bg-black overflow-hidden">
         <div className="relative z-10 px-6 max-w-3xl mx-auto flex flex-col items-start w-full">
+          {/* Eyebrow Logo */}
           <div className="mb-10">
-            <BrandLogo className="h-4 w-auto opacity-70" />
+            <Image
+              src="/aivory-logo.svg"
+              alt="Aivory Logo"
+              width={90}
+              height={24}
+              className="h-4 w-auto opacity-70"
+            />
           </div>
+          
           <h1
             className="text-4xl sm:text-5xl md:text-[56px] font-light text-white mb-12 leading-[1.1] tracking-tight w-full"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             Terms of Service
           </h1>
+          
+          {/* Divider Line */}
           <div className="w-full border-b border-white/20"></div>
         </div>
       </section>
 
       {/* Content */}
-      <main className="flex-1 pt-24 pb-32 px-6 md:px-16 lg:px-24">
+      <div className="bg-black pt-24 pb-32 px-6 md:px-16 lg:px-24 font-manrope">
         <div className="max-w-3xl mx-auto space-y-16 text-white/80 font-light leading-relaxed">
+          
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">The short version</h3>
             <p>
@@ -127,10 +138,11 @@ export default function TermsPage() {
               Aivory is provided &quot;as is.&quot; We&apos;re not liable for indirect, incidental, or consequential damages. Our total liability to you won&apos;t exceed what you paid us in the last 12 months.
             </p>
           </section>
-        </div>
-      </main>
 
-      <HomeFooter />
-    </div>
+        </div>
+      </div>
+
+      <Footer />
+    </main>
   );
 }

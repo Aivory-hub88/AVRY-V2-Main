@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 export interface ScrollAnimationOptions {
-  /** IntersectionObserver threshold (0–1). Default 0.05 */
+  /** IntersectionObserver threshold (0–1). Default 0.15 */
   threshold?: number;
-  /** IntersectionObserver rootMargin. Default '0px 0px 0px 0px' */
+  /** IntersectionObserver rootMargin. Default '0px 0px -50px 0px' */
   rootMargin?: string;
   /** If true, unobserve after first trigger. Default true */
   once?: boolean;

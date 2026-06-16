@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
-import { HomeNavbar } from "@/components/layout/home-navbar";
-import { HomeFooter } from "@/components/layout/home-footer";
-import { PricingSection } from "@/components/layout/pricing-section";
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
+import PricingStepOne from '@/components/home/PricingStepOne';
+import PricingStepTwo from '@/components/home/PricingStepTwo';
+import PricingClientWrapper from './PricingClientWrapper';
 
 export const metadata: Metadata = {
   title: 'Pricing — Aivory',
@@ -10,14 +12,12 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <main className="relative bg-[#050505] min-h-screen text-white font-manrope">
-      <HomeNavbar />
+    <main className="relative bg-[#050505] min-h-screen pt-24 text-white font-manrope">
+      <Navbar />
       
-      <div className="pt-24 pb-12 bg-white text-black">
-         <PricingSection />
-      </div>
+      <PricingClientWrapper />
 
-      <HomeFooter />
+      <Footer />
     </main>
   );
 }

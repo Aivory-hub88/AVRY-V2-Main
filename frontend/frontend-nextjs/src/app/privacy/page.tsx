@@ -1,38 +1,49 @@
-import type { Metadata } from "next";
-import { HomeNavbar } from "@/components/layout/home-navbar";
-import { HomeFooter } from "@/components/layout/home-footer";
-import { BrandLogo } from "@/components/layout/brand-logo";
+import type { Metadata } from 'next';
+import Image from 'next/image';
+import Navbar from '@/components/home/Navbar';
+import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Aivory",
-  description:
-    "Privacy Policy and data usage guidelines for Aivory platform.",
+  title: 'Privacy Policy — Aivory',
+  description: 'Privacy Policy and data usage guidelines for Aivory platform.',
 };
 
 export default function PrivacyPage() {
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "#050505" }}>
-      <HomeNavbar />
+    <main className="relative bg-black min-h-screen font-manrope text-white overflow-hidden">
+      {/* Sticky navigation bar */}
+      <Navbar />
 
       {/* Hero Header */}
-      <section className="relative pt-48 pb-12 overflow-hidden">
+      <section className="relative pt-32 md:pt-48 pb-12 bg-black overflow-hidden">
         <div className="relative z-10 px-6 max-w-3xl mx-auto flex flex-col items-start w-full">
+          {/* Eyebrow Logo */}
           <div className="mb-10">
-            <BrandLogo className="h-4 w-auto opacity-70" />
+            <Image
+              src="/aivory-logo.svg"
+              alt="Aivory Logo"
+              width={90}
+              height={24}
+              className="h-4 w-auto opacity-70"
+            />
           </div>
+          
           <h1
             className="text-4xl sm:text-5xl md:text-[56px] font-light text-white mb-12 leading-[1.1] tracking-tight w-full"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             Privacy Policy
           </h1>
+          
+          {/* Divider Line */}
           <div className="w-full border-b border-white/20"></div>
         </div>
       </section>
 
       {/* Content */}
-      <main className="flex-1 pt-24 pb-32 px-6 md:px-16 lg:px-24">
+      <div className="bg-black pt-24 pb-32 px-6 md:px-16 lg:px-24 font-manrope">
         <div className="max-w-3xl mx-auto space-y-16 text-white/80 font-light leading-relaxed">
+          
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">The short version</h3>
             <p>
@@ -43,23 +54,23 @@ export default function PrivacyPage() {
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">1. What we collect — and why</h3>
             <p>
-              <strong className="text-white">Account information</strong><br />
+              <strong className="text-white">Account information</strong><br/>
               Your name, email, and password when you sign up. We need this to create and manage your account.
             </p>
             <p>
-              <strong className="text-white">Usage data</strong><br />
+              <strong className="text-white">Usage data</strong><br/>
               How you use Aivory — which features you use, how often, where you click. We use this to improve the platform and fix what&apos;s broken.
             </p>
             <p>
-              <strong className="text-white">Content you create</strong><br />
+              <strong className="text-white">Content you create</strong><br/>
               Your assessments, blueprints, workflows, and agent configurations. We store this so you can access and use it. It stays yours.
             </p>
             <p>
-              <strong className="text-white">Payment information</strong><br />
+              <strong className="text-white">Payment information</strong><br/>
               Processed securely through our payment provider. We never see or store your full card details.
             </p>
             <p>
-              <strong className="text-white">Communications</strong><br />
+              <strong className="text-white">Communications</strong><br/>
               If you contact us by email or chat, we keep a record to help us respond and improve our support.
             </p>
           </section>
@@ -67,9 +78,9 @@ export default function PrivacyPage() {
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">2. What we don&apos;t do with your data</h3>
             <p>
-              We don&apos;t sell it. Ever.<br />
-              We don&apos;t share it with advertisers.<br />
-              We don&apos;t use it to train AI models — ours or anyone else&apos;s.<br />
+              We don&apos;t sell it. Ever.<br/>
+              We don&apos;t share it with advertisers.<br/>
+              We don&apos;t use it to train AI models — ours or anyone else&apos;s.<br/>
               We don&apos;t hand it to governments unless legally required, and we&apos;ll tell you when that happens if we legally can.
             </p>
           </section>
@@ -149,14 +160,15 @@ export default function PrivacyPage() {
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">10. Questions?</h3>
             <p>
-              We&apos;re real people and we&apos;re happy to talk.<br />
+              We&apos;re real people and we&apos;re happy to talk.<br/>
               Email: hello@aivory.uk
             </p>
           </section>
-        </div>
-      </main>
 
-      <HomeFooter />
-    </div>
+        </div>
+      </div>
+
+      <Footer />
+    </main>
   );
 }

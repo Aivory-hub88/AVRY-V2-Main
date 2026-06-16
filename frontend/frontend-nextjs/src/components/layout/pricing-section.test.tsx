@@ -11,7 +11,7 @@
  *   truth (`@/lib/pricing`) rather than hardcoded, so this is an ANTI-DRIFT
  *   assertion: if a literal is ever reintroduced into the component, or the
  *   catalog price changes, this test fails.
- * - Req 13.1 / 12.2: the legacy marketing copy `Save $48 compare to buying
+ * - Req 13.1 / 12.2: the legacy marketing copy `Save 13% compare to buying
  *   separately` is rendered verbatim in the legacy accent hue `#00e59e`.
  * - Req 5.3: the section renders on a white background.
  * - Req 6.2: the tier grid collapses to one column (`grid-cols-1
@@ -78,17 +78,17 @@ describe('PricingSection', () => {
     });
   });
 
-  describe('Save $48 copy + accent hue (Req 13.1, 12.2)', () => {
-    it('renders the legacy "Save $48" marketing copy verbatim', () => {
+  describe('Save 13% copy + accent hue (Req 13.1, 12.2)', () => {
+    it('renders the legacy "Save 13%" marketing copy verbatim', () => {
       render(<PricingSection />);
       expect(
-        screen.getByText('Save $48 compare to buying separately')
+        screen.getByText('Save 13% compare to buying separately')
       ).toBeInTheDocument();
     });
 
-    it('renders the "Save $48" copy in the legacy accent hue #00e59e', () => {
+    it('renders the "Save 13%" copy in the legacy accent hue #00e59e', () => {
       render(<PricingSection />);
-      const saveEl = screen.getByText('Save $48 compare to buying separately');
+      const saveEl = screen.getByText('Save 13% compare to buying separately');
       expect(saveEl).toHaveStyle({ color: '#00e59e' });
     });
   });
