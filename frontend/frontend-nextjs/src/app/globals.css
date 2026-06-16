@@ -1,0 +1,725 @@
+@import "./tailwind.css";
+
+/* =========================================================================
+ * TAILWIND LAYER ORGANIZATION
+ * Properly organize CSS using @layer to fix Tailwind v4 specificity issues
+ * ========================================================================= */
+
+@import "./tailwind.css";
+
+/* =========================================================================
+ * TAILWIND LAYER ORGANIZATION
+ * Properly organize CSS using @layer to fix Tailwind v4 specificity issues
+ * ========================================================================= */
+
+@layer base {
+  /* Base resets and global element styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-inter-tight);
+    font-weight: var(--weight-regular);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Global Link Styles */
+  a,
+  a:link,
+  a:visited {
+    color: #00e59e;
+    text-decoration: underline;
+  }
+
+  a:hover {
+    color: #00e59e;
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+
+  /* Accessibility - Focus Indicators */
+  *:focus {
+    outline: none;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--brand-mint);
+    outline-offset: 2px;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    box-shadow: 0 0 0 3px rgba(10, 232, 175, 0.2);
+  }
+
+  /* Accessibility - Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Skip Navigation Link */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--brand-mint);
+    color: var(--bg-primary);
+    padding: var(--space-2) var(--space-4);
+    text-decoration: none;
+    font-weight: var(--weight-semibold);
+    z-index: 100;
+    border-radius: var(--radius-md);
+  }
+
+  .skip-link:focus {
+    top: var(--space-2);
+  }
+}
+
+@layer components {
+  /* ---------------------------------------------------------------------------
+   * Legacy `.score-columns` results layout (Free Diagnostic results card)
+   * Ported from legacy `index_embedded.html` for capture fidelity.
+   *
+   * Two-column presentation:
+   *   - Column 1 (`.score-badge-col`): the readiness badge      (Req 11.3)
+   *   - Column 2: the score details                              (Req 11.3)
+   *
+   * Responsive collapse: at viewport width <= 768px the layout
+   * collapses to a single column.                                (Req 11.4)
+   * ------------------------------------------------------------------------- */
+  .score-columns {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  /* Column 1: readiness badge */
+  .score-badge-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  /* Responsive collapse to a single column at <= 768px */
+  @media (max-width: 768px) {
+    .score-columns {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+      text-align: center;
+    }
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Hero Section Styles
+   * ---------------------------------------------------------------------------
+   */
+
+  /* Hero container - centered layout matching live site */
+  .hero {
+    text-align: center;
+    padding: 6rem 2rem;
+    background: #030408;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  /* Ensure hero content is above canvas */
+  .hero h1,
+  .hero h2,
+  .hero p,
+  .hero .cta-group {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* LED Hero Background Canvas */
+  #led-hero-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.2;
+  }
+
+  /* Hero Tagline - Elevated */
+  .hero-tagline {
+    font-size: 2.5rem;
+    font-weight: 300;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    color: #0ae8af;
+    margin-bottom: 1.25rem;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+  }
+
+  /* Hero Title */
+  .hero-title {
+    font-size: 1.9375rem;
+    margin-bottom: 1.25rem;
+    font-weight: 300;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+    letter-spacing: -0.02em;
+    color: white;
+    line-height: 1.15;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  /* Typewriter cursor */
+  .typewriter-cursor {
+    color: #0ae8af;
+    font-weight: 300;
+    animation: none;
+    display: inline-block;
+    margin-left: 2px;
+  }
+
+  /* Hero Subline */
+  .hero-subline {
+    font-size: 0.7875rem;
+    margin-bottom: 2.5rem;
+    color: rgba(255, 255, 255, 0.75);
+    font-weight: 300;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+    line-height: 1.6;
+    max-width: 600px;
+  }
+
+  /* Hero CTA Group */
+  .hero-cta-group {
+    display: flex;
+    flex-direction: row;
+    gap: 0.875rem;
+    justify-content: flex-start;
+    align-items: center;
+    margin-bottom: 3rem;
+  }
+
+  .hero-cta-group .cta-button.primary {
+    width: auto;
+  }
+
+  .hero-cta-group .secondary-button {
+    width: auto;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * Features Section Styles
+   * ---------------------------------------------------------------------------
+   */
+
+  /* Container with centered max-width for all sections */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  /* Action Cards Container */
+  .action-cards-section {
+    padding: 3rem 2rem;
+  }
+
+  .action-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  /* Action Card */
+  .action-card {
+    background: rgba(255, 255, 255, 0.04);
+    padding: 2rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.25s ease;
+    text-align: center;
+  }
+
+  .action-card:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-2px);
+  }
+
+  .action-card h3 {
+    font-size: 1.5rem;
+    color: white;
+    margin-bottom: 1rem;
+    font-weight: 300;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+  }
+
+  .action-card p {
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 1.5rem;
+    font-weight: 300;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+  }
+
+  /* Scroll Reveal Animation */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  .reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+  }
+
+  /* ---------------------------------------------------------------------------
+   * GSAP Stacking Cards — exact port from live-frontend-repo/index.html
+   * ---------------------------------------------------------------------------
+   */
+
+  .gsap-card-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-bottom: 60px;
+    margin-top: 80px;
+    isolation: isolate;
+  }
+
+  .gsap-card {
+    position: sticky;
+    top: 12vh;
+    border-radius: 32px;
+    min-height: 520px;
+    margin-bottom: 80px;
+    overflow: hidden;
+    will-change: transform;
+    transform-origin: center top;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.6);
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    background: linear-gradient(135deg, #15171c 0%, #05070b 100%);
+  }
+
+  .gsap-card.animate {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .gsap-card-text-area {
+    padding: 64px 48px 64px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .gsap-card-visual-area {
+    padding: 48px 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .gsap-card .fc-step-v {
+    display: inline-block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #0ae8af;
+    margin-bottom: 20px;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+  }
+
+  .gsap-card .fc-title-v {
+    font-size: 44px;
+    font-weight: 300;
+    color: #fff;
+    margin-bottom: 24px;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+    line-height: 1.15;
+    text-align: left;
+    width: 100%;
+  }
+
+  .gsap-card .fc-desc-v {
+    font-size: 17px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.7;
+    font-family: var(--font-inter-tight), 'Inter Tight', sans-serif;
+    text-align: left;
+    width: 100%;
+  }
+
+  @media (max-width: 1024px) {
+    .gsap-card {
+      grid-template-columns: 1fr;
+      min-height: auto;
+      border-radius: 24px;
+      top: 15vh;
+    }
+    .gsap-card-text-area {
+      padding: 40px 32px 24px;
+      align-items: center;
+      text-align: center;
+    }
+    .gsap-card .fc-title-v,
+    .gsap-card .fc-desc-v {
+      text-align: center;
+    }
+    .gsap-card-visual-area {
+      padding: 24px 32px 40px;
+      min-height: 200px;
+    }
+  }
+
+  /* SVG dark-mode inversion for gsap-card */
+  .gsap-card svg :not(text)[fill="#fff"],
+  .gsap-card svg :not(text)[fill="#FFFFFF"] { 
+    fill: rgba(255,255,255,0.08); 
+  }
+  .gsap-card svg :not(text)[fill="#ddd"],
+  .gsap-card svg :not(text)[fill="#bbb"] { 
+    fill: rgba(255,255,255,0.15); 
+  }
+  .gsap-card svg [stroke="#222"],
+  .gsap-card svg [stroke="#111"],
+  .gsap-card svg [stroke="#333"],
+  .gsap-card svg [stroke="#DDD"],
+  .gsap-card svg [stroke="#CCC"],
+  .gsap-card svg [stroke="#ccc"],
+  .gsap-card svg [stroke="#E8E8E8"] { 
+    stroke: rgba(255,255,255,0.15); 
+  }
+  .gsap-card svg path[stroke]:not([stroke="#0ae8af"]) { 
+    stroke: rgba(255,255,255,0.15); 
+  }
+  .gsap-card svg text:not(.fc-blueprint-label) { 
+    fill: rgba(255,255,255,0.7); 
+  }
+  .gsap-card svg .fc-blueprint-label { 
+    fill: rgba(255,255,255,0.9); 
+  }
+
+  /* Exempt DiagramAccelerate from dark mode inversion */
+  .gsap-card .diagram-accelerate svg [stroke="#111"] {
+    stroke: rgba(255,255,255,0.7) !important;
+  }
+  .gsap-card .diagram-accelerate svg path[stroke] {
+    stroke: rgba(255,255,255,0.7) !important;
+  }
+  .gsap-card .diagram-accelerate [style*="backgroundColor: rgba"] {
+    background: rgba(255,255,255,0.05) !important;
+  }
+  .gsap-card .diagram-accelerate [style*="border: 1px solid rgba"] {
+    border-color: rgba(255,255,255,0.2) !important;
+  }
+  .gsap-card .diagram-accelerate [style*="color: rgba"] {
+    color: rgba(255,255,255,0.6) !important;
+  }
+
+  /* Style attribute overrides for SVG containers in dark mode */
+  .gsap-card [style*="background:#fff"],
+  .gsap-card [style*="background: #fff"],
+  .gsap-card [style*="background:#FFFFFF"],
+  .gsap-card [style*="background: #FFFFFF"] { 
+    background: rgba(255,255,255,0.06) !important; 
+  }
+
+  .gsap-card [style*="border:1px solid"] { 
+    border-color: rgba(255,255,255,0.12) !important; 
+  }
+
+  .gsap-card [style*="color:#333"],
+  .gsap-card [style*="color:#555"] { 
+    color: rgba(255,255,255,0.6) !important; 
+  }
+
+  @keyframes agentPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(10, 232, 175, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(10, 232, 175, 0); }
+  }
+  .agent-hub {
+    animation: agentPulse 2.5s ease-in-out infinite;
+  }
+
+  @keyframes wfTypeText {
+    0%, 8% { width: 0; }
+    42%, 86% { width: 23ch; }
+    87%, 100% { width: 0; }
+  }
+  @keyframes wfTypeCursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+  @keyframes wfNodeLoop1 {
+    0%, 42%, 100% { opacity: 0; transform: translateY(6px); }
+    50%, 84% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 0; transform: translateY(0); }
+  }
+  @keyframes wfNodeLoop2 {
+    0%, 46%, 100% { opacity: 0; transform: translateY(6px); }
+    54%, 84% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 0; transform: translateY(0); }
+  }
+  @keyframes wfNodeLoop3 {
+    0%, 50%, 100% { opacity: 0; transform: translateY(6px); }
+    58%, 84% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 0; transform: translateY(0); }
+  }
+  @keyframes wfNodeLoop4 {
+    0%, 54%, 100% { opacity: 0; transform: translateY(6px); }
+    62%, 84% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 0; transform: translateY(0); }
+  }
+  @keyframes wfArrowFade {
+    0%, 41% { opacity: 0; }
+    42%, 86% { opacity: 1; }
+    87%, 100% { opacity: 0; }
+  }
+  .wf-prompt-text {
+    display: inline-block;
+    width: 0;
+    max-width: 23ch;
+    overflow: hidden;
+    white-space: nowrap;
+    animation: wfTypeText 6.5s steps(23, end) infinite;
+  }
+  .wf-node {
+    opacity: 0;
+    transform: translateY(6px);
+    animation-duration: 6.5s;
+    animation-iteration-count: infinite;
+    animation-timing-function: ease;
+  }
+  .wf-node:nth-child(1) { animation-name: wfNodeLoop1; }
+  .wf-node:nth-child(2) { animation-name: wfNodeLoop2; }
+  .wf-node:nth-child(3) { animation-name: wfNodeLoop3; }
+  .wf-node:nth-child(4) { animation-name: wfNodeLoop4; }
+}
+
+
+/* ===========================================================================
+ * NEW UI/UX — Animations & Utilities from team update (Midtrans parity)
+ * =========================================================================== */
+
+/* ─── Scroll Animation (IntersectionObserver-based) ─── */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(80px);
+  transition: opacity 1000ms cubic-bezier(0.16, 1, 0.3, 1), transform 1000ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ─── Background Grid Pattern ─── */
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* ─── Spotlight Card (cursor-follow radial gradient) ─── */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(300px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
+      rgba(111, 142, 91, 0.15),
+      transparent 40%);
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+/* ─── Spotlight Section (pricing sections particle effect) ─── */
+.spotlight-section {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='20' cy='30' r='1.5' fill='black' opacity='0.4'/%3E%3Ccircle cx='80' cy='15' r='1' fill='black' opacity='0.25'/%3E%3Ccircle cx='150' cy='40' r='2' fill='black' opacity='0.5'/%3E%3Ccircle cx='45' cy='90' r='1.5' fill='black' opacity='0.3'/%3E%3Ccircle cx='110' cy='80' r='1' fill='black' opacity='0.2'/%3E%3Ccircle cx='180' cy='110' r='2' fill='black' opacity='0.4'/%3E%3Ccircle cx='30' cy='160' r='1.5' fill='black' opacity='0.3'/%3E%3Ccircle cx='90' cy='140' r='1' fill='black' opacity='0.25'/%3E%3Ccircle cx='160' cy='180' r='2' fill='black' opacity='0.5'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  animation: particle-wavy 20s linear infinite;
+  mask-image: radial-gradient(600px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), black, transparent 50%);
+  -webkit-mask-image: radial-gradient(600px circle at var(--mouse-x, 0px) var(--mouse-y, 0px), black, transparent 50%);
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  transition: opacity 0.5s ease;
+  opacity: 0;
+}
+
+.spotlight-section:hover::after {
+  opacity: 1;
+}
+
+@keyframes particle-wavy {
+  0% { background-position: 0px 0px; }
+  25% { background-position: -50px 15px; }
+  50% { background-position: -100px 0px; }
+  75% { background-position: -150px -15px; }
+  100% { background-position: -200px 0px; }
+}
+
+/* ─── Fade / Slide Animations ─── */
+@keyframes fade-in-up {
+  0% { opacity: 0; transform: translateY(15px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes scale-x {
+  0% { transform: translateY(-50%) scaleX(0); }
+  100% { transform: translateY(-50%) scaleX(1); }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-scale-x {
+  animation: scale-x 0.6s ease-out forwards;
+}
+
+.animate-slide-up-1 {
+  animation: slideUpFade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  animation-delay: 0s;
+}
+
+.animate-slide-up-2 {
+  animation: slideUpFade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  animation-delay: 0.4s;
+}
+
+.animate-slide-up-3 {
+  animation: slideUpFade 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  animation-delay: 0.8s;
+}
+
+.animate-gentle-bounce {
+  animation: gentle-bounce 3s ease-in-out infinite;
+}
+
+/* ─── Stats Section Laser Animations ─── */
+@keyframes laserMoveRight {
+  0% { left: -120px; opacity: 0; }
+  5% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+@keyframes laserMoveLeft {
+  0% { right: -120px; opacity: 0; }
+  5% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { right: 100%; opacity: 0; }
+}
+
+.animate-laser-right {
+  animation: laserMoveRight 4s ease-in-out infinite;
+}
+
+.animate-laser-left {
+  animation: laserMoveLeft 4s ease-in-out infinite 2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-laser-right,
+  .animate-laser-left,
+  .animate-gentle-bounce,
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-scale-x {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

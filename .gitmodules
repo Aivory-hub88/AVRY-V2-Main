@@ -1,9 +1,6 @@
 [submodule "backend/avry-backend"]
 	path = backend/avry-backend
 	url = https://github.com/ClementHansel/avry-backend.git
-[submodule "frontend/frontend-nextjs"]
-	path = frontend/frontend-nextjs
-	url = https://github.com/ClementHansel/avry-website.git
 [submodule "frontend/avry-user-dashboard"]
 	path = frontend/avry-user-dashboard
 	url = https://github.com/ClementHansel/avry-user-dashboard.git
