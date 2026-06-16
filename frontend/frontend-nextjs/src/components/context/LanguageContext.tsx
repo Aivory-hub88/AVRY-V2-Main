@@ -39,8 +39,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (language === 'en') {
       return `$${usdPrice}`;
     } else {
-      // Convert to IDR
-      const idrValue = usdPrice * exchangeRate;
+      // Convert to IDR with 5% margin
+      const idrValue = usdPrice * (exchangeRate * 1.05);
       
       // Format IDR nicely
       if (idrValue >= 1000000) {
