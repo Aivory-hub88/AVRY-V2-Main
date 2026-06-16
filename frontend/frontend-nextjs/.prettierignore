@@ -1,0 +1,10 @@
+.next
+node_modules
+out
+build
+dist
+.git
+.gitignore
+README.md
+package-lock.json
+package.json
