@@ -210,7 +210,10 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
               {/* Features */}
               <ul className="mt-14 space-y-2 text-[15px] md:text-[16px] font-medium leading-[1.35] text-[#494949]">
                 {plan.features.map((f) => (
-                  <li key={f}>• {f}</li>
+                  <li key={f} className="flex gap-2">
+                    <span className="shrink-0">•</span>
+                    <span>{f}</span>
+                  </li>
                 ))}
               </ul>
               </div>
