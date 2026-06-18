@@ -627,7 +627,7 @@ export default function FreeDiagnosticPage() {
 
                     <div style={{ marginTop: 'auto' }}>
                       <div style={{ fontSize: 20, fontWeight: 500, color: '#111', marginBottom: 20 }}>© 2026 Aivory. All rights reserved.</div>
-                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.id</div>
+                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
                     </div>
                   </div>
                 </div>
@@ -684,7 +684,7 @@ export default function FreeDiagnosticPage() {
                           <img src="/Aivory logo for diagnostic card.svg" alt="Aivory" style={{ height: '32px', width: 'auto', display: 'block' }} />
                         </div>
                       </div>
-                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.id</div>
+                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
                     </div>
                   </div>
                 </div>
