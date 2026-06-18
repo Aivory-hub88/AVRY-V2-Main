@@ -536,7 +536,7 @@ export default function FreeDiagnosticPage() {
                     <div>
                       {/* Logo placeholder */}
                       <div style={{ height: 60, width: 290, marginBottom: 36, display: 'flex', alignItems: 'center' }}>
-                        <span style={{ fontSize: 36, fontWeight: 700, letterSpacing: '-0.03em' }}>Aivory</span>
+                        <img src="/Aivory logo for diagnostic card.svg" alt="Aivory" style={{ height: '36px', width: 'auto', display: 'block' }} />
                       </div>
                       <h1 style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: 30, color: '#111' }}>AI Readiness<br />Quick Diagnostic</h1>
 
@@ -679,9 +679,9 @@ export default function FreeDiagnosticPage() {
                     <div style={{ marginTop: 'auto' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
                         <div style={{ fontSize: 20, fontWeight: 500, color: '#111' }}>© 2026 Aivory. All rights reserved.</div>
-                        <div style={{ textAlign: 'right' }}>
+                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                           <div style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 12 }}>Diagnose by</div>
-                          <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.03em' }}>Aivory</span>
+                          <img src="/Aivory logo for diagnostic card.svg" alt="Aivory" style={{ height: '32px', width: 'auto', display: 'block' }} />
                         </div>
                       </div>
                       <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.id</div>
