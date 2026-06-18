@@ -559,7 +559,7 @@ export default function FreeDiagnosticPage() {
                               </g>
                               <circle cx="100" cy="100" r="68" fill="#111111" />
                             </svg>
-                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', color: '#ffffff' }}>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}>
                               <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, marginBottom: -2 }}>score</div>
                               <div style={{ fontFamily: "'Doto', monospace", fontSize: 50, fontWeight: 700, lineHeight: 1 }}>{score}</div>
                             </div>
