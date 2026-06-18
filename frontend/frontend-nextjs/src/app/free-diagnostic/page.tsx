@@ -558,9 +558,9 @@ export default function FreeDiagnosticPage() {
                               </g>
                               <circle cx="100" cy="100" r="68" fill="#111111" />
                             </svg>
-                            <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}>
-                              <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, marginBottom: -2 }}>score</div>
-                              <div style={{ fontFamily: "'Doto', monospace", fontSize: 50, fontWeight: 700, lineHeight: 1 }}>{score}</div>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px' }}>
+                              <div style={{ position: 'absolute', top: '44px', width: '100%', textAlign: 'center', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, color: '#ffffff' }}>score</div>
+                              <div style={{ position: 'absolute', top: '64px', width: '100%', textAlign: 'center', fontFamily: "'Doto', monospace", fontSize: 50, fontWeight: 700, lineHeight: 1, color: '#ffffff' }}>{score}</div>
                             </div>
                           </div>
                           <div>
@@ -579,9 +579,9 @@ export default function FreeDiagnosticPage() {
                                   <div style={{ height: 6, background: isActive ? '#ff5757' : '#111111', marginBottom: 10, borderRadius: 3 }} />
                                   <div style={{ fontSize: 15, fontWeight: isActive ? 700 : 500, color: '#111' }}>{stage}</div>
                                   {isActive ? (
-                                    <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontSize: 12, fontStyle: 'italic', padding: '3px 8px', borderRadius: 6, marginTop: 5 }}>You are here</div>
+                                    <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontSize: 12, fontStyle: 'italic', padding: '0 8px', height: '24px', lineHeight: '24px', borderRadius: 6, marginTop: 5 }}>You are here</div>
                                   ) : (
-                                    <div style={{ height: 24 }} />
+                                    <div style={{ height: 29 }} />
                                   )}
                                 </div>
                               );
