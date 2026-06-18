@@ -399,20 +399,11 @@ export default function FreeDiagnosticPage() {
   const previewHeight = 1350 * PREVIEW_SCALE;
 
   return (
-    <>
-      {/* Google Fonts for Manrope + Doto */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Doto:wght@400;600;700;800&family=Manrope:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet"
-      />
+    <div className={`diagnostic-app ${step === 'results' ? 'results-mode' : ''}`}>
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
-
+      
       {/* Close button */}
       <a href="/" className="close-diagnostic-btn" title="Close Diagnostic" aria-label="Close Diagnostic">✕</a>
-
-      <div className={`diagnostic-app ${step === 'results' ? 'results-mode' : ''}`}>
         {/* ===== PROFILE STEP ===== */}
         {step === 'profile' && (
           <>
@@ -755,7 +746,6 @@ export default function FreeDiagnosticPage() {
           </>
         )}
       </div>
-    </>
   );
 }
 
