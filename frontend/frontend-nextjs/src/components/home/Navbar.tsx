@@ -17,9 +17,9 @@ export default function Navbar() {
         {/* Left: Aivory logo */}
         <Link href="/" className="flex items-center">
           <Image
-            src="/aivory-logo.svg"
+            src="/Aivory_logo_2_2026.svg"
             alt="Aivory Logo"
-            width={90}
+            width={140}
             height={30}
             className="h-[30px] w-auto object-contain"
             priority
@@ -129,9 +129,9 @@ export default function Navbar() {
         <div className="flex justify-between items-center px-4 py-6">
           <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
             <Image
-              src="/aivory-logo.svg"
+              src="/Aivory_logo_2_2026.svg"
               alt="Aivory Logo"
-              width={90}
+              width={140}
               height={30}
               className="h-[30px] w-auto object-contain"
             />
