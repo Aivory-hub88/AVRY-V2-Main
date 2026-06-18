@@ -310,9 +310,10 @@ export default function FreeDiagnosticPage() {
 
         // Clone and render at full size
         const clone = node.cloneNode(true) as HTMLElement;
+        clone.id = 'html2canvas-clone';
         clone.style.position = 'fixed';
-        clone.style.left = '0px';
-        clone.style.top = '0px';
+        clone.style.left = '-9999px';
+        clone.style.top = '-9999px';
         clone.style.width = '1080px';
         clone.style.height = '1350px';
         clone.style.overflow = 'hidden';
@@ -321,26 +322,20 @@ export default function FreeDiagnosticPage() {
         clone.style.background = '#ffffff';
         clone.style.zIndex = '-9999';
         clone.style.pointerEvents = 'none';
-        clone.style.visibility = 'hidden';
         document.body.appendChild(clone);
 
         try {
+          await document.fonts.ready;
           const canvas = await html2canvas(clone, {
-            scale: 1,
+            scale: 2,
             width: 1080,
             height: 1350,
             useCORS: true,
             allowTaint: true,
             backgroundColor: '#ffffff',
             logging: false,
-            scrollX: 0,
-            scrollY: 0,
             windowWidth: 1080,
-            windowHeight: 1350,
-            onclone: (clonedDoc) => {
-              const el = clonedDoc.querySelector('[style*="visibility: hidden"]') as HTMLElement;
-              if (el) el.style.visibility = 'visible';
-            }
+            windowHeight: 1350
           });
 
           const link = document.createElement('a');
@@ -536,7 +531,7 @@ export default function FreeDiagnosticPage() {
                     <div>
                       {/* Logo placeholder */}
                       <div style={{ height: 60, width: 290, marginBottom: 36, display: 'flex', alignItems: 'center' }}>
-                        <img src="/Aivory logo for diagnostic card.svg" alt="Aivory" style={{ height: '36px', width: 'auto', display: 'block' }} />
+                        <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAzODIuNiA3OS40Ij4KICA8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMzAuNC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogMi4xLjQgQnVpbGQgMjI2KSAgLS0+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5zdDAgewogICAgICAgIGZpbGw6ICM1YjViNWI7CiAgICAgIH0KCiAgICAgIC5zdDEgewogICAgICAgIGZpbGw6ICM5Y2I3N2U7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMDQuOCw2NS40VjIwLjdoOC45djQ0LjdoLTguOVoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTgyLjIsMjAuNWwtMTkuNiwzMi42Yy01LjksOS44LTkuOCwxMi4xLTI1LDEyLjFoLTE3LjNWMjAuNWg4Ljl2MzkuMmMxMy4zLDAsMTcuNy42LDI2LjUtMTMuNGwxNS4zLTI1LjhzMTEuMSwwLDExLjEsMFoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMjQwLjQsNDNjMCwxMi43LTQuOCwyMi44LTMwLjIsMjIuOGgtMS4zYy0yNS4yLDAtMzAuMi0xMC4xLTMwLjItMjIuOHM0LjgtMjIuOCwzMC4yLTIyLjhoMS4zYzI1LjIsMCwzMC4yLDEwLjEsMzAuMiwyMi44Wk0yMzAuMSw0M2MwLTE2LjMtOC45LTE3LjItMTgtMTcuMmgtNC42Yy05LjEsMC0xOCwxLTE4LDE3LjJzOS4xLDE3LjcsMTgsMTcuN2g0LjZjOS4yLDAsMTgtMS40LDE4LTE3LjdaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTMwMC44LDY1LjRoLTUuNmMtNC41LDAtOC45LTIuNi0xNC42LTguOGwtMy0zLjNoLTI0LjJ2MTIuMWgtOS40VjIwLjdoMzYuMWMxNC40LDAsMTcuOSw1LjYsMTcuNiwxNi40LS4xLDUuNi0xLjYsMTIuOC0xMC41LDE1LjNsMTMuNywxM2gwWk0yODkuMiwzNy4zYzAtNi45LTEuMy0xMS05LjctMTFoLTI2LjF2MjAuM2gyNi4xYzQuNiwwLDkuNy0xLjQsOS43LTkuNFoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMzUwLjEsMjAuNWwtMjIuOSwyOC43djE2aC04Ljh2LTE1LjdsLTIzLjQtMjloMTAuMWwxNy45LDIyLjQsMTctMjIuNGgxMC4xWiIvPgogIDxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0zNi4xLDY1LjVsMTkuOC0zMi45YzUuOS0xMCwxMC0xMi4zLDI1LjEtMTIuM2gxNy41djQ1LjJoLTkuMVYyOC4zYy0xNi43LDAtMjAuMS0xLjktMjguMSwxMS4xbC0xNS40LDI2LjFoLTkuOC4xWiIvPgogIDxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik03Ny40LDU2LjJ2OS40aC0xNi4zbDEuNi0zYzEuMi0yLDIuMi00LDMuOS00LjksMCwwLDItMS4zLDUuNS0xLjNoNS41LS4xWiIvPgo8L3N2Zz4=" alt="Aivory" style={{ height: '36px', width: 'auto', display: 'block' }} />
                       </div>
                       <h1 style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: 30, color: '#111' }}>AI Readiness<br />Quick Diagnostic</h1>
 
@@ -681,7 +676,7 @@ export default function FreeDiagnosticPage() {
                         <div style={{ fontSize: 20, fontWeight: 500, color: '#111' }}>© 2026 Aivory. All rights reserved.</div>
                         <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                           <div style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 12 }}>Diagnose by</div>
-                          <img src="/Aivory logo for diagnostic card.svg" alt="Aivory" style={{ height: '32px', width: 'auto', display: 'block' }} />
+                          <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAzODIuNiA3OS40Ij4KICA8IS0tIEdlbmVyYXRvcjogQWRvYmUgSWxsdXN0cmF0b3IgMzAuNC4wLCBTVkcgRXhwb3J0IFBsdWctSW4gLiBTVkcgVmVyc2lvbjogMi4xLjQgQnVpbGQgMjI2KSAgLS0+CiAgPGRlZnM+CiAgICA8c3R5bGU+CiAgICAgIC5zdDAgewogICAgICAgIGZpbGw6ICM1YjViNWI7CiAgICAgIH0KCiAgICAgIC5zdDEgewogICAgICAgIGZpbGw6ICM5Y2I3N2U7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMDQuOCw2NS40VjIwLjdoOC45djQ0LjdoLTguOVoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTgyLjIsMjAuNWwtMTkuNiwzMi42Yy01LjksOS44LTkuOCwxMi4xLTI1LDEyLjFoLTE3LjNWMjAuNWg4Ljl2MzkuMmMxMy4zLDAsMTcuNy42LDI2LjUtMTMuNGwxNS4zLTI1LjhzMTEuMSwwLDExLjEsMFoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMjQwLjQsNDNjMCwxMi43LTQuOCwyMi44LTMwLjIsMjIuOGgtMS4zYy0yNS4yLDAtMzAuMi0xMC4xLTMwLjItMjIuOHM0LjgtMjIuOCwzMC4yLTIyLjhoMS4zYzI1LjIsMCwzMC4yLDEwLjEsMzAuMiwyMi44Wk0yMzAuMSw0M2MwLTE2LjMtOC45LTE3LjItMTgtMTcuMmgtNC42Yy05LjEsMC0xOCwxLTE4LDE3LjJzOS4xLDE3LjcsMTgsMTcuN2g0LjZjOS4yLDAsMTgtMS40LDE4LTE3LjdaIi8+CiAgPHBhdGggY2xhc3M9InN0MCIgZD0iTTMwMC44LDY1LjRoLTUuNmMtNC41LDAtOC45LTIuNi0xNC42LTguOGwtMy0zLjNoLTI0LjJ2MTIuMWgtOS40VjIwLjdoMzYuMWMxNC40LDAsMTcuOSw1LjYsMTcuNiwxNi40LS4xLDUuNi0xLjYsMTIuOC0xMC41LDE1LjNsMTMuNywxM2gwWk0yODkuMiwzNy4zYzAtNi45LTEuMy0xMS05LjctMTFoLTI2LjF2MjAuM2gyNi4xYzQuNiwwLDkuNy0xLjQsOS43LTkuNFoiLz4KICA8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMzUwLjEsMjAuNWwtMjIuOSwyOC43djE2aC04Ljh2LTE1LjdsLTIzLjQtMjloMTAuMWwxNy45LDIyLjQsMTctMjIuNGgxMC4xWiIvPgogIDxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0zNi4xLDY1LjVsMTkuOC0zMi45YzUuOS0xMCwxMC0xMi4zLDI1LjEtMTIuM2gxNy41djQ1LjJoLTkuMVYyOC4zYy0xNi43LDAtMjAuMS0xLjktMjguMSwxMS4xbC0xNS40LDI2LjFoLTkuOC4xWiIvPgogIDxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik03Ny40LDU2LjJ2OS40aC0xNi4zbDEuNi0zYzEuMi0yLDIuMi00LDMuOS00LjksMCwwLDItMS4zLDUuNS0xLjNoNS41LS4xWiIvPgo8L3N2Zz4=" alt="Aivory" style={{ height: '32px', width: 'auto', display: 'block' }} />
                         </div>
                       </div>
                       <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
