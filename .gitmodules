@@ -1,12 +1,12 @@
 [submodule "backend/avry-backend"]
 	path = backend/avry-backend
-	url = https://github.com/ClementHansel/avry-backend.git
+	url = https://github.com/Aivory-hub88/avry-backend.git
 [submodule "frontend/avry-user-dashboard"]
 	path = frontend/avry-user-dashboard
-	url = https://github.com/ClementHansel/avry-user-dashboard.git
+	url = https://github.com/Aivory-hub88/avry-user-dashboard.git
 [submodule "frontend/avry-admin-dashboard"]
 	path = frontend/avry-admin-dashboard
-	url = https://github.com/ClementHansel/avry-admin-dashboard.git
+	url = https://github.com/Aivory-hub88/avry-admin-dashboard.git
 [submodule "services/avry-console"]
 	path = services/avry-console
 	url = https://github.com/ClementHansel/avry-console.git

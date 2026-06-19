@@ -473,6 +473,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=9001
+      - BACKEND_SERVICE_URL=http://avry-backend:8081
       - NEXT_PUBLIC_API_URL=https://backend.aivory.id
       - NEXT_PUBLIC_ZEROCLAW_URL=https://api.aivory.id
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
