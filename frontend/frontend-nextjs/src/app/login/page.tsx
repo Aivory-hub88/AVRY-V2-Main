@@ -2,13 +2,13 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { isAuthenticated, login as authLogin } from "@/lib/auth";
 
 /**
  * Login Page Component
  *
- * Standalone login page matching the legacy auth-modals.js design.
- * White card modal centered on a dark backdrop.
+ * Standalone login page matching the landing-site SignInModal dark design.
  */
 export default function LoginPage() {
   const router = useRouter();
@@ -27,9 +27,8 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  const validateEmail = (value: string): boolean => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-  };
+  const validateEmail = (value: string): boolean =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
   const handleSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -49,7 +48,6 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-
     try {
       await authLogin(email, password);
       router.push("/");
@@ -65,7 +63,7 @@ export default function LoginPage() {
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-        <div className="text-brand-mint text-xl animate-pulse">Loading...</div>
+        <div className="text-[#b2cca2] text-xl animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -73,99 +71,99 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#050505] px-4 py-12">
       {/* Backdrop with blur */}
-      <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
 
-      {/* Modal Card */}
-      <div className="relative bg-white rounded-3xl shadow-2xl p-12 max-w-[480px] w-full">
+      {/* Dark modal card (matches landing SignInModal) */}
+      <div className="relative w-full max-w-[420px] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-8 sm:p-10">
         {/* Close button */}
         <button
           onClick={() => router.push("/")}
-          className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all text-2xl"
+          className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors p-1"
           aria-label="Close"
         >
-          &times;
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </button>
 
-        <h2 className="text-4xl font-light text-black mb-3">
-          Welcome Back
-        </h2>
-        <p className="text-gray-500 text-lg mb-10">
-          Log in to access your AI diagnostics
-        </p>
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-6">
+            <Image src="/Aivory_logo_2_2026.svg" alt="Aivory" width={100} height={32} className="h-[32px] w-auto opacity-90" priority />
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            Welcome back
+          </h2>
+          <p className="text-[#b2cca2] text-sm font-light">
+            Only subscribed users can access their workspace.
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div className="mb-6">
-            <label
-              htmlFor="login-email"
-              className="block mb-2.5 font-semibold text-black text-base"
-            >
-              Email
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="login-email" className="block text-[13px] font-medium text-white/70 mb-2">
+              Email address
             </label>
             <input
               id="login-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              placeholder="name@company.com"
               autoComplete="email"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base text-black bg-white placeholder:text-gray-400 focus:outline-none focus:border-brand-mint focus:ring-1 focus:ring-brand-mint transition-colors"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#0ae8af] focus:ring-1 focus:ring-[#0ae8af] transition-all text-sm"
             />
           </div>
 
-          {/* Password */}
-          <div className="mb-6">
-            <label
-              htmlFor="login-password"
-              className="block mb-2.5 font-semibold text-black text-base"
-            >
-              Password
-            </label>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="login-password" className="block text-[13px] font-medium text-white/70">
+                Password
+              </label>
+              <a href="#" onClick={(e) => e.preventDefault()} className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
+                Forgot password?
+              </a>
+            </div>
             <input
               id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base text-black bg-white placeholder:text-gray-400 focus:outline-none focus:border-brand-mint focus:ring-1 focus:ring-brand-mint transition-colors"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#0ae8af] focus:ring-1 focus:ring-[#0ae8af] transition-all text-sm tracking-widest"
             />
           </div>
 
-          {/* Error */}
           {error && (
-            <div
-              className="bg-[#FFE5E5] border border-[#FF4444] text-[#CC0000] px-4 py-3 rounded-lg mb-5 text-sm"
-              role="alert"
-            >
+            <p className="text-red-400 text-sm text-center" role="alert">
               {error}
-            </div>
+            </p>
           )}
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-4 bg-[#07D197] text-white rounded-xl text-base font-semibold hover:bg-[#06B882] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full py-3 px-4 bg-white hover:bg-gray-100 text-black font-semibold rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
-            {isLoading ? "Logging in..." : "Log In"}
+            {isLoading ? "Signing in..." : "Sign In"}
+            {!isLoading && (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            )}
           </button>
         </form>
 
-        {/* Footer */}
-        <p className="mt-8 text-center text-gray-600 text-base">
-          Don&apos;t have an account?{" "}
-          <a
-            href="#"
-            onClick={(e) => e.preventDefault()}
-            className="text-[#07D197] font-semibold no-underline hover:underline"
-          >
-            Sign up
-          </a>
-        </p>
+        <div className="mt-8 text-center">
+          <p className="text-[13px] text-white/40">
+            Don&apos;t have a subscription yet?{" "}
+            <a href="/product" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
+              Explore plans &rarr;
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
