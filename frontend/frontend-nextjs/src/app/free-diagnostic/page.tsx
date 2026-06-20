@@ -298,53 +298,41 @@ export default function FreeDiagnosticPage() {
   const downloadDiagnosticCards = useCallback(async () => {
     setDownloading(true);
     try {
-      const html2canvas = (await import('html2canvas')).default;
+      const { toPng } = await import('html-to-image');
       const slides = [
         { ref: slide1Ref, suffix: 'Card_1' },
         { ref: slide2Ref, suffix: 'Card_2' },
       ];
 
+      // Make sure web fonts are loaded before capturing
+      await document.fonts.ready;
+
       for (const slide of slides) {
         const node = slide.ref.current;
         if (!node) continue;
 
-        // Clone and render at full size
-        const clone = node.cloneNode(true) as HTMLElement;
-        clone.id = 'html2canvas-clone';
-        clone.style.position = 'fixed';
-        clone.style.left = '-9999px';
-        clone.style.top = '-9999px';
-        clone.style.width = '1080px';
-        clone.style.height = '1350px';
-        clone.style.overflow = 'hidden';
-        clone.style.transform = 'none';
-        clone.style.transformOrigin = 'top left';
-        clone.style.background = '#ffffff';
-        clone.style.zIndex = '-9999';
-        clone.style.pointerEvents = 'none';
-        document.body.appendChild(clone);
+        // html-to-image renders through the browser's own engine (SVG
+        // foreignObject), so text baselines, ellipsis, line-clamp and web
+        // fonts come out exactly as on screen — unlike html2canvas.
+        const dataUrl = await toPng(node, {
+          width: 1080,
+          height: 1350,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          cacheBust: true,
+          // Capture the node at its native size, ignoring the preview
+          // transform:scale applied by the parent wrapper.
+          style: {
+            transform: 'none',
+            transformOrigin: 'top left',
+            margin: '0',
+          },
+        });
 
-        try {
-          await document.fonts.ready;
-          const canvas = await html2canvas(clone, {
-            scale: 2,
-            width: 1080,
-            height: 1350,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            windowWidth: 1080,
-            windowHeight: 1350
-          });
-
-          const link = document.createElement('a');
-          link.download = `${companyName.trim() || 'Company'}_AI_Diagnostic_${slide.suffix}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-        } finally {
-          clone.remove();
-        }
+        const link = document.createElement('a');
+        link.download = `${companyName.trim() || 'Company'}_AI_Diagnostic_${slide.suffix}.png`;
+        link.href = dataUrl;
+        link.click();
 
         // Small delay between downloads
         await new Promise(resolve => setTimeout(resolve, 800));
@@ -518,7 +506,7 @@ export default function FreeDiagnosticPage() {
               {/* Slide 1 */}
               <div className="ig-slide-wrapper" style={{ width: previewWidth, height: previewHeight, maxWidth: '100%', overflow: 'auto', display: 'flex', justifyContent: 'flex-start', background: '#ffffff', padding: 0, border: '1px solid #d8e0e0', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                 <div style={{ width: 1080, height: 1350, flexShrink: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-                  <div ref={slide1Ref} id="ig-slide-1" style={{ width: 1080, height: 1350, overflow: 'hidden', background: '#ffffff', padding: '90px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
+                  <div ref={slide1Ref} id="ig-slide-1" style={{ width: 1080, height: 1350, overflow: 'hidden', background: '#ffffff', padding: '80px 90px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
                     <div>
                       {/* Logo placeholder */}
                       <div style={{ height: 60, width: 290, marginBottom: 36, display: 'flex', alignItems: 'center' }}>
@@ -532,20 +520,20 @@ export default function FreeDiagnosticPage() {
                           <path fill="#9cb77e" d="M77.4,56.2v9.4h-16.3l1.6-3c1.2-2,2.2-4,3.9-4.9,0,0,2-1.3,5.5-1.3h5.5-.1Z"/>
                         </svg>
                       </div>
-                      <h1 style={{ fontSize: 64, fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: 30, color: '#111' }}>AI Readiness<br />Quick Diagnostic</h1>
+                      <h1 style={{ fontSize: 64, fontWeight: 400, lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: 30, color: '#111' }}>AI Readiness<br />Quick Diagnostic</h1>
 
                       {/* Company info grid */}
-                      <div style={{ border: '2px solid #111', padding: '22px 30px', background: '#ffffff', marginBottom: 28, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Company Name<div style={{ fontSize: 19, fontWeight: 400, color: '#333', marginTop: 4 }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry category<div style={{ fontSize: 19, fontWeight: 400, color: '#333', marginTop: 4 }}>{industryLabel}</div></div>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry Size<div style={{ fontSize: 19, fontWeight: 400, color: '#333', marginTop: 4 }}>{sizeLabel}</div></div>
+                      <div style={{ border: '2px solid #111', padding: '28px 36px', background: '#ffffff', marginBottom: 28, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Company Name<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
+                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry category<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLabel}</div></div>
+                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry Size<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sizeLabel}</div></div>
                       </div>
 
                       {/* Score section */}
-                      <div style={{ border: '2px solid #111', padding: '30px 36px 36px', background: '#ffffff', marginBottom: 24, position: 'relative' }}>
-                        <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontFamily: "'Doto', monospace", fontSize: 16, padding: '6px 16px', borderRadius: 9999, marginBottom: 24 }}>&gt;&gt; {maturity} &lt;&lt;</div>
+                      <div style={{ border: '2px solid #111', padding: '36px 40px 40px', background: '#ffffff', marginBottom: 28, position: 'relative' }}>
+                        <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontFamily: "'Doto', monospace", fontSize: 16, padding: '6px 16px', borderRadius: 9999, marginBottom: 20 }}>&gt;&gt; {maturity} &lt;&lt;</div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 40, marginBottom: 28 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 24 }}>
                           {/* Gauge */}
                           <div style={{ position: 'relative', width: 160, height: 160, flexShrink: 0 }}>
                             <svg width="160" height="160" viewBox="0 0 200 200">
@@ -565,13 +553,13 @@ export default function FreeDiagnosticPage() {
                           </div>
                           <div>
                             <h3 style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.25, color: '#111', marginBottom: 12 }}>{quickNote.title}</h3>
-                            <p style={{ fontSize: 18, color: '#333', lineHeight: 1.4 }}>{quickNote.body}</p>
+                            <p style={{ fontSize: 17, color: '#333', lineHeight: 1.4 }}>{quickNote.body}</p>
                           </div>
                         </div>
 
                         {/* Maturity stages */}
-                        <div style={{ marginTop: 14 }}>
-                          <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+                        <div style={{ marginTop: 20 }}>
+                          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
                             {MATURITY_STAGES.map((stage) => {
                               const isActive = stage.toLowerCase() === maturity.toLowerCase();
                               return (
@@ -579,9 +567,9 @@ export default function FreeDiagnosticPage() {
                                   <div style={{ height: 6, background: isActive ? '#ff5757' : '#111111', marginBottom: 10, borderRadius: 3 }} />
                                   <div style={{ fontSize: 15, fontWeight: isActive ? 700 : 500, color: '#111' }}>{stage}</div>
                                   {isActive ? (
-                                    <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontSize: 12, fontStyle: 'italic', padding: '0 8px', height: '24px', lineHeight: '24px', borderRadius: 6, marginTop: 5 }}>You are here</div>
+                                    <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontSize: 12, fontStyle: 'italic', padding: '0 10px', height: '24px', lineHeight: '24px', borderRadius: 6, marginTop: 6 }}>You are here</div>
                                   ) : (
-                                    <div style={{ height: 29 }} />
+                                    <div style={{ height: 32 }} />
                                   )}
                                 </div>
                               );
@@ -600,14 +588,14 @@ export default function FreeDiagnosticPage() {
                       </div>
 
                       {/* Dimension grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 36 }}>
                         {[...top, ...bottom].map(d => {
                           let iconChar = '→';
                           let iconColor = '#ffb020';
                           if (d.score >= 2) { iconChar = '↗'; iconColor = '#0ae8af'; }
                           else if (d.score === 0) { iconChar = '↓'; iconColor = '#ff5757'; }
                           return (
-                            <div key={d.id} style={{ border: '2px solid #111', minHeight: 84, padding: '14px 18px', background: '#f8fafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 8 }}>
+                            <div key={d.id} style={{ border: '2px solid #111', minHeight: 96, padding: '20px 24px', background: '#f8fafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 8 }}>
                               <div style={{ fontSize: 18, fontWeight: 700, color: '#111', textTransform: 'lowercase' }}>{d.label}</div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
                                 <span style={{ fontSize: 20, color: iconColor, fontWeight: 700 }}>{iconChar}</span>
@@ -619,7 +607,7 @@ export default function FreeDiagnosticPage() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: 'auto' }}>
+                    <div style={{ marginTop: 'auto', paddingTop: 16 }}>
                       <div style={{ fontSize: 20, fontWeight: 500, color: '#111', marginBottom: 20 }}>© 2026 Aivory. All rights reserved.</div>
                       <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
                     </div>
@@ -664,7 +652,7 @@ export default function FreeDiagnosticPage() {
                       {/* Notes */}
                       <div style={{ marginBottom: 40 }}>
                         <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 12 }}>Notes</div>
-                        <div style={{ fontSize: 20, color: '#111', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: 20, color: '#111', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' }}>
                           For {companyName.trim() || 'your company'}, a score of {score}/100 shows the foundation is beginning to take shape, but critical gaps remain. Organizations at this stage benefit most from quick wins — choose an AI use case where ROI can be demonstrated in 90 days.
                         </div>
                       </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, MouseEvent } from 'react';
 import Image from 'next/image';
+import { login } from '@/lib/auth';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     email: '',
     password: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const modalRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -39,10 +42,19 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     };
   }, [isOpen, onClose]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Sign in submitted:', formData);
-    // TODO: implement actual sign in logic
+    setError('');
+    setIsLoading(true);
+    try {
+      await login(formData.email, formData.password);
+      onClose();
+      window.location.href = '/';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,11 +149,15 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             />
           </div>
 
+          {error && (
+            <p className="text-red-400 text-sm text-center" role="alert">{error}</p>
+          )}
           <button
             type="submit"
-            className="w-full py-3 px-4 bg-white hover:bg-gray-100 text-black font-semibold rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2"
+            disabled={isLoading}
+            className="w-full py-3 px-4 bg-white hover:bg-gray-100 text-black font-semibold rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
-            Sign In
+            {isLoading ? 'Signing in...' : 'Sign In'}
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
