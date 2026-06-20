@@ -2,14 +2,65 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/components/context/LanguageContext';
 import SignInModal from '@/components/auth/SignInModal';
+import { isAuthenticated, getUser, logout } from '@/lib/auth';
 
 export default function Navbar() {
   const { language, setLanguage } = useLanguage();
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [accountType, setAccountType] = useState('free');
+
+  useEffect(() => {
+    const check = () => {
+      const a = isAuthenticated();
+      setAuthed(a);
+      if (a) {
+        const u = getUser();
+        setUserName(u?.email?.split('@')[0] || u?.email || '');
+        setAccountType(u?.account_type || 'free');
+      } else {
+        setUserName('');
+        setAccountType('free');
+      }
+    };
+    check();
+    window.addEventListener('authManager:login', check);
+    window.addEventListener('authManager:logout', check);
+    return () => {
+      window.removeEventListener('authManager:login', check);
+      window.removeEventListener('authManager:logout', check);
+    };
+  }, []);
+
+  // Set the shared cookies the dashboards expect, then navigate. Robust even if
+  // the session predates cookie-setting on login.
+  const handleDashboard = (target: 'user' | 'admin' = 'user') => {
+    if (!authed) { setIsSignInModalOpen(true); return; }
+    try {
+      const raw = localStorage.getItem('aivory_auth');
+      if (raw) {
+        const s = JSON.parse(raw);
+        const at = s?.access_token || '';
+        const acct = s?.user?.user_metadata?.account_type || 'free';
+        const u = { id: s?.user?.id || '', email: s?.user?.email || '', account_type: acct, role: acct };
+        const attrs = 'path=/; max-age=604800; SameSite=Lax';
+        if (at) {
+          document.cookie = `aivory_access_token=${at}; ${attrs}`;
+          document.cookie = `aivory_session_token=${encodeURIComponent(JSON.stringify(at))}; ${attrs}`;
+          document.cookie = `aivory_user=${encodeURIComponent(JSON.stringify(u))}; ${attrs}`;
+        }
+      }
+    } catch {}
+    const dashUrl = target === 'admin'
+      ? (process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || '/admin')
+      : (process.env.NEXT_PUBLIC_DASHBOARD_URL || '/dashboard');
+    window.location.href = dashUrl;
+  };
 
   return (
     <nav className="absolute top-0 left-0 right-0 z-[1000]" style={{ background: 'transparent' }}>
@@ -86,14 +137,30 @@ export default function Navbar() {
           >
             CAREERS
           </Link>
+          {authed ? (
+            <>
+              <span className="text-white" style={{ fontFamily: "'Manrope', sans-serif", fontSize: '11px' }}>
+                Welcome, {userName}
+              </span>
+              <button
+                onClick={() => logout()}
+                className="text-white font-normal uppercase tracking-normal no-underline hover:underline transition-all duration-200 bg-transparent border-none cursor-pointer"
+                style={{ fontFamily: "'Manrope', sans-serif", fontSize: '10px' }}
+              >
+                SIGN OUT
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsSignInModalOpen(true)}
+              className="text-white font-normal uppercase tracking-normal no-underline hover:underline transition-all duration-200 bg-transparent border-none cursor-pointer"
+              style={{ fontFamily: "'Manrope', sans-serif", fontSize: '10px' }}
+            >
+              SIGN IN
+            </button>
+          )}
           <button
-            onClick={() => setIsSignInModalOpen(true)}
-            className="text-white font-normal uppercase tracking-normal no-underline hover:underline transition-all duration-200 bg-transparent border-none cursor-pointer"
-            style={{ fontFamily: "'Manrope', sans-serif", fontSize: '10px' }}
-          >
-            SIGN IN
-          </button>
-          <button
+            onClick={() => handleDashboard('user')}
             className="h-[29px] px-[18px] font-normal text-white bg-transparent inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/[0.08] hover:border-white/40"
             style={{
               border: '1px solid rgba(255, 255, 255, 0.25)',
@@ -106,6 +173,21 @@ export default function Navbar() {
           >
             DASHBOARD
           </button>
+          {authed && (accountType === 'superadmin' || accountType === 'admin') && (
+            <button
+              onClick={() => handleDashboard('admin')}
+              className="h-[29px] px-[18px] font-normal text-black bg-white inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/80"
+              style={{
+                borderRadius: 0,
+                fontFamily: "'Manrope', sans-serif",
+                fontSize: '10px',
+                letterSpacing: '-0.01em',
+                textTransform: 'uppercase',
+              }}
+            >
+              ADMIN
+            </button>
+          )}
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -190,21 +272,39 @@ export default function Navbar() {
           >
             Careers
           </Link>
+          {authed ? (
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); logout(); }}
+              className="text-white text-3xl font-light tracking-tight no-underline hover:text-white/70 transition-colors bg-transparent border-none cursor-pointer text-left"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              Sign Out
+            </button>
+          ) : (
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); setIsSignInModalOpen(true); }}
+              className="text-white text-3xl font-light tracking-tight no-underline hover:text-white/70 transition-colors bg-transparent border-none cursor-pointer text-left"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              Sign In
+            </button>
+          )}
           <button
-            onClick={() => { setIsMobileMenuOpen(false); setIsSignInModalOpen(true); }}
+            onClick={() => { setIsMobileMenuOpen(false); handleDashboard('user'); }}
             className="text-white text-3xl font-light tracking-tight no-underline hover:text-white/70 transition-colors bg-transparent border-none cursor-pointer text-left"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
-            Sign In
-          </button>
-          <Link
-            href="#"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="text-white text-3xl font-light tracking-tight no-underline hover:text-white/70 transition-colors"
-            style={{ fontFamily: "'Manrope', sans-serif" }}
-          >
             Dashboard
-          </Link>
+          </button>
+          {authed && (accountType === 'superadmin' || accountType === 'admin') && (
+            <button
+              onClick={() => { setIsMobileMenuOpen(false); handleDashboard('admin'); }}
+              className="text-white text-3xl font-light tracking-tight no-underline hover:text-white/70 transition-colors bg-transparent border-none cursor-pointer text-left"
+              style={{ fontFamily: "'Manrope', sans-serif" }}
+            >
+              Admin
+            </button>
+          )}
         </div>
 
         {/* Bottom: Language Toggle */}

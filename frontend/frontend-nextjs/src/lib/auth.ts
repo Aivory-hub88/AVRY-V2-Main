@@ -172,9 +172,40 @@ export async function signup(
   // Persist to localStorage so getToken/getUser/isAuthenticated work
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    setAuthCookies(data);
     window.dispatchEvent(new Event("authManager:login"));
   }
   return mapUser(session.user!, session.access_token);
+}
+
+/**
+ * Set shared cookies so the user & admin dashboards (path-based, same host as
+ * the landing) recognize the session without a second sign-in.
+ * - admin middleware reads `aivory_access_token` (raw JWT, decoded for account_type)
+ * - user dashboard authManager reads `aivory_session_token` + `aivory_user` (JSON)
+ * Host-only, path=/ so they are sent to /dashboard and /admin on the same host.
+ */
+function setAuthCookies(data: any): void {
+  if (typeof document === "undefined") return;
+  const at = data?.tokens?.access_token || "";
+  const acct = data?.user?.account_type || "free";
+  const u = {
+    id: data?.user?.user_id || "",
+    email: data?.user?.email || "",
+    account_type: acct,
+    role: acct,
+  };
+  const attrs = "path=/; max-age=604800; SameSite=Lax";
+  document.cookie = `aivory_access_token=${at}; ${attrs}`;
+  document.cookie = `aivory_session_token=${encodeURIComponent(JSON.stringify(at))}; ${attrs}`;
+  document.cookie = `aivory_user=${encodeURIComponent(JSON.stringify(u))}; ${attrs}`;
+}
+
+function clearAuthCookies(): void {
+  if (typeof document === "undefined") return;
+  for (const k of ["aivory_access_token", "aivory_session_token", "aivory_user"]) {
+    document.cookie = `${k}=; path=/; max-age=0; SameSite=Lax`;
+  }
 }
 
 /** Login with email + password — uses the backend auth service (works locally without Supabase). */
@@ -208,6 +239,7 @@ export async function login(email: string, password: string): Promise<User> {
   };
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    setAuthCookies(data);
     window.dispatchEvent(new Event("authManager:login"));
   }
   return mapUser(session.user!, session.access_token);
@@ -230,6 +262,7 @@ export async function logout(redirect: boolean = true): Promise<void> {
   } finally {
     if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEY);
+      clearAuthCookies();
       window.dispatchEvent(new Event("authManager:logout"));
       if (redirect) {
         setTimeout(() => {
