@@ -95,7 +95,7 @@ const MOCK_RESULT: DiagnosticResult = {
   badge_svg: BADGE_SVG,
 };
 
-const SHARE_URL = "https://aivory.id";
+const SHARE_URL = "https://aivory.uk";
 
 beforeEach(() => {
   vi.clearAllMocks();

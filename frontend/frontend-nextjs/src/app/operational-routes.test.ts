@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 /**
  * Requirement 1.4: IF a client requests an operational dashboard path
  * (`app/dashboard/*`, `app/console`, `app/workflows`, `app/logs`, `app/settings`)
- * at `aivory.id`, THEN THE Marketing_Site SHALL respond with a not-found result
+ * at `aivory.uk`, THEN THE Marketing_Site SHALL respond with a not-found result
  * and SHALL NOT render any operational dashboard page.
  *
  * In the Next.js App Router, a route is only served when a matching segment

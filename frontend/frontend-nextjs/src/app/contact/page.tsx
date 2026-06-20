@@ -16,8 +16,14 @@ export default function ContactPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement form submission logic
-    console.log('Form submitted:', formData);
+    // Route the enquiry to hello@aivory.uk via the visitor's mail client
+    const subject = `Contact from ${formData.name}${formData.company ? ` — ${formData.company}` : ''}`;
+    const body =
+      `Name: ${formData.name}\n` +
+      `Company: ${formData.company}\n` +
+      `Email: ${formData.email}\n\n` +
+      `${formData.message}`;
+    window.location.href = `mailto:hello@aivory.uk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setIsSubmitted(true);
   };
 

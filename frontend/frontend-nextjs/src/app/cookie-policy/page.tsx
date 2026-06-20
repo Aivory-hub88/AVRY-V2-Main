@@ -140,7 +140,7 @@ export default function CookiePolicyPage() {
             <h3 className="text-2xl font-medium text-white">7. Questions?</h3>
             <p>
               Email: <a href="mailto:hello@aivory.uk" className="text-white hover:underline transition-all">hello@aivory.uk</a><br />
-              Website: <a href="https://aivory.uk/contact" className="text-white hover:underline transition-all">aivory.id/contact</a>
+              Website: <a href="https://aivory.uk/contact" className="text-white hover:underline transition-all">aivory.uk/contact</a>
             </p>
           </section>
 

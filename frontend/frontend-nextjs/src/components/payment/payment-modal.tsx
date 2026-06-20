@@ -238,9 +238,9 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
 
   // Get user email for display
   const getUserEmail = (): string => {
-    if (!isAuthenticated()) return 'user@aivory.id';
+    if (!isAuthenticated()) return 'user@aivory.uk';
     const user = getUser();
-    return user?.email || 'user@aivory.id';
+    return user?.email || 'user@aivory.uk';
   };
 
   // Render payment options

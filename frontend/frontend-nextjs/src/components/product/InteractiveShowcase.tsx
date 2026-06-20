@@ -581,7 +581,7 @@ function IntroAnimation() {
     <div ref={containerRef} className="w-full h-full bg-[#151515] border border-white/5 rounded-3xl p-8 relative shadow-2xl flex flex-col justify-center items-center text-center">
       {/* Agent Label */}
       <div className={`transition-all duration-1000 ease-out absolute top-12 ${step >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <img src="/Aivory logo for diagnostic card.svg" alt="Aivory Agent" className="h-6 w-auto opacity-80 mx-auto" />
+        <img src="/aivory-logo.svg" alt="Aivory Agent" className="h-6 w-auto opacity-80 mx-auto" />
       </div>
 
       {/* Rotating Lines Container */}

@@ -22,7 +22,7 @@ const IMAGE_DATA_URL = "data:image/png;base64,iVBORw0KGgo=";
 const ctx: ShareContext = {
   score: 75,
   category: "Advanced",
-  shareUrl: "https://aivory.id",
+  shareUrl: "https://aivory.uk",
 };
 
 /** Build the un-encoded message the service would produce for a network. */
