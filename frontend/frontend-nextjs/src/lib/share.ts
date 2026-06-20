@@ -35,7 +35,7 @@ export interface ShareContext {
   score: number;
   /** Category label, e.g. "Emerging", "Advanced". */
   category: string;
-  /** Canonical marketing URL, e.g. `https://aivory.id`. */
+  /** Canonical marketing URL, e.g. `https://aivory.uk`. */
   shareUrl: string;
   /** Optional captured PNG data URL for the native share / manual attach. */
   imageDataUrl?: string;

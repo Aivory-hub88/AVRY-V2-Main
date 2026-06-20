@@ -23,7 +23,7 @@ import fc from "fast-check";
 import { resolveDashboardUrl, resolveMarketingUrl } from "./config";
 
 const DASHBOARD_URL_DEV = "http://localhost:3000";
-const DASHBOARD_URL_PROD = "https://dashboard.aivory.id";
+const DASHBOARD_URL_PROD = "https://dashboard.aivory.uk";
 
 /**
  * Models the `NEXT_PUBLIC_*` environment-variable input space: unset
@@ -37,7 +37,7 @@ const envArb: fc.Arbitrary<string | null | undefined> = fc.oneof(
   fc.constant(""),
   fc.constantFrom("   ", "\t", "\n", " \t \n "), // whitespace-only -> treated as unset
   fc.constantFrom(
-    "https://dashboard.aivory.id",
+    "https://dashboard.aivory.uk",
     "http://localhost:3000",
     "https://custom.example.com",
     "  https://padded.example.com  ", // surrounding whitespace -> trimmed
@@ -66,8 +66,8 @@ const hostArb: fc.Arbitrary<string | null | undefined> = fc.oneof(
     "  localhost  ",
   ),
   fc.constantFrom(
-    "aivory.id",
-    "dashboard.aivory.id",
+    "aivory.uk",
+    "dashboard.aivory.uk",
     "example.com:443",
     "192.168.1.10",
   ),
@@ -102,7 +102,7 @@ const nonLocalHostArb: fc.Arbitrary<string | null | undefined> = fc
     fc.constant(null),
     fc.constant(""),
     fc.domain(),
-    fc.constantFrom("aivory.id", "dashboard.aivory.id", "192.168.0.1", "example.com:8080"),
+    fc.constantFrom("aivory.uk", "dashboard.aivory.uk", "192.168.0.1", "example.com:8080"),
   )
   .filter((h) => {
     if (h == null || h === "") return true;

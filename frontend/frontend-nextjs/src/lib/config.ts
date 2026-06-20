@@ -2,7 +2,7 @@
  * Deterministic, environment-aware URL resolution.
  *
  * Resolves the canonical base URL for the product dashboard
- * (`dashboard.aivory.id`) and the marketing site (`aivory.id`) so that
+ * (`dashboard.aivory.uk`) and the marketing site (`aivory.uk`) so that
  * cross-app redirects never cross-point between the two apps.
  *
  * The resolvers are:
@@ -21,11 +21,11 @@
 /** Dashboard base URL used for local development. */
 const DASHBOARD_URL_DEV = "http://localhost:3000";
 /** Dashboard base URL used for every non-local host. */
-const DASHBOARD_URL_PROD = "https://dashboard.aivory.id";
+const DASHBOARD_URL_PROD = "https://dashboard.aivory.uk";
 /** Marketing base URL used for local development (legacy landing port). */
 const MARKETING_URL_DEV = "http://localhost:9000";
 /** Marketing base URL used for every non-local host. */
-const MARKETING_URL_PROD = "https://aivory.id";
+const MARKETING_URL_PROD = "https://aivory.uk";
 
 /**
  * Read the current request host from the browser in an SSR-safe way.
@@ -58,7 +58,7 @@ function isLocalHost(host: string | null | undefined): boolean {
  * Resolution order (Requirements 4.1–4.3):
  * 1. A trimmed, non-empty `NEXT_PUBLIC_DASHBOARD_URL` value wins.
  * 2. Otherwise, a `localhost`/`127.0.0.1` host resolves to `http://localhost:3000`.
- * 3. Otherwise, resolve to `https://dashboard.aivory.id`.
+ * 3. Otherwise, resolve to `https://dashboard.aivory.uk`.
  *
  * @param dashboardUrlEnv - The raw `NEXT_PUBLIC_DASHBOARD_URL` value (or null/undefined).
  * @param host - The request host (or null/undefined during SSR).
@@ -83,7 +83,7 @@ export function resolveDashboardUrl(
  * Resolution order mirrors the dashboard resolver:
  * 1. A trimmed, non-empty `NEXT_PUBLIC_MARKETING_URL` value wins.
  * 2. Otherwise, a `localhost`/`127.0.0.1` host resolves to `http://localhost:9000`.
- * 3. Otherwise, resolve to `https://aivory.id`.
+ * 3. Otherwise, resolve to `https://aivory.uk`.
  *
  * Enforces the non-equality GUARANTEE (Requirement 4.5): if the resolved
  * marketing URL would be byte-equal to the resolved dashboard URL (only
@@ -121,7 +121,7 @@ export function resolveMarketingUrl(
  * SSR-safe accessor unless a host is supplied explicitly.
  *
  * @param host - Optional request host override (useful for SSR/tests).
- * @returns The dashboard base URL (e.g. `https://dashboard.aivory.id`).
+ * @returns The dashboard base URL (e.g. `https://dashboard.aivory.uk`).
  */
 export function getDashboardUrl(host: string | undefined = getCurrentHost()): string {
   return resolveDashboardUrl(process.env.NEXT_PUBLIC_DASHBOARD_URL, host);
@@ -133,7 +133,7 @@ export function getDashboardUrl(host: string | undefined = getCurrentHost()): st
  * and the host from an SSR-safe accessor unless a host is supplied explicitly.
  *
  * @param host - Optional request host override (useful for SSR/tests).
- * @returns The marketing base URL (e.g. `https://aivory.id`), guaranteed
+ * @returns The marketing base URL (e.g. `https://aivory.uk`), guaranteed
  *   distinct from the dashboard base URL.
  */
 export function getMarketingUrl(host: string | undefined = getCurrentHost()): string {
