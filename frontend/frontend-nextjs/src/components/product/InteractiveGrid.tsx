@@ -531,7 +531,7 @@ function TypewriterText({ text, onComplete }: { text: string, onComplete?: () =>
   return <span>{displayed}<span className="ml-[2px] w-[2px] h-2.5 bg-[#aec99d] animate-pulse inline-block align-middle" /></span>;
 }
 
-function AgentFlowVisual({ title }: { title: string }) {
+function AgentFlowVisual({ title, activeTask }: { title: string, activeTask?: any }) {
   const [inView, setInView] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -545,38 +545,40 @@ function AgentFlowVisual({ title }: { title: string }) {
     return () => observer.disconnect();
   }, []);
 
-  // Customer Service
-  const [csState, setCsState] = useState({ channel: 0, status: 'resolved' });
-  useEffect(() => {
-    if (!inView || reducedMotion) return;
-    let channel = 0;
-    const runCycle = () => {
-      setCsState({ channel, status: 'processing' });
-      setTimeout(() => {
-        setCsState({ channel, status: 'resolved' });
-        channel = (channel + 1) % 3;
-      }, 1500);
-    };
-    runCycle();
-    const interval = setInterval(runCycle, 3000);
-    return () => clearInterval(interval);
-  }, [inView, reducedMotion]);
-
-  // Leads Qualifier
+  const [csState, setCsState] = useState({ channel: -1, status: 'resolved' });
   const [lqPhase, setLqPhase] = useState(-1);
+  const [oaTick, setOaTick] = useState(0);
+
   useEffect(() => {
-    if (!inView || reducedMotion) return;
-    const runCycle = () => {
+    if (!inView || reducedMotion || !activeTask) return;
+
+    if (title === 'Customer Service Agent') {
+      const source = activeTask.source.toLowerCase();
+      let channel = 0;
+      if (source.includes('whatsapp')) channel = 0;
+      else if (source.includes('telegram')) channel = 1;
+      else if (source.includes('email') || source.includes('gmail')) channel = 2;
+
+      setCsState({ channel, status: 'processing' });
+      const timer = setTimeout(() => {
+        setCsState(s => ({ ...s, status: 'resolved' }));
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+
+    if (title === 'Leads Qualifier Agent') {
       setLqPhase(0);
-      setTimeout(() => setLqPhase(1), 400);
-      setTimeout(() => setLqPhase(2), 800);
-      setTimeout(() => setLqPhase(3), 1200);
-      setTimeout(() => setLqPhase(-1), 2000);
-    };
-    runCycle();
-    const interval = setInterval(runCycle, 3000);
-    return () => clearInterval(interval);
-  }, [inView, reducedMotion]);
+      const t1 = setTimeout(() => setLqPhase(1), 400);
+      const t2 = setTimeout(() => setLqPhase(2), 800);
+      const t3 = setTimeout(() => setLqPhase(3), 1200);
+      const t4 = setTimeout(() => setLqPhase(-1), 2000);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+    }
+
+    if (title === 'Office Assistant') {
+      setOaTick(t => t + 1);
+    }
+  }, [title, activeTask, inView, reducedMotion]);
 
   const arrowRight = (
     <svg className="w-3 h-3 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -595,20 +597,20 @@ function AgentFlowVisual({ title }: { title: string }) {
           100% { transform: translateX(200%); }
         }
         .animate-travel {
-          animation: travel-line 2s infinite linear;
+          animation: travel-line 2s forwards linear;
         }
       `}</style>
       
       {title === 'Customer Service Agent' && (
         <div className="flex items-center gap-1.5 w-full">
           <div className={`${boxClasses} ${csState.channel === 0 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 0 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
+            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 0 && csState.status === 'processing' ? 'opacity-100 grayscale-0 scale-110' : 'opacity-30 grayscale')}`} />
           </div>
           <div className={`${boxClasses} ${csState.channel === 1 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/telegram.svg" alt="Telegram" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 1 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
+            <img src="/integrations/icons/telegram.svg" alt="Telegram" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 1 && csState.status === 'processing' ? 'opacity-100 grayscale-0 scale-110' : 'opacity-30 grayscale')}`} />
           </div>
           <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/gmail.svg" alt="Email" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 2 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
+            <img src="/integrations/icons/gmail.svg" alt="Email" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 2 && csState.status === 'processing' ? 'opacity-100 grayscale-0 scale-110' : 'opacity-30 grayscale')}`} />
           </div>
           <div className="ml-0.5">{arrowRight}</div>
           <div className="ml-0.5">
@@ -620,7 +622,7 @@ function AgentFlowVisual({ title }: { title: string }) {
           </div>
           <div className="ml-auto flex items-center shrink-0">
             <div className={`px-2 py-0.5 text-[9px] font-mono rounded-sm border transition-colors duration-700 uppercase tracking-widest ${csState.status === 'processing' && !reducedMotion ? 'bg-blue-400/10 text-blue-400 border-blue-400/20' : 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20'}`}>
-              {reducedMotion ? 'RESOLVED' : csState.status}
+              {reducedMotion ? 'RESOLVED' : (csState.channel === -1 ? 'WAITING' : csState.status)}
             </div>
           </div>
         </div>
@@ -647,8 +649,8 @@ function AgentFlowVisual({ title }: { title: string }) {
               </svg>
            </div>
            <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
-              {!reducedMotion && inView && (
-                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" />
+              {!reducedMotion && inView && activeTask && (
+                <div key={`oa-1-${oaTick}`} className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" />
               )}
               {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
            </div>
@@ -658,8 +660,8 @@ function AgentFlowVisual({ title }: { title: string }) {
               </svg>
            </div>
            <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
-              {!reducedMotion && inView && (
-                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" style={{ animationDelay: '1s' }} />
+              {!reducedMotion && inView && activeTask && (
+                <div key={`oa-2-${oaTick}`} className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" style={{ animationDelay: '0.8s' }} />
               )}
               {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
            </div>
@@ -762,6 +764,8 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
 }
 
 function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
+  const [activeTask, setActiveTask] = useState<any>(null);
+
   return (
     <SpotlightCard className="group flex flex-col p-6 relative overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_0_30px_rgba(174,201,157,0.05)] cursor-default">
       <div className="relative z-10 mb-5 flex-shrink-0">
@@ -787,11 +791,11 @@ function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
           </span>
         </div>
 
-        <AgentFlowVisual title={agent.title} />
+        <AgentFlowVisual title={agent.title} activeTask={activeTask} />
 
         {/* Task Queue Area */}
         <div className="flex-1 overflow-hidden relative">
-          <TaskQueueAnimation tasks={agent.tasks} offset={agent.delay} />
+          <TaskQueueAnimation tasks={agent.tasks} offset={agent.delay} onTaskChange={setActiveTask} />
         </div>
 
       </div>
