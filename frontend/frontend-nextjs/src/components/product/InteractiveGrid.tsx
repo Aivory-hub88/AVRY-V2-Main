@@ -674,7 +674,7 @@ function AgentFlowVisual({ title, activeTask }: { title: string, activeTask?: an
   );
 }
 
-function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number }) {
+function TaskQueueAnimation({ tasks, offset, onTaskChange }: { tasks: any[], offset: number, onTaskChange?: (task: any) => void }) {
   const [visibleItems, setVisibleItems] = useState<any[]>([]);
   // Use a ref to track unique IDs for each added task to avoid key collisions and allow React to track identity
   const idCounter = useRef(0);
@@ -685,11 +685,14 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
       let currentIdx = 0;
       
       // Add first task
-      setVisibleItems([{ ...tasks[0], uid: idCounter.current++ }]);
+      const firstTask = { ...tasks[0], uid: idCounter.current++ };
+      setVisibleItems([firstTask]);
+      if (onTaskChange) onTaskChange(firstTask);
       
       timer = setInterval(() => {
         currentIdx = (currentIdx + 1) % tasks.length;
         const nextTask = { ...tasks[currentIdx], uid: idCounter.current++ };
+        if (onTaskChange) onTaskChange(nextTask);
         
         setVisibleItems((current) => {
           const newItems = [...current, nextTask];
