@@ -602,13 +602,13 @@ function AgentFlowVisual({ title }: { title: string }) {
       {title === 'Customer Service Agent' && (
         <div className="flex items-center gap-1.5 w-full">
           <div className={`${boxClasses} ${csState.channel === 0 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className="w-4 h-4 opacity-80" />
+            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 0 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
           </div>
           <div className={`${boxClasses} ${csState.channel === 1 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/telegram.svg" alt="Telegram" className="w-4 h-4 opacity-80" />
+            <img src="/integrations/icons/telegram.svg" alt="Telegram" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 1 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
           </div>
           <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/gmail.svg" alt="Email" className="w-4 h-4 opacity-80 grayscale" />
+            <img src="/integrations/icons/gmail.svg" alt="Email" className={`w-4 h-4 transition-all duration-700 ${reducedMotion ? 'opacity-80' : (csState.channel === 2 && csState.status === 'processing' ? 'opacity-100 grayscale-0' : 'opacity-30 grayscale')}`} />
           </div>
           <div className="ml-0.5">{arrowRight}</div>
           <div className="ml-0.5">
