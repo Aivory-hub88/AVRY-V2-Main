@@ -451,7 +451,7 @@ function IntegrationsMarquee() {
 const NEW_AGENTS = [
   {
     title: 'Customer Service Agent',
-    description: 'Handle inbound support 24/7. Automatically triage, resolve, and escalate to a human if necessary.',
+    description: 'Resolve up to 80% of tier-1 support tickets instantly and escalate complex cases with full context.',
     status: 'ACTIVE · WHATSAPP · TELEGRAM · EMAIL',
     delay: 0,
     tasks: [
@@ -465,7 +465,7 @@ const NEW_AGENTS = [
   },
   {
     title: 'Leads Qualifier Agent',
-    description: 'Filter inbound leads using the BANT framework. Qualified leads are automatically routed to sales.',
+    description: 'Score inbound leads in under 5 seconds and route qualified prospects directly to sales calendars.',
     status: 'ACTIVE · BANT SCORING · CRM SYNC',
     delay: 1500,
     tasks: [
@@ -479,7 +479,7 @@ const NEW_AGENTS = [
   },
   {
     title: 'Office Assistant',
-    description: 'Turn meeting transcripts into summaries, action items, & decisions synced directly to Notion & Slack.',
+    description: 'Save 4 hours per week by automatically extracting action items and syncing decisions to your workspace.',
     status: 'ACTIVE · NOTION · SLACK · SHEETS',
     delay: 3000,
     tasks: [
@@ -529,6 +529,147 @@ function TypewriterText({ text, onComplete }: { text: string, onComplete?: () =>
   }, [text, onComplete]);
 
   return <span>{displayed}<span className="ml-[2px] w-[2px] h-2.5 bg-[#aec99d] animate-pulse inline-block align-middle" /></span>;
+}
+
+function AgentFlowVisual({ title }: { title: string }) {
+  const [inView, setInView] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(entry.isIntersecting);
+    }, { threshold: 0.1 });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Customer Service
+  const [csState, setCsState] = useState({ channel: 0, status: 'resolved' });
+  useEffect(() => {
+    if (!inView || reducedMotion) return;
+    let channel = 0;
+    const runCycle = () => {
+      setCsState({ channel, status: 'processing' });
+      setTimeout(() => {
+        setCsState({ channel, status: 'resolved' });
+        channel = (channel + 1) % 3;
+      }, 1500);
+    };
+    runCycle();
+    const interval = setInterval(runCycle, 3000);
+    return () => clearInterval(interval);
+  }, [inView, reducedMotion]);
+
+  // Leads Qualifier
+  const [lqPhase, setLqPhase] = useState(-1);
+  useEffect(() => {
+    if (!inView || reducedMotion) return;
+    const runCycle = () => {
+      setLqPhase(0);
+      setTimeout(() => setLqPhase(1), 400);
+      setTimeout(() => setLqPhase(2), 800);
+      setTimeout(() => setLqPhase(3), 1200);
+      setTimeout(() => setLqPhase(-1), 2000);
+    };
+    runCycle();
+    const interval = setInterval(runCycle, 3000);
+    return () => clearInterval(interval);
+  }, [inView, reducedMotion]);
+
+  const arrowRight = (
+    <svg className="w-3 h-3 text-white/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    </svg>
+  );
+
+  const boxClasses = "w-8 h-8 shrink-0 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl transition-colors duration-700";
+  const activePulseClasses = "bg-blue-400/10 border-blue-400/20";
+
+  return (
+    <div ref={containerRef} className="flex items-center w-full px-5 pb-4 pt-2">
+      <style>{`
+        @keyframes travel-line {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .animate-travel {
+          animation: travel-line 2s infinite linear;
+        }
+      `}</style>
+      
+      {title === 'Customer Service Agent' && (
+        <div className="flex items-center gap-1.5 w-full">
+          <div className={`${boxClasses} ${csState.channel === 0 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
+            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className="w-4 h-4 opacity-80" />
+          </div>
+          <div className={`${boxClasses} ${csState.channel === 1 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
+            <img src="/integrations/icons/telegram.svg" alt="Telegram" className="w-4 h-4 opacity-80" />
+          </div>
+          <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
+            <img src="/integrations/icons/gmail.svg" alt="Email" className="w-4 h-4 opacity-80 grayscale" />
+          </div>
+          <div className="ml-0.5">{arrowRight}</div>
+          <div className="ml-0.5">
+            <div className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-colors duration-700 ${reducedMotion || csState.status === 'resolved' ? 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20' : 'bg-white/5 text-white/40 border-white/10'}`}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+          <div className="ml-auto flex items-center shrink-0">
+            <div className={`px-2 py-0.5 text-[9px] font-mono rounded-sm border transition-colors duration-700 uppercase tracking-widest ${csState.status === 'processing' && !reducedMotion ? 'bg-blue-400/10 text-blue-400 border-blue-400/20' : 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20'}`}>
+              {reducedMotion ? 'RESOLVED' : csState.status}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {title === 'Leads Qualifier Agent' && (
+        <div className="flex items-center gap-1.5 w-full">
+          {['BUDGET', 'AUTHORITY', 'NEED', 'TIME'].map((tag, i) => {
+            const isLit = reducedMotion || lqPhase >= i;
+            return (
+              <div key={tag} className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors duration-300 ${isLit ? 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20' : 'bg-white/5 text-white/30 border-white/10'}`}>
+                 {tag}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {title === 'Office Assistant' && (
+        <div className="flex items-center w-full max-w-[85%]">
+           <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
+              <svg className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+           </div>
+           <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
+              {!reducedMotion && inView && (
+                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" />
+              )}
+              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
+           </div>
+           <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
+              <svg className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+           </div>
+           <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
+              {!reducedMotion && inView && (
+                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" style={{ animationDelay: '1s' }} />
+              )}
+              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
+           </div>
+           <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
+              <img src="/integrations/icons/slack.svg" alt="Slack" className="w-4 h-4 opacity-80" />
+           </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number }) {
@@ -646,8 +787,12 @@ function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
           </span>
         </div>
 
+        <AgentFlowVisual title={agent.title} />
+
         {/* Task Queue Area */}
-        <TaskQueueAnimation tasks={agent.tasks} offset={agent.delay} />
+        <div className="flex-1 overflow-hidden relative">
+          <TaskQueueAnimation tasks={agent.tasks} offset={agent.delay} />
+        </div>
 
       </div>
     </SpotlightCard>
