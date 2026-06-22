@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "landing (frontend-nextjs)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend/frontend-nextjs", "run", "dev"],
+      "port": 3001
+    },
+    {
+      "name": "user-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend/avry-user-dashboard", "run", "dev"],
+      "port": 9000
+    },
+    {
+      "name": "admin-dashboard",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend/avry-admin-dashboard", "run", "dev"],
+      "port": 9002
+    },
+    {
+      "name": "backend (avry-backend)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["backend/avry-backend/main.py"],
+      "port": 8082
+    }
+  ]
+}
