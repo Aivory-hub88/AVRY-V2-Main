@@ -143,7 +143,7 @@ export default function ContactPage() {
 
                 <button
                   type="submit"
-                  className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white text-black font-semibold hover:bg-black hover:text-white transition-all text-sm border border-white mt-4"
+                  className="flex items-center justify-center gap-2 px-8 py-3.5 bg-[#a3aa96] text-[#494949] font-medium hover:bg-[#8f9681] transition-all text-sm mt-4"
                 >
                   <svg
                     width="14"

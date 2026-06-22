@@ -106,8 +106,8 @@ export default function PricingStepOne({ currency }: { currency?: 'IDR' | 'USD' 
     const activeCurrency = currency || (language === 'id' ? 'IDR' : 'USD');
     if (activeCurrency === 'USD') return `$${basePrice}`;
     
-    // For IDR, use dynamic exchangeRate
-    const idrValue = basePrice * exchangeRate;
+    // For IDR, use dynamic exchangeRate with 5% margin
+    const idrValue = basePrice * (exchangeRate * 1.05);
     if (idrValue >= 1000000) {
       const juta = idrValue / 1000000;
       return `Rp ${parseFloat(juta.toFixed(2))} jt`;

@@ -18,7 +18,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [exchangeRate, setExchangeRate] = useState<number>(16000); // default fallback
 
   useEffect(() => {
-    // Fetch live rate on mount
+    // Fetch live rate on mount and periodically
     async function fetchRate() {
       try {
         const res = await fetch('/api/exchange-rate');
@@ -33,6 +33,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       }
     }
     fetchRate();
+
+    // Auto check currency per 1 hour (3600000 ms)
+    const intervalId = setInterval(fetchRate, 3600000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const formatPrice = (usdPrice: number) => {
