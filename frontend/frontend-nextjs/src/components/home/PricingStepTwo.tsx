@@ -115,8 +115,8 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
     const activeCurrency = currency || (language === 'id' ? 'IDR' : 'USD');
     if (activeCurrency === 'USD') return `$${basePrice}`;
     
-    // For IDR
-    const idrValue = basePrice * exchangeRate;
+    // For IDR, use dynamic exchangeRate with 5% margin
+    const idrValue = basePrice * (exchangeRate * 1.05);
     if (idrValue >= 1000000) {
       const juta = idrValue / 1000000;
       return `Rp ${parseFloat(juta.toFixed(2))} jt`;
@@ -132,8 +132,8 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
     const activeCurrency = currency || (language === 'id' ? 'IDR' : 'USD');
     if (activeCurrency === 'USD') return `${overageUSD}/conversation`;
     
-    // IDR
-    const idrValue = overageUSD * exchangeRate;
+    // IDR with 5% margin
+    const idrValue = overageUSD * (exchangeRate * 1.05);
     // Round to nearest 10 for cleaner look in IDR (e.g. 243 -> 240)
     const roundedIdr = Math.round(idrValue / 10) * 10;
     return `Rp ${roundedIdr}/conversation`;

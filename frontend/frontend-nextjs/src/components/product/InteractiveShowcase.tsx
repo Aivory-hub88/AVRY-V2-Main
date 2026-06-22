@@ -250,7 +250,7 @@ function ConsoleAnimation() {
           <button className="w-7 h-7 flex items-center justify-center text-white/50 hover:text-white/80 transition-colors hidden sm:flex">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-          <button className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black hover:bg-white/90 transition-colors">
+          <button className="w-8 h-8 rounded-full bg-[#a3aa96] flex items-center justify-center text-[#494949] hover:bg-[#8f9681] transition-colors">
             {phase === 'typing' || phase === 'thinking' ? (
               <div className="w-3 h-3 bg-black rounded-[2px]" />
             ) : (
@@ -405,7 +405,7 @@ function WorkflowAnimation() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <button className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black hover:bg-white/90 transition-colors">
+          <button className="w-8 h-8 rounded-full bg-[#a3aa96] flex items-center justify-center text-[#494949] hover:bg-[#8f9681] transition-colors">
             {phase === 'typing' || phase === 'generating' ? (
               <div className="w-3 h-3 bg-black rounded-[2px]" />
             ) : (

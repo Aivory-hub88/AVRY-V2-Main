@@ -176,7 +176,7 @@ export default function Navbar() {
           {authed && (accountType === 'superadmin' || accountType === 'admin') && (
             <button
               onClick={() => handleDashboard('admin')}
-              className="h-[29px] px-[18px] font-normal text-black bg-white inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/80"
+              className="h-[29px] px-[18px] font-normal text-[#494949] bg-[#a3aa96] inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-[#8f9681]"
               style={{
                 borderRadius: 0,
                 fontFamily: "'Manrope', sans-serif",

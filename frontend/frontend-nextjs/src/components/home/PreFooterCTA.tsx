@@ -81,7 +81,7 @@ export default function PreFooterCTA() {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="px-8 py-4 bg-white text-black font-semibold hover:bg-gray-200 transition-colors text-lg"
+              className="px-8 py-4 bg-[#a3aa96] text-[#494949] font-medium hover:bg-[#8f9681] transition-colors text-lg"
             >
               Talk to Our Team
             </button>
