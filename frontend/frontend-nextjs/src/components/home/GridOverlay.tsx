@@ -90,23 +90,22 @@ export default function GridOverlay({ animated = false, className = '' }: GridOv
 
 
         // Crosshairs at intersections
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
         const cs = 4;
+        
+        ctx.beginPath();
         for (let x = -1; x <= colCount + 1; x++) {
           for (let y = -1; y <= rowCount + 1; y++) {
             const px = x * cw + offsetX;
             const py = y * ch + offsetY;
-            ctx.beginPath();
             ctx.moveTo(px - cs, py);
             ctx.lineTo(px + cs, py);
-            ctx.stroke();
-            ctx.beginPath();
             ctx.moveTo(px, py - cs);
             ctx.lineTo(px, py + cs);
-            ctx.stroke();
           }
         }
+        ctx.stroke();
 
         ctx.restore();
 
@@ -138,23 +137,22 @@ export default function GridOverlay({ animated = false, className = '' }: GridOv
 
 
 
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
         const cs = 4;
+        
+        ctx.beginPath();
         for (let x = -1; x <= colCount + 1; x++) {
           for (let y = -1; y <= rowCount + 1; y++) {
             const px = x * cw + offsetX;
             const py = y * ch + offsetY;
-            ctx.beginPath();
             ctx.moveTo(px - cs, py);
             ctx.lineTo(px + cs, py);
-            ctx.stroke();
-            ctx.beginPath();
             ctx.moveTo(px, py - cs);
             ctx.lineTo(px, py + cs);
-            ctx.stroke();
           }
         }
+        ctx.stroke();
       };
 
       drawStatic();

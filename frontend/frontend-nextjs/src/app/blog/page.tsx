@@ -1,10 +1,25 @@
-"use client"
-
-import { useEffect, useState, useCallback } from "react"
+import type { Metadata } from "next"
 import Link from "next/link"
 import Navbar from "@/components/home/Navbar";
 import Footer from "@/components/Footer";
 import { getBlogPosts, BlogPost, BlogPostsResponse } from "@/lib/blog-api"
+import { DEFAULT_OG_IMAGE } from "@/lib/seo"
+
+export const metadata: Metadata = {
+  title: "Blog",
+  description:
+    "Insights, guides, and updates on AI adoption, automation, and business transformation from the Aivory team.",
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    type: "website",
+    title: "Aivory Blog",
+    description:
+      "Insights, guides, and updates on AI adoption, automation, and business transformation.",
+    url: "/blog",
+    images: [DEFAULT_OG_IMAGE],
+  },
+  twitter: { card: "summary_large_image", images: [DEFAULT_OG_IMAGE] },
+}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
@@ -19,7 +34,7 @@ function BlogPostCard({ post }: { post: BlogPost }) {
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden hover:border-[#07D197]/40 hover:bg-white/[0.04] transition-all duration-300"
+      className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden hover:border-[#c4c9b8]/40 hover:bg-white/[0.04] transition-all duration-300"
     >
       {/* Thumbnail */}
       <div className="aspect-video w-full bg-white/5 overflow-hidden">
@@ -51,7 +66,7 @@ function BlogPostCard({ post }: { post: BlogPost }) {
 
       {/* Content */}
       <div className="flex flex-col flex-1 p-5">
-        <h2 className="text-lg font-semibold text-white mb-2 group-hover:text-[#07D197] transition-colors line-clamp-2">
+        <h2 className="text-lg font-semibold text-white mb-2 group-hover:text-[#c4c9b8] transition-colors line-clamp-2">
           {post.title}
         </h2>
 
@@ -123,72 +138,78 @@ function LoadingGrid() {
 function PaginationControls({
   page,
   totalPages,
-  onPageChange,
 }: {
   page: number
   totalPages: number
-  onPageChange: (page: number) => void
 }) {
   if (totalPages <= 1) return null
 
   return (
     <div className="flex items-center justify-center gap-4 mt-12">
-      <button
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-        className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        aria-label="Previous page"
-      >
-        ← Previous
-      </button>
+      {page > 1 ? (
+        <Link
+          href={`/blog?page=${page - 1}`}
+          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors"
+          aria-label="Previous page"
+        >
+          ← Previous
+        </Link>
+      ) : (
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors opacity-30 cursor-not-allowed"
+          aria-label="Previous page"
+        >
+          ← Previous
+        </button>
+      )}
 
       <span className="text-sm text-gray-400">
         Page {page} of {totalPages}
       </span>
 
-      <button
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-        className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        aria-label="Next page"
-      >
-        Next →
-      </button>
+      {page < totalPages ? (
+        <Link
+          href={`/blog?page=${page + 1}`}
+          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors"
+          aria-label="Next page"
+        >
+          Next →
+        </Link>
+      ) : (
+        <button
+          disabled
+          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors opacity-30 cursor-not-allowed"
+          aria-label="Next page"
+        >
+          Next →
+        </button>
+      )}
     </div>
   )
+
 }
 
-export default function BlogPage() {
-  const [posts, setPosts] = useState<BlogPost[]>([])
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export const revalidate = 60; // SSG with ISR (1 min)
 
-  const fetchPosts = useCallback(async (pageNum: number) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data: BlogPostsResponse = await getBlogPosts(pageNum, 9)
-      setPosts(data.posts)
-      setTotalPages(data.total_pages)
-      setPage(data.page)
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load blog posts"
-      )
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+export default async function BlogPage(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams;
+  const pageStr = searchParams?.page;
+  const page = typeof pageStr === 'string' ? parseInt(pageStr, 10) : 1;
+  const validPage = isNaN(page) || page < 1 ? 1 : page;
 
-  useEffect(() => {
-    fetchPosts(1)
-  }, [fetchPosts])
+  let posts: BlogPost[] = [];
+  let totalPages = 0;
+  let error: string | null = null;
 
-  const handlePageChange = (newPage: number) => {
-    fetchPosts(newPage)
-    window.scrollTo({ top: 0, behavior: "smooth" })
+  try {
+    const data: BlogPostsResponse = await getBlogPosts(validPage, 9);
+    posts = data.posts;
+    totalPages = data.total_pages;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Failed to load blog posts";
   }
 
   return (
@@ -207,13 +228,11 @@ export default function BlogPage() {
           </div>
 
           {/* Content */}
-          {loading ? (
-            <LoadingGrid />
-          ) : error ? (
+          {error ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-red-400 mb-4">{error}</p>
-              <button
-                onClick={() => fetchPosts(page)}
+              <Link
+                href="/blog"
                 className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
                 style={{
                   padding: '0.75rem 1.5rem',
@@ -224,7 +243,7 @@ export default function BlogPage() {
                 }}
               >
                 Try Again
-              </button>
+              </Link>
             </div>
           ) : posts.length === 0 ? (
             <EmptyState />
@@ -237,9 +256,8 @@ export default function BlogPage() {
               </div>
 
               <PaginationControls
-                page={page}
+                page={validPage}
                 totalPages={totalPages}
-                onPageChange={handlePageChange}
               />
             </>
           )}

@@ -22,23 +22,17 @@ export default function ScrollRevealProvider() {
       return;
     }
 
-    // Target section-level headings and paragraphs (matching index.html selectors)
-    const headingSelectors = [
-      'main > section > div > div > h2',
-      'main > section > div > div > p',
-      'main > section > div > div > div > h2',
-      'main > section > div > div > div > p',
-      '#features h2',
-      '#features > div > div > p',
-    ].join(',');
+    // Target section-level headings and paragraphs
+    // useGsapScrollReveal hook already filters out .hero, .gsap-card, and .animate-on-scroll
+    const headingSelectors = 'h2, p';
 
     revealElements(headingSelectors);
 
-    // Grid containers — only target grids NOT inside animate-on-scroll sections
+    // Grid containers
     revealGrids('main .grid');
 
     // Border dividers — only standalone decorative dividers, not section borders
-    revealDividers('.border-t:not(section):not([class*="animate-on-scroll"])');
+    revealDividers('.border-t:not(section)');
 
     return () => {
       killAllScrollTriggers();

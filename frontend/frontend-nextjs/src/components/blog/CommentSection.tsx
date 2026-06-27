@@ -98,7 +98,7 @@ function CommentForm({
         placeholder="Your name"
         required
         aria-label="Author name"
-        className={`w-full px-3 ${compact ? "py-2 text-sm" : "py-2.5"} rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#07D197]/50 transition-colors`}
+        className={`w-full px-3 ${compact ? "py-2 text-sm" : "py-2.5"} rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#c4c9b8]/50 transition-colors`}
       />
       <textarea
         value={body}
@@ -107,7 +107,7 @@ function CommentForm({
         required
         rows={compact ? 2 : 3}
         aria-label="Comment body"
-        className={`w-full px-3 ${compact ? "py-2 text-sm" : "py-2.5"} rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#07D197]/50 transition-colors resize-none`}
+        className={`w-full px-3 ${compact ? "py-2 text-sm" : "py-2.5"} rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#c4c9b8]/50 transition-colors resize-none`}
       />
       {error && (
         <p className="text-sm text-red-400" role="alert">
@@ -118,7 +118,7 @@ function CommentForm({
         <button
           type="submit"
           disabled={submitting || !authorName.trim() || !body.trim()}
-          className={`${compact ? "px-3 py-1.5 text-sm" : "px-4 py-2"} rounded-lg bg-[#07D197] text-[#050505] font-semibold hover:bg-[#06B882] transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${compact ? "px-3 py-1.5 text-sm" : "px-4 py-2"} rounded-lg bg-[#c4c9b8] text-[#050505] font-semibold hover:bg-[#b2b8a6] transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}
         >
           {submitting ? "Posting…" : submitLabel}
         </button>
@@ -206,7 +206,7 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
           <div className="flex items-center gap-3 mt-2">
             <button
               onClick={handleLike}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#07D197] transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#c4c9b8] transition-colors"
               aria-label={`Like comment by ${comment.author_name}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -447,7 +447,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
           <p className="text-red-400 text-sm mb-3">{error}</p>
           <button
             onClick={fetchComments}
-            className="text-sm text-[#07D197] hover:underline"
+            className="text-sm text-[#c4c9b8] hover:underline"
           >
             Try again
           </button>

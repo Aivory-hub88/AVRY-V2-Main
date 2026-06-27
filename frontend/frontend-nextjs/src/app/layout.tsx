@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Manrope } from 'next/font/google';
 import './globals.css';
+import { SITE_URL, ORGANIZATION, JsonLd } from '@/lib/seo';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -8,10 +9,39 @@ const manrope = Manrope({
   display: 'swap',
 });
 
+const SITE_NAME = 'Aivory';
+const SITE_TITLE = 'Aivory — AI-Powered Business Transformation';
+const SITE_DESCRIPTION =
+  'From diagnostic to deployment — everything you need to integrate AI into your business operations.';
+
+// Default social/share image used by any page that doesn't set its own.
+const DEFAULT_OG_IMAGE = '/hero-video-poster.jpg';
+
 export const metadata: Metadata = {
-  title: 'Aivory — AI-Powered Business Transformation',
-  description:
-    'From diagnostic to deployment — everything you need to integrate AI into your business operations.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: '%s | Aivory',
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [{ url: DEFAULT_OG_IMAGE, width: 1200, height: 630, alt: SITE_TITLE }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [DEFAULT_OG_IMAGE],
+  },
 };
 
 import { LanguageProvider } from '@/components/context/LanguageContext';
@@ -30,6 +60,20 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-background text-white font-manrope antialiased" style={{ fontFamily: 'var(--font-manrope), Manrope, sans-serif' }}>
+        <JsonLd
+          data={{
+            '@context': 'https://schema.org',
+            '@graph': [
+              { ...ORGANIZATION, description: SITE_DESCRIPTION },
+              {
+                '@type': 'WebSite',
+                name: SITE_NAME,
+                url: SITE_URL,
+                publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+              },
+            ],
+          }}
+        />
         <LanguageProvider>
           {children}
         </LanguageProvider>

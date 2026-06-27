@@ -53,7 +53,7 @@ export default function PreFooterCTA() {
 
   return (
     <>
-      <section ref={ref} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full bg-[#050505] text-white pt-12 pb-24 font-sans`}>
+      <section ref={ref} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full text-white pt-12 pb-24 font-sans`}>
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           {/* Headline */}
           <h2 className="text-3xl md:text-5xl lg:text-6xl font-normal tracking-tight mb-6">

@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source
 COPY . .
@@ -44,6 +44,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Server-side runtime URLs for Docker internal networking (SSR fetches)
+# These are NOT baked at build time — they're resolved at runtime.
+ENV BLOG_SERVICE_URL=http://avry-blog:8089
+ENV CAREERS_SERVICE_URL=http://avry-careers:8090
+ENV BACKEND_SERVICE_URL=http://avry-backend:8081
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs

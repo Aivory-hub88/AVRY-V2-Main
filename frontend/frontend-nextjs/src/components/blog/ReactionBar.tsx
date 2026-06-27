@@ -182,11 +182,11 @@ export function ReactionBar({
       <button
         onClick={handleLike}
         disabled={likeLoading}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 hover:border-[#07D197]/40 hover:bg-white/[0.04] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 hover:border-[#c4c9b8]/40 hover:bg-white/[0.04] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group"
         aria-label={`Like this post (${likeCount} likes)`}
       >
         <svg
-          className="w-4 h-4 text-gray-400 group-hover:text-[#07D197] transition-colors"
+          className="w-4 h-4 text-gray-400 group-hover:text-[#c4c9b8] transition-colors"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

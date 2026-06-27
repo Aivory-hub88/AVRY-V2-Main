@@ -1,10 +1,24 @@
-"use client"
-
-import { useEffect, useState } from "react"
+import type { Metadata } from "next"
 import Link from "next/link"
 import Navbar from "@/components/home/Navbar";
 import Footer from "@/components/Footer";
 import { getVacancies, type Vacancy } from "@/lib/careers-api"
+import { DEFAULT_OG_IMAGE } from "@/lib/seo"
+
+export const metadata: Metadata = {
+  title: "Careers",
+  description:
+    "Join Aivory. Explore open roles and help build the platform that brings AI into everyday business operations.",
+  alternates: { canonical: "/careers" },
+  openGraph: {
+    type: "website",
+    title: "Careers at Aivory",
+    description: "Explore open roles and join the team building AI for business.",
+    url: "/careers",
+    images: [DEFAULT_OG_IMAGE],
+  },
+  twitter: { card: "summary_large_image", images: [DEFAULT_OG_IMAGE] },
+}
 
 /**
  * Extract a brief plain-text description from the rich editor JSONB output.
@@ -78,10 +92,10 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
   return (
     <Link
       href={`/careers/${vacancy.id}`}
-      className="block group rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-[#07D197]/40 hover:bg-white/[0.05]"
+      className="block group rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-[#c4c9b8]/40 hover:bg-white/[0.05]"
     >
       <div className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold text-white group-hover:text-[#07D197] transition-colors">
+        <h2 className="text-xl font-semibold text-white group-hover:text-[#c4c9b8] transition-colors">
           {vacancy.title}
         </h2>
 
@@ -119,7 +133,7 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
           </p>
         )}
 
-        <div className="mt-3 text-sm font-medium text-[#07D197] group-hover:underline">
+        <div className="mt-3 text-sm font-medium text-[#c4c9b8] group-hover:underline">
           View Details →
         </div>
       </div>
@@ -143,50 +157,20 @@ function EmptyState() {
   )
 }
 
-function LoadingState() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {[1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          className="rounded-xl border border-white/10 bg-white/[0.03] p-6 animate-pulse"
-        >
-          <div className="h-6 bg-white/10 rounded w-3/4 mb-3" />
-          <div className="flex gap-3 mb-3">
-            <div className="h-4 bg-white/5 rounded w-20" />
-            <div className="h-4 bg-white/5 rounded w-24" />
-            <div className="h-4 bg-white/5 rounded w-16" />
-          </div>
-          <div className="h-4 bg-white/5 rounded w-full mb-2" />
-          <div className="h-4 bg-white/5 rounded w-2/3" />
-        </div>
-      ))}
-    </div>
-  )
-}
 
-export default function CareersPage() {
-  const [vacancies, setVacancies] = useState<Vacancy[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export const revalidate = 60; // SSG with ISR (1 min)
 
-  useEffect(() => {
-    async function fetchVacancies() {
-      try {
-        setLoading(true)
-        setError(null)
-        const data = await getVacancies()
-        setVacancies(data)
-      } catch (err) {
-        setError("Failed to load vacancies. Please try again later.")
-        console.error("[CareersPage] Error fetching vacancies:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
+export default async function CareersPage() {
+  let vacancies: Vacancy[] = [];
+  let error: string | null = null;
 
-    fetchVacancies()
-  }, [])
+  try {
+    const data = await getVacancies();
+    vacancies = data || [];
+  } catch (err) {
+    error = "Failed to load vacancies. Please try again later.";
+    console.error("[CareersPage] Error fetching vacancies:", err);
+  }
 
   return (
     <div className="flex min-h-screen flex-col font-manrope" style={{ background: '#050505' }}>
@@ -206,9 +190,7 @@ export default function CareersPage() {
             </div>
           )}
 
-          {loading ? (
-            <LoadingState />
-          ) : vacancies.length === 0 ? (
+          {vacancies.length === 0 ? (
             <EmptyState />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

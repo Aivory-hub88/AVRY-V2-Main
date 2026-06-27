@@ -1,11 +1,115 @@
-"use client"
-
-import React, { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import type { Metadata } from "next"
+import React from "react"
 import Link from "next/link"
 import Navbar from "@/components/home/Navbar";
 import Footer from "@/components/Footer";
 import { getVacancy, type Vacancy } from "@/lib/careers-api"
+import {
+  ORGANIZATION,
+  SITE_NAME,
+  DEFAULT_OG_IMAGE,
+  absoluteUrl,
+  richContentToPlainText,
+  clampDescription,
+  JsonLd,
+} from "@/lib/seo"
+
+/** Map our employment_type strings to schema.org employmentType enums. */
+function schemaEmploymentType(type: string | null): string | undefined {
+  if (!type) return undefined
+  const t = type.toLowerCase().replace(/[\s_]/g, "-")
+  const map: Record<string, string> = {
+    "full-time": "FULL_TIME",
+    "part-time": "PART_TIME",
+    contract: "CONTRACTOR",
+    contractor: "CONTRACTOR",
+    freelance: "CONTRACTOR",
+    internship: "INTERN",
+    intern: "INTERN",
+    temporary: "TEMPORARY",
+    volunteer: "VOLUNTEER",
+  }
+  return map[t]
+}
+
+/** Build the JobPosting structured-data object for a vacancy. */
+function jobPostingJsonLd(vacancy: Vacancy, description: string) {
+  const datePosted = vacancy.posted_at || vacancy.created_at
+  const isRemote = (vacancy.location || "").toLowerCase().includes("remote")
+
+  const jobLocation = isRemote
+    ? undefined
+    : vacancy.location
+      ? {
+          "@type": "Place",
+          address: { "@type": "PostalAddress", addressLocality: vacancy.location },
+        }
+      : undefined
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "JobPosting",
+    title: vacancy.title,
+    description,
+    datePosted,
+    employmentType: schemaEmploymentType(vacancy.employment_type),
+    hiringOrganization: ORGANIZATION,
+    industry: vacancy.department || undefined,
+    directApply: true,
+    url: absoluteUrl(`/careers/${vacancy.id}`),
+    ...(jobLocation ? { jobLocation } : {}),
+    ...(isRemote
+      ? {
+          jobLocationType: "TELECOMMUTE",
+          applicantLocationRequirements: {
+            "@type": "Country",
+            name: vacancy.location?.replace(/remote/i, "").replace(/[-—,]/g, "").trim() || "Worldwide",
+          },
+        }
+      : {}),
+  }
+}
+
+/** Description text for meta + structured data, drawn from the rich body. */
+function vacancyDescription(vacancy: Vacancy): string {
+  const brief = vacancy.brief_description?.trim()
+  const full = [
+    richContentToPlainText(vacancy.description),
+    richContentToPlainText(vacancy.requirements),
+  ]
+    .filter(Boolean)
+    .join(" ")
+  return brief || full
+}
+
+export async function generateMetadata(
+  props: { params: Promise<{ id: string }> }
+): Promise<Metadata> {
+  const { id } = await props.params
+  const vacancy = await getVacancy(id)
+
+  if (!vacancy) {
+    return { title: "Position not found", robots: { index: false, follow: false } }
+  }
+
+  const description = clampDescription(vacancyDescription(vacancy))
+  const url = absoluteUrl(`/careers/${vacancy.id}`)
+  const titleParts = [vacancy.title, vacancy.location].filter(Boolean).join(" · ")
+
+  return {
+    title: titleParts || vacancy.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      title: `${vacancy.title} — Careers at ${SITE_NAME}`,
+      description,
+      url,
+      images: [DEFAULT_OG_IMAGE],
+    },
+    twitter: { card: "summary_large_image", title: vacancy.title, description, images: [DEFAULT_OG_IMAGE] },
+  }
+}
 
 /**
  * Render a Rich_Editor JSONB block into HTML elements.
@@ -83,7 +187,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
     case "quote":
     case "blockquote":
       return (
-        <blockquote key={index} className="border-l-4 border-[#07D197]/50 pl-4 mb-4 italic text-gray-400">
+        <blockquote key={index} className="border-l-4 border-[#c4c9b8]/50 pl-4 mb-4 italic text-gray-400">
           {text}
         </blockquote>
       )
@@ -155,7 +259,7 @@ function renderInlineContent(content: unknown[] | undefined): React.ReactNode {
       if (inline.code) return <code key={i} className="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono">{text}</code>
       if (inline.link || inline.href) {
         return (
-          <a key={i} href={(inline.link as string) || (inline.href as string)} className="text-[#07D197] hover:underline" target="_blank" rel="noopener noreferrer">
+          <a key={i} href={(inline.link as string) || (inline.href as string)} className="text-[#c4c9b8] hover:underline" target="_blank" rel="noopener noreferrer">
             {text}
           </a>
         )
@@ -264,77 +368,51 @@ function NotFoundState() {
   )
 }
 
-function LoadingState() {
-  return (
-    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
-      <Navbar />
-      <main className="flex-1 px-6 py-24">
-        <div className="max-w-3xl mx-auto animate-pulse">
-          <div className="h-4 bg-white/10 rounded w-32 mb-8" />
-          <div className="h-10 bg-white/10 rounded w-3/4 mb-6" />
-          <div className="flex gap-3 mb-8">
-            <div className="h-8 bg-white/5 rounded-full w-28" />
-            <div className="h-8 bg-white/5 rounded-full w-24" />
-            <div className="h-8 bg-white/5 rounded-full w-32" />
-          </div>
-          <div className="space-y-3">
-            <div className="h-4 bg-white/5 rounded w-full" />
-            <div className="h-4 bg-white/5 rounded w-full" />
-            <div className="h-4 bg-white/5 rounded w-5/6" />
-            <div className="h-4 bg-white/5 rounded w-full" />
-            <div className="h-4 bg-white/5 rounded w-2/3" />
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
-  )
-}
 
-export default function VacancyDetailPage() {
-  const params = useParams()
-  const id = params.id as string
+export const revalidate = 60; // SSG with ISR (1 min)
 
-  const [vacancy, setVacancy] = useState<Vacancy | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+export default async function VacancyDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
 
-  useEffect(() => {
-    async function fetchVacancy() {
-      if (!id) return
+  let vacancy: Vacancy | null = null;
+  let notFound = false;
 
-      try {
-        setLoading(true)
-        setNotFound(false)
-        const data = await getVacancy(id)
-        if (!data) {
-          setNotFound(true)
-        } else {
-          setVacancy(data)
-        }
-      } catch (err) {
-        console.error("[VacancyDetailPage] Error fetching vacancy:", err)
-        setNotFound(true)
-      } finally {
-        setLoading(false)
-      }
+  try {
+    const data = await getVacancy(id);
+    if (!data) {
+      notFound = true;
+    } else {
+      vacancy = data;
     }
+  } catch (err) {
+    console.error("[VacancyDetailPage] Error fetching vacancy:", err);
+    notFound = true;
+  }
 
-    fetchVacancy()
-  }, [id])
-
-  if (loading) return <LoadingState />
-  if (notFound || !vacancy) return <NotFoundState />
+  if (notFound || !vacancy) return <NotFoundState />;
 
   return (
     <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
       <Navbar />
       <main className="flex-1 px-6 py-24">
         <div className="max-w-3xl mx-auto">
+          <JsonLd data={jobPostingJsonLd(vacancy, clampDescription(vacancyDescription(vacancy), 500))} />
+          <JsonLd
+            data={{
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+                { "@type": "ListItem", position: 2, name: "Careers", item: absoluteUrl("/careers") },
+                { "@type": "ListItem", position: 3, name: vacancy.title, item: absoluteUrl(`/careers/${vacancy.id}`) },
+              ],
+            }}
+          />
           {/* Back link */}
           <Link
             href="/careers"
-            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#07D197] transition-colors mb-8"
+            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#c4c9b8] transition-colors mb-8"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

@@ -13,13 +13,14 @@ const config: Config = {
         background: '#050505',
         surface: '#0a0a0a',
         'surface-hover': '#111111',
-        accent: '#0ae8af',
-        'accent-hover': '#1cffbf',
+        accent: '#c4c9b8',
+        'accent-hover': '#dbe0ce',
         border: 'rgba(255,255,255,0.08)',
         'border-hover': 'rgba(255,255,255,0.18)',
       },
       fontFamily: {
         manrope: ['var(--font-manrope)', 'sans-serif'],
+        sans: ['var(--font-manrope)', 'sans-serif'],
       },
       animation: {
         marquee: 'marquee 30s linear infinite',
