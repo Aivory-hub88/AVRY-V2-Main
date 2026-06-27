@@ -14,15 +14,11 @@ export default function AIReadySection() {
           </h2>
 
           <p className="text-white/60 max-w-2xl font-light leading-relaxed mb-6">
-            Aivory™ helps you move from <span className="text-white">&ldquo;where do we start?&rdquo;</span> to AI that&rsquo;s working inside your business.
-          </p>
-
-          <p className="text-white/60 max-w-2xl font-light leading-relaxed mb-6">
-            <span className="text-white">Most businesses don&rsquo;t fail at AI because of the technology.</span> They fail because there&rsquo;s no clear starting point. No map. No structure. No plan that actually fits how they operate. So they stall.
-          </p>
-
-          <p className="text-white/60 max-w-2xl font-light leading-relaxed">
-            Aivory fixes that. Assess your readiness, surface what actually matters, and launch the right AI systems with one clear plan. <span className="text-white">No long discovery cycles. No bloated consulting timelines.<br /> No generic decks that go nowhere.</span>
+            Aivory&trade; helps you move from <span className="text-white">&ldquo;where do we start?&rdquo;</span> to AI that&rsquo;s working inside your business.<br />
+            <span className="text-white">Most businesses don&rsquo;t fail at AI because of the technology.</span> They fail because there&rsquo;s no clear starting point. No map. No structure. No plan that actually fits how they operate. So they stall.<br />
+            Aivory fixes that. Assess your readiness, surface what actually matters, and launch the right AI systems with one clear plan.<br />
+            <span className="text-white">No long discovery cycles. No bloated consulting timelines.<br />
+            No generic decks that go nowhere.</span>
           </p>
 
           <p

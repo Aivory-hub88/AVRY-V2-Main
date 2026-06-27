@@ -83,7 +83,7 @@ class MockImage {
 /** A well-formed badge SVG so the SVG render + raster-swap path is exercised. */
 const BADGE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-  '<circle cx="50" cy="50" r="40" fill="#0ae8af" /></svg>';
+  '<circle cx="50" cy="50" r="40" fill="#c4c9b8" /></svg>';
 
 /** A representative mock diagnostic result. */
 const MOCK_RESULT: DiagnosticResult = {

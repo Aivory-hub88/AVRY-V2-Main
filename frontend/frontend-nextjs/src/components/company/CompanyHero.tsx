@@ -16,7 +16,7 @@ export function CompanyHero() {
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none opacity-20 blur-[100px]"
         style={{
-          background: 'radial-gradient(ellipse 50% 50% at 50% 0%, #0ae8af 0%, transparent 80%)',
+          background: 'radial-gradient(ellipse 50% 50% at 50% 0%, #c4c9b8 0%, transparent 80%)',
         }}
       />
 

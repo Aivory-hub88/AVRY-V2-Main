@@ -14,6 +14,13 @@ export default function HeroSection() {
     const CW = 120;
     const CH = 120;
 
+    // Force video to play reliably
+    if (videoRef.current) {
+      videoRef.current.play().catch(error => {
+        console.log("Video autoplay failed:", error);
+      });
+    }
+
     const positionDarkCell = () => {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -73,10 +80,11 @@ export default function HeroSection() {
         loop
         playsInline
         preload="auto"
+        poster="/hero-video-poster.jpg"
         className="absolute inset-0 w-full h-full object-cover z-0"
         style={{ willChange: 'transform' }}
       >
-        <source src="/hero-video/Hero%20Aivory%20black%20sphere%202%20optimized.mp4" type="video/mp4" />
+        <source src="/hero-video/hero-aivory-optimized.mp4" type="video/mp4" />
       </video>
 
       {/* Grid Overlay with random fade (hero only) */}
@@ -90,7 +98,7 @@ export default function HeroSection() {
       >
         <h1
           className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90 text-center leading-[1.1] animate-slide-up-1"
-          style={{ fontFamily: "'Manrope', sans-serif", animationDelay: '2s' }}
+          style={{ fontFamily: "'Manrope', sans-serif", animationDelay: '0.2s' }}
         >
           Make AI make sense
           <span
@@ -108,12 +116,12 @@ export default function HeroSection() {
         </h1>
 
         {/* Rotating subtitle with initial slide up */}
-        <div className="w-full animate-slide-up-2" style={{ animationDelay: '2.4s' }}>
+        <div className="w-full animate-slide-up-2" style={{ animationDelay: '0.4s' }}>
           <RotatingText />
         </div>
 
         {/* CTA Button */}
-        <div className="animate-slide-up-3" style={{ animationDelay: '2.8s' }}>
+        <div className="animate-slide-up-3" style={{ animationDelay: '0.6s' }}>
           <a
             href="/free-diagnostic"
             className="inline-flex items-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white animate-gentle-bounce min-h-[44px]"

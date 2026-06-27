@@ -1,11 +1,65 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import type { Metadata } from "next"
 import Link from "next/link"
 import Navbar from "@/components/home/Navbar";
 import Footer from "@/components/Footer";
 import { getBlogPost, BlogPostDetail, BlogContentBlock } from "@/lib/blog-api"
+import { notFound } from "next/navigation"
+import {
+  SITE_URL,
+  ORGANIZATION,
+  DEFAULT_OG_IMAGE,
+  absoluteUrl,
+  richContentToPlainText,
+  clampDescription,
+  JsonLd,
+} from "@/lib/seo"
+
+/** Best-effort description: explicit excerpt, else first words of the body. */
+function postDescription(post: BlogPostDetail): string {
+  if (post.excerpt) return clampDescription(post.excerpt)
+  return clampDescription(richContentToPlainText(post.body?.blocks))
+}
+
+export async function generateMetadata(
+  props: { params: Promise<{ slug: string }> }
+): Promise<Metadata> {
+  const { slug } = await props.params
+  let post: BlogPostDetail | null = null
+  try {
+    post = await getBlogPost(slug)
+  } catch {
+    post = null
+  }
+
+  if (!post) {
+    return { title: "Post not found", robots: { index: false, follow: false } }
+  }
+
+  const description = postDescription(post)
+  const url = absoluteUrl(`/blog/${post.slug}`)
+  const images = [post.thumbnail_url || DEFAULT_OG_IMAGE]
+
+  return {
+    title: post.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description,
+      url,
+      images,
+      publishedTime: post.published_at,
+      authors: post.author_name ? [post.author_name] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.title,
+      description,
+      images,
+    },
+  }
+}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
@@ -110,7 +164,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
             href={block.href || "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#07D197] underline hover:text-[#06B882] transition-colors"
+            className="text-[#c4c9b8] underline hover:text-[#b2b8a6] transition-colors"
           >
             {block.text || block.href}
           </a>
@@ -147,109 +201,39 @@ function formatInlineMarkup(text: string): string {
   // Inline code: `text`
   html = html.replace(
     /`(.+?)`/g,
-    '<code class="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-sm font-mono text-[#07D197]">$1</code>'
+    '<code class="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-sm font-mono text-[#c4c9b8]">$1</code>'
   )
   return html
 }
 
-function LoadingSkeleton() {
-  return (
-    <div className="max-w-3xl mx-auto animate-pulse">
-      <div className="h-10 bg-white/10 rounded w-3/4 mb-4" />
-      <div className="flex items-center gap-4 mb-8">
-        <div className="h-4 bg-white/5 rounded w-24" />
-        <div className="h-4 bg-white/5 rounded w-32" />
-      </div>
-      <div className="space-y-4">
-        <div className="h-4 bg-white/5 rounded w-full" />
-        <div className="h-4 bg-white/5 rounded w-5/6" />
-        <div className="h-4 bg-white/5 rounded w-4/6" />
-        <div className="h-4 bg-white/5 rounded w-full" />
-        <div className="h-4 bg-white/5 rounded w-3/4" />
-      </div>
-    </div>
-  )
-}
 
-function NotFoundState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <svg
-        className="w-16 h-16 text-white/20 mb-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1}
-          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <h2 className="text-2xl font-semibold text-white mb-3">Post not found</h2>
-      <p className="text-gray-400 mb-6 max-w-sm">
-        The blog post you&apos;re looking for doesn&apos;t exist or has been removed.
-      </p>
-      <Link
-        href="/blog"
-        className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
-        style={{
-          padding: '0.75rem 1.5rem',
-          fontFamily: "'Manrope', sans-serif",
-          fontWeight: 400,
-          fontSize: '0.75rem',
-          letterSpacing: '0.1em',
-        }}
-      >
-        ← Back to Blog
-      </Link>
-    </div>
-  )
-}
 
-export default function BlogPostPage() {
-  const params = useParams()
-  const slug = params.slug as string
+export const revalidate = 60; // SSG with ISR (1 min)
 
-  const [post, setPost] = useState<BlogPostDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export default async function BlogPostPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
+  const slug = params.slug;
 
-  useEffect(() => {
-    if (!slug) return
+  let post: BlogPostDetail | null = null;
+  let error: string | null = null;
 
-    async function fetchPost() {
-      setLoading(true)
-      setError(null)
-      setNotFound(false)
-      try {
-        const data = await getBlogPost(slug)
-        if (data === null) {
-          setNotFound(true)
-        } else {
-          setPost(data)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load blog post")
-      } finally {
-        setLoading(false)
-      }
+  try {
+    const data = await getBlogPost(slug);
+    if (data === null) {
+      notFound();
+    } else {
+      post = data;
     }
-
-    fetchPost()
-  }, [slug])
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Failed to load blog post";
+  }
 
   return (
     <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
       <Navbar />
 
       <main className="flex-1 px-6 py-24">
-        {loading ? (
-          <LoadingSkeleton />
-        ) : error ? (
+        {error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-red-400 mb-4">{error}</p>
             <Link
@@ -266,14 +250,42 @@ export default function BlogPostPage() {
               ← Back to Blog
             </Link>
           </div>
-        ) : notFound ? (
-          <NotFoundState />
         ) : post ? (
           <article className="max-w-3xl mx-auto">
+            <JsonLd
+              data={{
+                "@context": "https://schema.org",
+                "@type": "BlogPosting",
+                headline: post.title,
+                description: postDescription(post),
+                image: post.thumbnail_url || undefined,
+                datePublished: post.published_at,
+                dateModified: post.published_at,
+                author: { "@type": "Person", name: post.author_name },
+                publisher: ORGANIZATION,
+                mainEntityOfPage: {
+                  "@type": "WebPage",
+                  "@id": absoluteUrl(`/blog/${post.slug}`),
+                },
+                url: absoluteUrl(`/blog/${post.slug}`),
+                isPartOf: { "@type": "Blog", name: "Aivory Blog", url: `${SITE_URL}/blog` },
+              }}
+            />
+            <JsonLd
+              data={{
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+                  { "@type": "ListItem", position: 2, name: "Blog", item: `${SITE_URL}/blog` },
+                  { "@type": "ListItem", position: 3, name: post.title, item: absoluteUrl(`/blog/${post.slug}`) },
+                ],
+              }}
+            />
             {/* Back link */}
             <Link
               href="/blog"
-              className="inline-flex items-center text-sm text-gray-400 hover:text-[#07D197] transition-colors mb-8"
+              className="inline-flex items-center text-sm text-gray-400 hover:text-[#c4c9b8] transition-colors mb-8"
             >
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

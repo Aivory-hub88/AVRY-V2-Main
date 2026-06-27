@@ -2,6 +2,7 @@
 
 import { MouseEvent, useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
+import { HalftoneWave } from '@/components/ui/HalftoneWave';
 
 // Reusable Spotlight Card Component
 function SpotlightCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -296,9 +297,9 @@ function AppIntegrationsAnimation() {
 
 export function InteractiveGrid() {
   return (
-    <section className="bg-black text-white py-24 px-6 md:px-16 lg:px-24 relative">
+    <section className="text-white pt-24 pb-0 px-6 md:px-16 lg:px-24 relative overflow-hidden">
       {/* Background grid line overlay */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none" />
+      <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none z-0" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         <div className="text-center mb-16">
@@ -418,8 +419,8 @@ function IntegrationsMarquee() {
   const marqueeItems = [...logos, ...logos];
 
   return (
-    <div className="w-full mt-20 md:mt-24 mb-10">
-      <div className="text-center mb-16 px-6">
+    <div className="w-full mt-10 md:mt-12 mb-0">
+      <div className="text-center mb-8 px-6">
         <h3 className="text-[22px] md:text-[32px] font-light text-[#c4c9b8] mb-3 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
           Every Aivory agent speaks your customer&apos;s language. Literally.
         </h3>

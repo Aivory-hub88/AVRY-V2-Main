@@ -207,7 +207,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   boxSizing: "border-box",
                   transition: "border-color 0.2s ease"
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#07D197"; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#c4c9b8"; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "#ddd"; }}
               />
             </div>
@@ -244,7 +244,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     boxSizing: "border-box",
                     transition: "border-color 0.2s ease"
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#07D197"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#c4c9b8"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#ddd"; }}
                 />
               </div>
@@ -282,7 +282,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                   boxSizing: "border-box",
                   transition: "border-color 0.2s ease"
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#07D197"; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#c4c9b8"; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "#ddd"; }}
               />
               {mode === "signup" && (
@@ -324,7 +324,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 fontSize: "16px",
                 fontWeight: 600,
                 color: "#fff",
-                backgroundColor: "#07D197",
+                backgroundColor: "#c4c9b8",
                 border: "none",
                 borderRadius: "8px",
                 cursor: isLoading ? "not-allowed" : "pointer",
@@ -333,12 +333,12 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
               }}
               onMouseEnter={(e) => {
                 if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#06B882";
+                  e.currentTarget.style.backgroundColor = "#b2b8a6";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#07D197";
+                  e.currentTarget.style.backgroundColor = "#c4c9b8";
                 }
               }}
             >
@@ -364,7 +364,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     setError("");
                   }}
                   style={{
-                    color: "#07D197",
+                    color: "#c4c9b8",
                     textDecoration: "none",
                     fontWeight: 600,
                     cursor: "pointer"
@@ -390,7 +390,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     setError("");
                   }}
                   style={{
-                    color: "#07D197",
+                    color: "#c4c9b8",
                     textDecoration: "none",
                     fontWeight: 600,
                     cursor: "pointer"

@@ -266,7 +266,7 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
   // --- Render helpers ---
 
   const inputClasses =
-    "w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#07D197] focus:border-transparent disabled:opacity-50"
+    "w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#c4c9b8] focus:border-transparent disabled:opacity-50"
   const inputErrorClasses =
     "w-full px-4 py-3 rounded-lg bg-white/[0.05] border border-red-500/50 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50"
 
@@ -297,9 +297,9 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
   // Success state
   if (status === "success") {
     return (
-      <div className="rounded-xl border border-[#07D197]/30 bg-[#07D197]/10 p-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#07D197]/20 flex items-center justify-center">
-          <svg className="w-8 h-8 text-[#07D197]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="rounded-xl border border-[#c4c9b8]/30 bg-[#c4c9b8]/10 p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#c4c9b8]/20 flex items-center justify-center">
+          <svg className="w-8 h-8 text-[#c4c9b8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
@@ -499,7 +499,7 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
           <button
             type="submit"
             disabled={status === "submitting"}
-            className="w-full px-6 py-3 bg-[#07D197] text-[#050505] font-medium rounded-lg hover:bg-[#07D197]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-6 py-3 bg-[#c4c9b8] text-[#050505] font-medium rounded-lg hover:bg-[#c4c9b8]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {status === "submitting" ? "Submitting Application..." : "Submit Application"}
           </button>

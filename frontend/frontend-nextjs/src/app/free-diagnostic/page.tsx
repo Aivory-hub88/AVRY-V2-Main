@@ -592,7 +592,7 @@ export default function FreeDiagnosticPage() {
                         {[...top, ...bottom].map(d => {
                           let iconChar = '→';
                           let iconColor = '#ffb020';
-                          if (d.score >= 2) { iconChar = '↗'; iconColor = '#0ae8af'; }
+                          if (d.score >= 2) { iconChar = '↗'; iconColor = '#c4c9b8'; }
                           else if (d.score === 0) { iconChar = '↓'; iconColor = '#ff5757'; }
                           return (
                             <div key={d.id} style={{ border: '2px solid #111', minHeight: 96, padding: '20px 24px', background: '#f8fafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 8 }}>

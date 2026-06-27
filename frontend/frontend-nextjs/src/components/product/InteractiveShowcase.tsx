@@ -604,13 +604,27 @@ function IntroAnimation() {
 
         {/* Scroll indicator (replaces the text) */}
         <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-1000 ease-out ${step >= 6 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          <div className="text-[12px] text-[#c4c9b8] uppercase tracking-widest font-medium mb-3 mt-4">
+          <div className="text-[12px] text-[#c4c9b8] uppercase tracking-widest font-medium mb-3 mt-4 animate-text-bounce">
             SCROLL TO EXPLORE
           </div>
+          <style>{`
+            @keyframes text-bounce {
+              0%, 100% { transform: translateY(-3px); }
+              50% { transform: translateY(0); }
+            }
+            .animate-text-bounce { animation: text-bounce 2s infinite ease-in-out; }
+            @keyframes chevron-sequence {
+              0%, 100% { opacity: 0.15; }
+              50% { opacity: 1; filter: drop-shadow(0 0 6px rgba(196, 201, 184, 0.6)); }
+            }
+            .animate-chevron-1 { animation: chevron-sequence 1.2s infinite ease-in-out 0s; }
+            .animate-chevron-2 { animation: chevron-sequence 1.2s infinite ease-in-out 0.2s; }
+            .animate-chevron-3 { animation: chevron-sequence 1.2s infinite ease-in-out 0.4s; }
+          `}</style>
           <div className="flex flex-col items-center space-y-[-14px]">
-            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.2s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <svg className="w-6 h-6 text-[#c4c9b8] animate-pulse" style={{ animationDelay: '0.4s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg className="w-12 h-6 text-[#c4c9b8] animate-chevron-1" viewBox="0 0 48 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9l20 6 20-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg className="w-12 h-6 text-[#c4c9b8] animate-chevron-2" viewBox="0 0 48 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9l20 6 20-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg className="w-12 h-6 text-[#c4c9b8] animate-chevron-3" viewBox="0 0 48 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9l20 6 20-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
         </div>
       </div>
@@ -660,7 +674,7 @@ function BlueprintAnimation() {
 
 export function InteractiveShowcase() {
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [alignedIndex, setAlignedIndex] = useState<number | null>(null);
+  const [connectedIndex, setConnectedIndex] = useState(-1);
   
   const introRef = useRef<HTMLDivElement | null>(null);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -697,29 +711,27 @@ export function InteractiveShowcase() {
       if (ref) observer.observe(ref);
     });
 
-    // 2. Scroll Listener for precise Alignment (line drawing)
+    // 2. Scroll Listener for Smart Connection Line
     const handleScroll = () => {
-      if (!stickyBoxRef.current) return;
-      
-      const boxRect = stickyBoxRef.current.getBoundingClientRect();
-      const targetY = boxRect.top + 60; 
-      let newlyAligned: number | null = null;
+      const vh = window.innerHeight;
+      let newlyConnected = -1;
       
       h4Refs.current.forEach((ref, idx) => {
         if (!ref) return;
         const rect = ref.getBoundingClientRect();
         const h4CenterY = rect.top + (rect.height / 2);
         
-        if (Math.abs(h4CenterY - targetY) < 60) {
-          newlyAligned = idx;
+        // If the h4 is between 12% and 70% of the viewport height, it's considered connected
+        // This ensures the line only breaks when it's about to miss the sticky box (which is at top-[12vh])
+        if (h4CenterY > vh * 0.12 && h4CenterY < vh * 0.70) {
+          newlyConnected = idx;
         }
       });
       
-      setAlignedIndex((prev) => (prev !== newlyAligned ? newlyAligned : prev));
+      setConnectedIndex((prev) => (prev !== newlyConnected ? newlyConnected : prev));
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    // Trigger once on mount
     handleScroll();
 
     return () => {
@@ -729,7 +741,7 @@ export function InteractiveShowcase() {
   }, []);
 
   return (
-    <section id="showcase" className="relative bg-black text-white py-16 md:py-32">
+    <section id="showcase" className="relative text-white py-16 md:py-32">
       <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-24">
         {/* Sticky Scroll Layout Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 relative">
@@ -774,7 +786,7 @@ export function InteractiveShowcase() {
                   {/* Animated Connecting Line to Right Visual Box */}
                   <div 
                     className={`hidden lg:block h-[1px] bg-[#b2cca2]/50 flex-grow transition-all duration-500 ease-out origin-left ${
-                      alignedIndex === idx ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0'
+                      connectedIndex === idx ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0'
                     }`}
                   />
                 </div>
@@ -809,7 +821,7 @@ export function InteractiveShowcase() {
             <div 
               ref={stickyBoxRef}
               className={`w-full h-full bg-[#181818] border transition-all duration-500 rounded-3xl p-6 md:p-8 flex flex-col relative overflow-hidden shadow-2xl ${
-                alignedIndex !== null ? 'border-[#b2cca2]/40 shadow-[0_0_30px_rgba(178,204,162,0.08)]' : 'border-white/5'
+                connectedIndex !== -1 ? 'border-[#b2cca2]/40 shadow-[0_0_30px_rgba(178,204,162,0.08)]' : 'border-white/5'
               }`}
             >
               

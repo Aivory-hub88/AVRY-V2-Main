@@ -20,7 +20,7 @@ import { ReadinessBadge } from "./readiness-badge";
 
 const VALID_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">' +
-  '<circle cx="90" cy="90" r="80" fill="#0ae8af" /></svg>';
+  '<circle cx="90" cy="90" r="80" fill="#c4c9b8" /></svg>';
 
 describe("ReadinessBadge", () => {
   describe("SVG rendering (Req 5.1)", () => {

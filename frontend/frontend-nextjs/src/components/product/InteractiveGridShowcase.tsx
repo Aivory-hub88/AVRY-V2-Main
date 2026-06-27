@@ -515,7 +515,7 @@ function WorkflowAnimation() {
 // ── Main Layout ──
 export function InteractiveGridShowcase() {
   return (
-    <section id="framework" className="relative bg-black text-white py-24 md:py-32 overflow-hidden">
+    <section id="framework" className="relative text-white py-24 md:py-32 overflow-hidden">
       {/* Background Grid */}
       <div className="absolute inset-0 bg-grid-pattern opacity-30 pointer-events-none" />
       

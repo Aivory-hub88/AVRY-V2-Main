@@ -30,15 +30,27 @@ services:
       - aivory-network
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/ubuntu/AVRY-V2-Main/traefik/dynamic:/etc/traefik/dynamic:ro
+      - /home/ubuntu/AVRY-V2-Main/traefik/letsencrypt:/letsencrypt
     command:
       - "--api.insecure=false"
       - "--api.dashboard=false"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=aivory-network"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.middlewares=aivory-secure@file"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.middlewares=aivory-secure@file"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@aivory.id"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--log.level=INFO"
       - "--accesslog=true"
 
@@ -48,15 +60,15 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://${VPS_IP:-129.226.155.216}:8081
-        NEXT_PUBLIC_BACKEND_URL: http://${VPS_IP:-129.226.155.216}:8081
-        NEXT_PUBLIC_BLOG_URL: http://${VPS_IP:-129.226.155.216}/api/blog
-        NEXT_PUBLIC_CAREERS_URL: http://${VPS_IP:-129.226.155.216}/api/careers
-        NEXT_PUBLIC_DIAGNOSTICS_URL: http://${VPS_IP:-129.226.155.216}:8082
-        NEXT_PUBLIC_BLUEPRINT_URL: http://${VPS_IP:-129.226.155.216}:8083
-        NEXT_PUBLIC_WORKFLOWS_URL: http://${VPS_IP:-129.226.155.216}:8082
-        NEXT_PUBLIC_PAYMENTS_URL: http://${VPS_IP:-129.226.155.216}:3030
-        NEXT_PUBLIC_ROADMAP_URL: http://${VPS_IP:-129.226.155.216}:8084
+        NEXT_PUBLIC_API_BASE_URL: https://api.aivory.id
+        NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
+        NEXT_PUBLIC_BLOG_URL: https://aivory.id/api/blog
+        NEXT_PUBLIC_CAREERS_URL: https://aivory.id/api/careers
+        NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.aivory.id/diagnostics
+        NEXT_PUBLIC_BLUEPRINT_URL: https://api.aivory.id/blueprint
+        NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
+        NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
+        NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
     container_name: avry-website
     restart: unless-stopped
     networks:
@@ -64,9 +76,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
-      - "traefik.http.routers.main-app.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.main-app.entrypoints=web"
+      - "traefik.http.routers.main-app.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && PathPrefix(`/`)"
+      - "traefik.http.routers.main-app.entrypoints=websecure,web"
+      - "traefik.http.routers.main-app.tls.certresolver=letsencrypt"
       - "traefik.http.routers.main-app.priority=1"
+      - "traefik.http.routers.main-app-api.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && PathPrefix(`/api/exchange-rate`)"
+      - "traefik.http.routers.main-app-api.entrypoints=websecure,web"
+      - "traefik.http.routers.main-app-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.main-app-api.priority=20"
       - "traefik.http.services.main-app.loadbalancer.server.port=3000"
 
   # ── User Dashboard (port 9001) ─────────────────────────────────────────────
@@ -75,22 +92,52 @@ services:
       context: ./frontend/avry-user-dashboard
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: http://${VPS_IP:-129.226.155.216}:8081
-        NEXT_PUBLIC_BACKEND_URL: http://${VPS_IP:-129.226.155.216}:8081
-        NEXT_PUBLIC_DIAGNOSTICS_URL: http://${VPS_IP:-129.226.155.216}:8082
-        NEXT_PUBLIC_BLUEPRINT_URL: http://${VPS_IP:-129.226.155.216}:8083
-        NEXT_PUBLIC_WORKFLOWS_URL: http://${VPS_IP:-129.226.155.216}:8082
-        NEXT_PUBLIC_PAYMENTS_URL: http://${VPS_IP:-129.226.155.216}:3030
-        NEXT_PUBLIC_ROADMAP_URL: http://${VPS_IP:-129.226.155.216}:8084
+        NEXT_PUBLIC_API_BASE_URL: https://api.aivory.id
+        NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
+        NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.aivory.id/diagnostics
+        NEXT_PUBLIC_BLUEPRINT_URL: https://api.aivory.id/blueprint
+        NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
+        NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
+        NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
     container_name: avry-user-dashboard
     restart: unless-stopped
     networks:
       - aivory-network
+      - aivory_aivory-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9001:9001"
     environment:
       - PORT=9001
       - NODE_ENV=production
+      - NEXT_PUBLIC_APP_URL=https://aivory.id/dashboard
+      # ── Backend services (no compromised defaults — requireEnv enforces these)
+      - VPS_BRIDGE_URL=http://host.docker.internal:3003
+      - ZEROCLAW_WEBHOOK_URL=http://host.docker.internal:3003/webhook
+      - N8N_AS_CODE_URL=http://host.docker.internal:3500
+      - N8N_BASE_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - N8N_MCP_URL=http://n8n-mcp:3020
+      - N8N_MCP_AUTH_TOKEN=${N8N_MCP_AUTH_TOKEN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.user-dashboard.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`dashboard.aivory.id`) || Host(`app.aivory.id`)) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.user-dashboard.entrypoints=web,websecure"
+      - "traefik.http.routers.user-dashboard.tls=true"
+      - "traefik.http.routers.user-dashboard.priority=10"
+      - "traefik.http.services.user-dashboard.loadbalancer.server.port=9001"
+      # Browser-side fetches go to /api/* (without basePath). Traefik adds the
+      # /dashboard prefix before forwarding so Next.js basePath router matches.
+      # Priority 5 < blog/careers (10) so those keep going to their services.
+      - "traefik.http.routers.user-dashboard-api.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`dashboard.aivory.id`) || Host(`app.aivory.id`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.user-dashboard-api.entrypoints=web,websecure"
+      - "traefik.http.routers.user-dashboard-api.tls=true"
+      - "traefik.http.routers.user-dashboard-api.priority=5"
+      - "traefik.http.routers.user-dashboard-api.service=user-dashboard"
+      - "traefik.http.routers.user-dashboard-api.middlewares=user-dashboard-addprefix"
+      - "traefik.http.middlewares.user-dashboard-addprefix.addprefix.prefix=/dashboard"
 
   # ── Admin Dashboard (port 9002) ────────────────────────────────────────────
   avry-admin-dashboards:
@@ -98,7 +145,11 @@ services:
       context: ./frontend/avry-admin-dashboard
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://${VPS_IP:-129.226.155.216}:8081
+        NEXT_PUBLIC_API_URL: https://api.aivory.id
+        NEXT_PUBLIC_BLOG_SERVICE_URL: https://aivory.id/api/blog
+        NEXT_PUBLIC_CAREERS_SERVICE_URL: https://aivory.id/api/careers
+        NEXT_PUBLIC_CAREERS_URL: https://aivory.id/api/careers
+        NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
     container_name: avry-admin-dashboards
     restart: unless-stopped
     networks:
@@ -114,9 +165,18 @@ services:
       - BLUEPRINT_SERVICE_URL=http://avry-blueprint:8083
       - ROADMAP_SERVICE_URL=http://avry-roadmap:8084
       - WORKFLOWS_SERVICE_URL=http://avry-workflows:8082
+      - VPS_PANEL_API_TOKEN=${VPS_PANEL_API_TOKEN}
       - BLOG_SERVICE_URL=http://avry-blog:8089
       - CAREERS_SERVICE_URL=http://avry-careers:8090
       - SETUP_SECRET=${INTERNAL_TOKEN:-aivory-internal-2026}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.admin-app.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`admin.aivory.id`)) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin-app.entrypoints=web,websecure"
+      - "traefik.http.routers.admin-app.tls=true"
+      - "traefik.http.routers.admin-app.priority=10"
+      - "traefik.http.services.admin-app.loadbalancer.server.port=9002"
 
   # ── Backend API (port 8081) ────────────────────────────────────────────────
   avry-backend:
@@ -135,6 +195,14 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ENVIRONMENT=production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.backend.rule=(Host(`api.aivory.id`) || Host(`backend.aivory.id`)) && (PathPrefix(`/api/v1`) || PathPrefix(`/api/database`) || PathPrefix(`/api/debug`) || PathPrefix(`/health`))"
+      - "traefik.http.routers.backend.entrypoints=web,websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.priority=10"
+      - "traefik.http.services.backend.loadbalancer.server.port=8081"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 15s
@@ -161,7 +229,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
       - "traefik.http.routers.blog.rule=PathPrefix(`/api/blog`)"
-      - "traefik.http.routers.blog.entrypoints=web"
+      - "traefik.http.routers.blog.entrypoints=web,websecure"
+      - "traefik.http.routers.blog.tls.certresolver=letsencrypt"
       - "traefik.http.routers.blog.priority=10"
       - "traefik.http.services.blog.loadbalancer.server.port=8089"
       - "traefik.http.routers.blog.middlewares=blog-stripprefix"
@@ -192,7 +261,8 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
       - "traefik.http.routers.careers.rule=PathPrefix(`/api/careers`)"
-      - "traefik.http.routers.careers.entrypoints=web"
+      - "traefik.http.routers.careers.entrypoints=web,websecure"
+      - "traefik.http.routers.careers.tls.certresolver=letsencrypt"
       - "traefik.http.routers.careers.priority=10"
       - "traefik.http.services.careers.loadbalancer.server.port=8090"
       - "traefik.http.routers.careers.middlewares=careers-stripprefix"
@@ -223,6 +293,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.diagnostics.rule=Host(`api.aivory.id`) && PathPrefix(`/diagnostics`)"
+      - "traefik.http.routers.diagnostics.entrypoints=web,websecure"
+      - "traefik.http.routers.diagnostics.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.diagnostics.priority=10"
+      - "traefik.http.services.diagnostics.loadbalancer.server.port=8082"
+      - "traefik.http.routers.diagnostics.middlewares=diagnostics-stripprefix"
+      - "traefik.http.middlewares.diagnostics-stripprefix.stripprefix.prefixes=/diagnostics"
     depends_on:
       postgres:
         condition: service_healthy
@@ -249,6 +329,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.blueprint.rule=Host(`api.aivory.id`) && PathPrefix(`/blueprint`)"
+      - "traefik.http.routers.blueprint.entrypoints=web,websecure"
+      - "traefik.http.routers.blueprint.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.blueprint.priority=10"
+      - "traefik.http.services.blueprint.loadbalancer.server.port=8083"
+      - "traefik.http.routers.blueprint.middlewares=blueprint-stripprefix"
+      - "traefik.http.middlewares.blueprint-stripprefix.stripprefix.prefixes=/blueprint"
     depends_on:
       postgres:
         condition: service_healthy
@@ -275,6 +365,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.roadmap.rule=Host(`api.aivory.id`) && PathPrefix(`/roadmap`)"
+      - "traefik.http.routers.roadmap.entrypoints=web,websecure"
+      - "traefik.http.routers.roadmap.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.roadmap.priority=10"
+      - "traefik.http.services.roadmap.loadbalancer.server.port=8084"
+      - "traefik.http.routers.roadmap.middlewares=roadmap-stripprefix"
+      - "traefik.http.middlewares.roadmap-stripprefix.stripprefix.prefixes=/roadmap"
     depends_on:
       postgres:
         condition: service_healthy
@@ -301,6 +401,16 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.workflows.rule=Host(`api.aivory.id`) && PathPrefix(`/workflows`)"
+      - "traefik.http.routers.workflows.entrypoints=web,websecure"
+      - "traefik.http.routers.workflows.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.workflows.priority=10"
+      - "traefik.http.services.workflows.loadbalancer.server.port=8087"
+      - "traefik.http.routers.workflows.middlewares=workflows-stripprefix"
+      - "traefik.http.middlewares.workflows-stripprefix.stripprefix.prefixes=/workflows"
     depends_on:
       postgres:
         condition: service_healthy
@@ -328,12 +438,24 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.payments.rule=Host(`api.aivory.id`) && PathPrefix(`/payments`)"
+      - "traefik.http.routers.payments.entrypoints=web,websecure"
+      - "traefik.http.routers.payments.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.payments.priority=10"
+      - "traefik.http.services.payments.loadbalancer.server.port=3030"
+      - "traefik.http.routers.payments.middlewares=payments-stripprefix"
+      - "traefik.http.middlewares.payments-stripprefix.stripprefix.prefixes=/payments"
     depends_on:
       postgres:
         condition: service_healthy
 
 networks:
   aivory-network:
+    external: true
+  aivory_aivory-net:
     external: true
 
 volumes:
