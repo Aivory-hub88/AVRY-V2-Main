@@ -205,6 +205,9 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       TELEGRAM_AGENT_GATEWAY_URL: ${TELEGRAM_AGENT_GATEWAY_URL:-}
+    volumes:
+      # telegram bindings + link tokens live in the JSON file store
+      - avry-backend-data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 10s
@@ -576,6 +579,7 @@ services:
       - "traefik.http.services.avry-grafana.loadbalancer.server.port=3000"
 
 volumes:
+  avry-backend-data:
   n8n_data:
   n8n_as_code_drafts:
   careers_cv_data:
