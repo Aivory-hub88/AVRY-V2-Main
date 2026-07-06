@@ -205,6 +205,9 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       TELEGRAM_AGENT_GATEWAY_URL: ${TELEGRAM_AGENT_GATEWAY_URL:-}
+      TELEGRAM_GATEWAY_TOKEN: ${TELEGRAM_GATEWAY_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # telegram bindings + link tokens live in the JSON file store
       - avry-backend-data:/app/data
