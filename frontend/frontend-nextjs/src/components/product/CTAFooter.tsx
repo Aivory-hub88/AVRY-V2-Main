@@ -5,6 +5,16 @@ import Link from 'next/link';
 import { useState } from 'react';
 import ContactModal from '@/components/home/ContactModal';
 
+/* ─── Arrow Icon ─── */
+function ArrowIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 7v10H7" />
+      <path d="M7 7l10 10" />
+    </svg>
+  );
+}
+
 interface CTAFooterProps {
   title: string;
   subtitle?: string;
@@ -19,8 +29,8 @@ export function CTAFooter({ title, subtitle, primaryCta, secondaryCta }: CTAFoot
   const renderCta = (cta: { label: string; href: string }, isPrimary: boolean) => {
     const isContact = cta.href === '#contact';
     const baseClasses = "w-full sm:w-auto inline-flex justify-center items-center gap-3 no-underline uppercase cursor-pointer transition-all duration-[250ms] min-h-[44px]";
-    const primaryClasses = "text-[#494949] bg-[#a3aa96] hover:bg-[#8f9681]";
-    const secondaryClasses = "text-white border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white";
+    const primaryClasses = "text-white border border-white/20 bg-transparent hover:border-[#a3aa96] hover:bg-white/5";
+    const secondaryClasses = "text-white border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5";
     const className = `${baseClasses} ${isPrimary ? primaryClasses : secondaryClasses}`;
     
     const inlineStyle = {
@@ -34,6 +44,7 @@ export function CTAFooter({ title, subtitle, primaryCta, secondaryCta }: CTAFoot
     if (isContact) {
       return (
         <button key={cta.label} onClick={() => setIsModalOpen(true)} className={className} style={inlineStyle}>
+          <ArrowIcon className="w-4 h-4 text-[#a3aa96]" />
           {cta.label}
         </button>
       );
@@ -41,6 +52,7 @@ export function CTAFooter({ title, subtitle, primaryCta, secondaryCta }: CTAFoot
     
     return (
       <Link key={cta.label} href={cta.href} className={className} style={inlineStyle}>
+        <ArrowIcon className="w-4 h-4 text-[#a3aa96]" />
         {cta.label}
       </Link>
     );
@@ -57,7 +69,7 @@ export function CTAFooter({ title, subtitle, primaryCta, secondaryCta }: CTAFoot
       <div className="max-w-4xl mx-auto px-6 text-center flex flex-col items-center relative z-10">
         {/* Monospaced tag */}
         <div
-          className="text-[12px] text-[#c4c9b8] tracking-[0.25em] uppercase mb-4 font-manrope font-light"
+          className="text-[12px] text-[#dfe2d8] tracking-[0.25em] uppercase mb-4 font-manrope font-light"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           // GET STARTED NOW
@@ -74,7 +86,7 @@ export function CTAFooter({ title, subtitle, primaryCta, secondaryCta }: CTAFoot
         {/* Subtitle */}
         {subtitle && (
           <p
-            className="text-white/60 text-base md:text-lg font-light mb-10 max-w-xl leading-relaxed"
+            className="text-white/75 text-base md:text-lg font-light mb-10 max-w-xl leading-relaxed"
             style={{ fontFamily: "'Manrope', sans-serif" }}
           >
             {subtitle}

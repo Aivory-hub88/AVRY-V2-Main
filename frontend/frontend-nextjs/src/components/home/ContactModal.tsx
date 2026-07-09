@@ -36,7 +36,7 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-[#888888] hover:text-[#111111] transition-colors text-2xl leading-none"
+          className="absolute top-4 right-4 text-[#c4c4c4] hover:text-[#111111] transition-colors text-2xl leading-none"
           aria-label="Close"
         >
           ✕

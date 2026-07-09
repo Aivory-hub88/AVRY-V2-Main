@@ -31,7 +31,7 @@ export function CompanyHero() {
         </h1>
 
         {/* Subtitle Paragraphs */}
-        <div className="flex flex-col gap-6 text-base sm:text-lg text-white/60 max-w-3xl mx-auto mb-10 font-light leading-relaxed" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <div className="flex flex-col gap-6 text-base sm:text-lg text-white/75 max-w-3xl mx-auto mb-10 font-light leading-relaxed" style={{ fontFamily: "'Manrope', sans-serif" }}>
           <p>
             We help organizations identify where AI creates real value, design the right systems, and bring them into production without guesswork, wasted budget, or drawn-out consulting cycles.
           </p>
@@ -45,7 +45,7 @@ export function CompanyHero() {
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
         <div className="w-[1px] h-20 bg-gradient-to-b from-transparent to-white/15" />
         <div
-          className="text-[9px] tracking-[0.15em] text-[#c4c9b8] uppercase my-3 font-light"
+          className="text-[9px] tracking-[0.15em] text-[#dfe2d8] uppercase my-3 font-light"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           SCROLL TO EXPLORE

@@ -4,6 +4,16 @@ import { useState, useRef } from 'react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import ContactModal from './ContactModal';
 
+/* ─── Arrow Icon ─── */
+function ArrowIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 7v10H7" />
+      <path d="M7 7l10 10" />
+    </svg>
+  );
+}
+
 const services = [
   {
     title: 'AI Strategy Consultation',
@@ -42,7 +52,7 @@ const ServiceCard = ({ service }: { service: typeof services[0] }) => {
       className="relative spotlight-card border border-white/10 p-8 transition-colors bg-[#0a0a0a] overflow-hidden rounded-xl"
     >
       <h3 className="text-xl font-normal text-white mb-3 relative z-10">{service.title}</h3>
-      <p className="text-[#b2b2b2] font-light leading-relaxed relative z-10">{service.description}</p>
+      <p className="text-[#dadada] font-light leading-relaxed relative z-10">{service.description}</p>
     </div>
   );
 };
@@ -62,7 +72,7 @@ export default function PreFooterCTA() {
           <p className="text-white text-xl md:text-2xl font-semibold mb-4">
             Some AI decisions are too important to leave to guesswork.
           </p>
-          <p className="text-[#b2b2b2] text-lg md:text-xl font-light mb-10 max-w-4xl">
+          <p className="text-[#dadada] text-lg md:text-xl font-light mb-10 max-w-4xl">
             Work directly with Aivory™ experts to validate your strategy, design custom AI systems, train your teams, and accelerate implementation.
           </p>
 
@@ -81,8 +91,9 @@ export default function PreFooterCTA() {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="px-8 py-4 bg-[#a3aa96] text-[#494949] font-medium hover:bg-[#8f9681] transition-colors text-lg"
+              className="flex items-center gap-2 border border-white/20 px-4 py-2.5 text-xs md:text-sm font-medium hover:border-[#a3aa96] hover:bg-white/5 transition-all cursor-pointer"
             >
+              <ArrowIcon className="w-4 h-4 text-[#a3aa96]" />
               Talk to Our Team
             </button>
           </div>

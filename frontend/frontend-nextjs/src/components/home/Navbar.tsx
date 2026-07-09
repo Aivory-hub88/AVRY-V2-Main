@@ -7,6 +7,16 @@ import { useLanguage } from '@/components/context/LanguageContext';
 import SignInModal from '@/components/auth/SignInModal';
 import { isAuthenticated, getUser, logout } from '@/lib/auth';
 
+/* ─── Arrow Icon ─── */
+function ArrowIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 7v10H7" />
+      <path d="M7 7l10 10" />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const { language, setLanguage } = useLanguage();
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
@@ -67,13 +77,10 @@ export default function Navbar() {
       <div className="max-w-[1400px] mx-auto flex justify-between items-center" style={{ padding: '1.5rem clamp(1rem, 4vw, 2rem)' }}>
         {/* Left: Aivory logo */}
         <Link href="/" className="flex items-center">
-          <Image
+          <img
             src="/Aivory_logo_2_2026.svg"
             alt="Aivory Logo"
-            width={140}
-            height={30}
-            className="h-[30px] w-auto object-contain"
-            priority
+            className="h-[26px] w-auto object-contain"
           />
         </Link>
 
@@ -161,30 +168,29 @@ export default function Navbar() {
           )}
           <button
             onClick={() => handleDashboard('user')}
-            className="h-[29px] px-[18px] font-normal text-white bg-transparent inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-white/[0.08] hover:border-white/40"
+            className="h-[29px] px-[18px] flex items-center justify-center gap-2 border border-white/20 hover:border-[#a3aa96] hover:bg-white/5 transition-all cursor-pointer text-white bg-transparent"
             style={{
-              border: '1px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: 0,
               fontFamily: "'Manrope', sans-serif",
               fontSize: '10px',
               letterSpacing: '-0.01em',
               textTransform: 'uppercase',
             }}
           >
+            <ArrowIcon className="w-3 h-3 text-[#a3aa96]" />
             DASHBOARD
           </button>
           {authed && (accountType === 'superadmin' || accountType === 'admin') && (
             <button
               onClick={() => handleDashboard('admin')}
-              className="h-[29px] px-[18px] font-normal text-[#494949] bg-[#a3aa96] inline-flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-[#8f9681]"
+              className="h-[29px] px-[18px] flex items-center justify-center gap-2 border border-white/20 hover:border-[#a3aa96] hover:bg-white/5 transition-all cursor-pointer text-white bg-transparent"
               style={{
-                borderRadius: 0,
                 fontFamily: "'Manrope', sans-serif",
                 fontSize: '10px',
                 letterSpacing: '-0.01em',
                 textTransform: 'uppercase',
               }}
             >
+              <ArrowIcon className="w-3 h-3 text-[#a3aa96]" />
               ADMIN
             </button>
           )}
@@ -210,12 +216,10 @@ export default function Navbar() {
         {/* Top bar: Logo + Close */}
         <div className="flex justify-between items-center px-4 py-6">
           <Link href="/" onClick={() => setIsMobileMenuOpen(false)}>
-            <Image
+            <img
               src="/Aivory_logo_2_2026.svg"
               alt="Aivory Logo"
-              width={140}
-              height={30}
-              className="h-[30px] w-auto object-contain"
+              className="h-[26px] w-auto object-contain"
             />
           </Link>
           <button

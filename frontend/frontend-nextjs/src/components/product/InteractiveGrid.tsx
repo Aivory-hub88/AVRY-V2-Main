@@ -21,7 +21,22 @@ function SpotlightCard({ children, className = '' }: { children: React.ReactNode
     <div
       ref={cardRef}
       onMouseMove={handleMouseMove}
-      className={`spotlight-card rounded-2xl border border-white/5 bg-zinc-950/65 shadow-lg ${className}`}
+      className={`spotlight-card rounded-[24px] border-t border-l border-white/10 border-b border-r border-black/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${className}`}
+      style={{
+        // Apple-style dark frosted glass. The tint is kept semi-transparent so the
+        // animated megamendung backdrop shows through; `brightness` lifts the very dim
+        // clouds just enough that the blur reads as frost rather than a flat dark panel.
+        // NOTE: for this backdrop-filter to actually sample the page background, no
+        // ancestor of this card may carry a transform/will-change (that would turn the
+        // ancestor into a "backdrop root"). See revealGrids() in useGsapScrollReveal.ts.
+        // Driven by CSS custom properties so the mobile override (globals.css) can
+        // switch the blur off via a single var — robust against the CSS minifier, which
+        // otherwise drops the unprefixed `backdrop-filter` from a plain media-query rule
+        // and leaves Chrome-Android still blurring. The var fallbacks are the desktop look.
+        backgroundColor: 'var(--card-bg, rgba(28, 28, 34, 0.45))',
+        backdropFilter: 'var(--card-frost, blur(2.5px))',
+        WebkitBackdropFilter: 'var(--card-frost, blur(2.5px))'
+      }}
     >
       {children}
     </div>
@@ -44,8 +59,8 @@ function AutonomousAgentAnimation() {
     {
       name: 'Slack',
       icon: '/integrations/icons/slack.svg',
-      bg: '#1a1a2e',
-      headerBg: '#2D2D3F',
+      bg: 'rgba(26, 26, 46, 0.4)',
+      headerBg: 'rgba(45, 45, 63, 0.5)',
       channel: '#sales-leads',
       messages: [
         { from: 'user', text: 'New lead from contact form — urgent' },
@@ -55,8 +70,8 @@ function AutonomousAgentAnimation() {
     {
       name: 'WhatsApp',
       icon: '/integrations/icons/whatsapp.svg',
-      bg: '#0b141a',
-      headerBg: '#1F2C33',
+      bg: 'rgba(11, 20, 26, 0.4)',
+      headerBg: 'rgba(31, 44, 51, 0.5)',
       channel: 'Customer Support',
       messages: [
         { from: 'user', text: 'Hi, I need help with my order #4821' },
@@ -66,8 +81,8 @@ function AutonomousAgentAnimation() {
     {
       name: 'Telegram',
       icon: '/integrations/icons/telegram.svg',
-      bg: '#17212b',
-      headerBg: '#242F3D',
+      bg: 'rgba(23, 33, 43, 0.4)',
+      headerBg: 'rgba(36, 47, 61, 0.5)',
       channel: 'Ops Notifications',
       messages: [
         { from: 'user', text: 'Schedule a follow-up with prospect ABC Corp' },
@@ -224,7 +239,7 @@ function TemplateLibraryAnimation() {
       {templates.map((tmpl, i) => (
         <div
           key={tmpl.label}
-          className="flex flex-col items-center justify-center gap-2 bg-[#111111] border border-white/5 rounded-xl p-3 hover:border-white/15 hover:bg-white/[0.03] transition-all duration-300 cursor-default group"
+          className="flex flex-col items-center justify-center gap-2 bg-black/20 border border-white/5 rounded-xl p-3 hover:border-white/10 hover:bg-black/40 transition-all duration-300 cursor-default group"
           style={{ animationDelay: `${i * 0.1}s` }}
         >
           <div className="text-white/40 group-hover:text-white/70 transition-colors duration-300">
@@ -239,8 +254,7 @@ function TemplateLibraryAnimation() {
   );
 }
 
-// ── App Integrations Card ─────────────────────────────────
-// Grid of real integration logos from the Aivory Dashboard
+// ── App Integrations Card (Glowing Grid Animation) ────────────────
 function AppIntegrationsAnimation() {
   const apps = [
     { name: 'Slack', icon: '/integrations/icons/slack.svg' },
@@ -273,35 +287,82 @@ function AppIntegrationsAnimation() {
     { name: 'HTTP API', icon: '/integrations/icons/http-api.svg' },
   ];
 
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Randomly change active index every 1.5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Pick a new random index that is different from the current one
+      setActiveIndex((prev) => {
+        let next = Math.floor(Math.random() * apps.length);
+        while (next === prev) next = Math.floor(Math.random() * apps.length);
+        return next;
+      });
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [apps.length]);
+
   return (
-    <div className="w-full h-full grid grid-cols-7 gap-2">
-      {apps.map((app, i) => (
-        <div
-          key={app.name}
-          className="flex items-center justify-center aspect-square bg-[#111111] border border-white/5 rounded-lg hover:border-white/15 hover:bg-white/[0.03] transition-all duration-300 cursor-default group"
-        >
-          {/* Using standard img for SVG to prevent Next.js Image lazy loading/optimization issues */}
-          <img
-            src={app.icon}
-            alt={app.name}
-            width={22}
-            height={22}
-            className="opacity-70 group-hover:opacity-100 transition-opacity duration-300"
-            loading="lazy"
-          />
-        </div>
-      ))}
+    <div className="w-full h-full relative flex items-center justify-center py-2 z-0">
+      {/* Moving Background Glow */}
+      <div 
+        className="absolute w-40 h-40 blur-[45px] rounded-full transition-all duration-[1500ms] ease-in-out opacity-40 -z-10"
+        style={{
+          background: 'linear-gradient(135deg, #a855f7, #ec4899, #f97316)', // Premium purple/pink/orange
+          left: `${(activeIndex % 7) * (100 / 7) + (100/14)}%`,
+          top: `${Math.floor(activeIndex / 7) * 25 + 12.5}%`,
+          transform: 'translate(-50%, -50%)'
+        }}
+      />
+
+      <div className="w-full h-full grid grid-cols-7 gap-1.5 relative z-10">
+        {apps.map((app, i) => {
+          const isActive = i === activeIndex;
+          const isInvert = app.name === 'GitHub' || app.name === 'Notion';
+          
+          return (
+            <div
+              key={app.name}
+              className={`flex items-center justify-center aspect-square rounded-md transition-all duration-[800ms] relative overflow-hidden border ${
+                isActive 
+                  ? 'bg-[#1a1a1a] border-[#f97316]/80 shadow-[0_0_12px_rgba(249,115,22,0.4)]' 
+                  : 'bg-[#0a0a0a]/90 border-white/5'
+              }`}
+            >
+              {/* Wrap the img in a div for filters to prevent Safari iOS SVG rendering bug */}
+              <div className={`transition-all duration-[800ms] z-10 relative flex items-center justify-center w-full h-full
+                ${isInvert ? 'invert' : ''}
+                ${isActive 
+                  ? 'opacity-100 scale-110 drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]' 
+                  : 'opacity-40 grayscale'}
+              `}>
+                <img
+                  src={app.icon}
+                  alt={app.name}
+                  width={22}
+                  height={22}
+                  className="w-[22px] h-[22px]"
+                />
+              </div>
+              {/* Inner subtle glow for active cell */}
+              {isActive && (
+                <div className="absolute inset-0 bg-gradient-to-br from-[#f97316]/10 to-transparent z-0" />
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export function InteractiveGrid() {
   return (
-    <section className="text-white pt-24 pb-0 px-6 md:px-16 lg:px-24 relative overflow-hidden">
+    <section className="text-white pt-24 pb-0 px-6 md:px-16 lg:px-24 relative">
       {/* Background grid line overlay */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-40 pointer-events-none z-0" />
+      <div className="absolute inset-0 bg-grid-pattern pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative">
         <div className="text-center mb-16">
           <h2 className="text-[#c4c9b8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
             THE PLATFORM
@@ -419,8 +480,8 @@ function IntegrationsMarquee() {
   const marqueeItems = [...logos, ...logos];
 
   return (
-    <div className="w-full mt-10 md:mt-12 mb-0">
-      <div className="text-center mb-8 px-6">
+    <div className="w-full mt-20 md:mt-28 mb-0">
+      <div className="text-center mb-10 md:mb-12 px-6">
         <h3 className="text-[22px] md:text-[32px] font-light text-[#c4c9b8] mb-3 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
           Every Aivory agent speaks your customer&apos;s language. Literally.
         </h3>
@@ -438,7 +499,9 @@ function IntegrationsMarquee() {
         {marqueeItems.map((item, idx) => (
           <div key={idx} className="flex flex-1 items-center justify-center gap-3 grayscale transition-all duration-300 px-8">
             {item.name === 'Zoom' || item.name === 'Glean' ? null : (
-              <img src={item.icon} alt={item.name} className="w-7 h-7 object-contain" style={{ filter: 'brightness(0) invert(1)' }} />
+              <div style={{ filter: 'brightness(0) invert(1)', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src={item.icon} alt={item.name} className="w-full h-full object-contain" />
+              </div>
             )}
             <span className="text-white/80 font-semibold text-xl tracking-tight" style={{ fontFamily: item.name === 'Zoom' ? 'sans-serif' : 'inherit' }}>{item.name}</span>
           </div>
@@ -609,7 +672,9 @@ function AgentFlowVisual({ title }: { title: string }) {
             <img src="/integrations/icons/telegram.svg" alt="Telegram" className="w-4 h-4 opacity-80" />
           </div>
           <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/gmail.svg" alt="Email" className="w-4 h-4 opacity-80 grayscale" />
+            <div className="w-4 h-4 opacity-80 grayscale flex items-center justify-center">
+              <img src="/integrations/icons/gmail.svg" alt="Email" className="w-full h-full" />
+            </div>
           </div>
           <div className="ml-0.5">{arrowRight}</div>
           <div className="ml-0.5">
@@ -775,7 +840,7 @@ function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
       </div>
 
       {/* Animation Element */}
-      <div className="relative z-10 flex-1 min-h-[300px] bg-[#0A0A0A] border border-white/5 rounded-xl mt-auto overflow-hidden flex flex-col pt-10">
+      <div className="relative z-10 flex-1 min-h-[300px] bg-black/20 border border-white/5 rounded-xl mt-auto overflow-hidden flex flex-col pt-10">
         
         {/* Status Header */}
         <div className="absolute top-4 left-4 flex items-center gap-2 z-20">

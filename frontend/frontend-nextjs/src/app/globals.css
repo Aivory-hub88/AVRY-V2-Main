@@ -9,6 +9,28 @@ body,
   font-family: var(--font-manrope), 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ─── Mobile perf: drop the GPU-expensive frosted-glass blur ───
+   backdrop-filter: blur() on the feature cards forces the browser to re-blur the
+   animated WebGL megamendung backdrop on EVERY frame — brutal on mobile GPUs. On
+   small dark screens the clouds behind the cards are barely visible anyway, so we
+   swap the blur for a near-opaque solid tint: visually almost identical, far cheaper.
+   Desktop keeps the real frosted glass. */
+@media (max-width: 1023px) {
+  .spotlight-card {
+    --card-frost: none;
+    --card-bg: rgba(18, 18, 22, 0.92);
+  }
+}
+
+/* ─── Desktop scroll perf: same trick, gated on active scrolling ───
+   Toggled by ScrollRevealProvider (adds/removes html.is-scrolling). Using CSS
+   vars (not a raw backdrop-filter decl) so the Next/lightningcss minifier
+   can't drop the unprefixed property the way it does with plain media rules. */
+html.is-scrolling .spotlight-card {
+  --card-frost: none;
+  --card-bg: rgba(18, 18, 22, 0.92);
+}
+
 /* ─── Scroll Animation Utility ─── */
 .animate-on-scroll {
   opacity: 0;
@@ -616,21 +638,52 @@ body,
   overflow: hidden;
 }
 
+/* Ensure all content sits above the glow effects */
+.spotlight-card > * {
+  position: relative;
+  z-index: 10;
+}
+
+/* Inner face glow */
+.spotlight-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    400px circle at var(--mouse-x, 0) var(--mouse-y, 0),
+    rgba(255, 255, 255, 0.06),
+    transparent 40%
+  );
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+/* Border glow using mask */
 .spotlight-card::before {
   content: "";
   position: absolute;
-  inset: -1px;
-  background: radial-gradient(300px circle at var(--mouse-x, 0px) var(--mouse-y, 0px),
-      rgba(111, 142, 91, 0.15),
-      transparent 40%);
-  z-index: 0;
-  pointer-events: none;
+  inset: 0;
   border-radius: inherit;
-  transition: opacity 0.5s ease;
+  padding: 1.5px; /* Thicker border glow */
+  background: radial-gradient(
+    400px circle at var(--mouse-x, 0) var(--mouse-y, 0),
+    rgba(255, 255, 255, 0.5),
+    transparent 40%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: 2;
+  pointer-events: none;
   opacity: 0;
+  transition: opacity 0.4s ease;
 }
 
-.spotlight-card:hover::before {
+.spotlight-card:hover::before,
+.spotlight-card:hover::after {
   opacity: 1;
 }
 
@@ -798,4 +851,58 @@ body,
 
 .spotlight-section:hover::after {
   opacity: 1;
+}
+
+@keyframes loader-wave {
+  0% { transform: scale(0.5); opacity: 0.3; background-color: #556B2F; }
+  50% { transform: scale(1.2); opacity: 1; background-color: #aec99d; }
+  100% { transform: scale(0.5); opacity: 0.3; background-color: #556B2F; }
+}
+.animate-loader-wave {
+  animation: loader-wave 1.2s infinite ease-in-out;
+}
+
+/* roadmap-comet / roadmap-ping / roadmap-glow */
+/* Used by InteractiveShowcase.tsx + InteractiveGridShowcase.tsx (roadmap step
+   connectors) — previously referenced with no CSS definition anywhere, so the
+   "traveling light pulse" was a complete no-op (invisible). */
+@keyframes roadmap-comet-travel {
+  0%   { left: -12%; opacity: 0; }
+  15%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.roadmap-comet {
+  position: absolute;
+  top: 50%;
+  left: -12%;
+  width: 26px;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #aec99d 55%, #eef7e6 100%);
+  box-shadow: 0 0 10px 2px rgba(174, 201, 157, 0.85), 0 0 22px 6px rgba(174, 201, 157, 0.4);
+  animation: roadmap-comet-travel 1.15s cubic-bezier(0.3, 0, 0.2, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes roadmap-ping-soft {
+  0%   { transform: scale(0.75); opacity: 0.7; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.roadmap-ping {
+  position: absolute;
+  inset: -5px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(174, 201, 157, 0.65);
+  animation: roadmap-ping-soft 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes roadmap-glow-breathe {
+  0%, 100% { opacity: 0.65; }
+  50%      { opacity: 1; }
+}
+.roadmap-glow {
+  animation: roadmap-glow-breathe 4s ease-in-out infinite;
 }

@@ -52,7 +52,7 @@ export function TechLabSection() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col items-center text-center mb-12">
-          <span className="text-[#c4c9b8] uppercase tracking-widest text-xs font-manrope font-light mb-6">
+          <span className="text-[#dfe2d8] uppercase tracking-widest text-xs font-manrope font-light mb-6">
             Built with you. Not just for you.
           </span>
           <img 
@@ -79,7 +79,7 @@ export function TechLabSection() {
             <div>
               <span className="text-[#555] font-mono text-sm mb-6 block">01.</span>
               <h3 className="text-white font-medium text-lg mb-3">Engineering Studio</h3>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed mb-10">
+              <p className="text-white/70 text-[13px] font-light leading-relaxed mb-10">
                 We design and build AI-native digital products — from architecture to deployment — as a dedicated creative and technical partner.
               </p>
             </div>
@@ -115,7 +115,7 @@ export function TechLabSection() {
             <div>
               <span className="text-[#555] font-mono text-sm mb-6 block">02.</span>
               <h3 className="text-white font-medium text-lg mb-3">AI Strategy Consultation</h3>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed mb-10">
+              <p className="text-white/70 text-[13px] font-light leading-relaxed mb-10">
                 One-on-one with an Aivory expert. Validate direction, identify leverage points, and leave with a plan worth executing.
               </p>
             </div>
@@ -153,7 +153,7 @@ export function TechLabSection() {
             <div>
               <span className="text-[#555] font-mono text-sm mb-6 block">03.</span>
               <h3 className="text-white font-medium text-lg mb-3">Custom AI Development</h3>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed mb-10">
+              <p className="text-white/70 text-[13px] font-light leading-relaxed mb-10">
                 Bespoke agents, workflows, and integrations — designed around your operations, built on enterprise-grade infrastructure.
               </p>
             </div>
@@ -188,7 +188,7 @@ export function TechLabSection() {
             <div className="max-w-full lg:max-w-[80%]">
               <span className="text-[#555] font-mono text-sm mb-6 block">04.</span>
               <h3 className="text-white font-medium text-lg mb-3">Corporate Training</h3>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed mb-10">
+              <p className="text-white/70 text-[13px] font-light leading-relaxed mb-10">
                 Structured programs for organizations embedding AI across teams — from executive alignment to hands-on implementation.
               </p>
             </div>
@@ -220,7 +220,7 @@ export function TechLabSection() {
             <div className="max-w-full lg:max-w-[80%]">
               <span className="text-[#555] font-mono text-sm mb-6 block">05.</span>
               <h3 className="text-white font-medium text-lg mb-3">Enterprise Advisory</h3>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed mb-10">
+              <p className="text-white/70 text-[13px] font-light leading-relaxed mb-10">
                 Long-form partnership for organizations navigating AI transformation at scale — governance, architecture, and continuity.
               </p>
             </div>

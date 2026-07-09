@@ -145,7 +145,7 @@ export function PaymentHistory({
         <div className="text-center py-12">
           <div className="inline-block p-4 rounded-full bg-bg-tertiary mb-4">
             <svg
-              className="w-8 h-8 text-gray-500"
+              className="w-8 h-8 text-gray-300"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -158,7 +158,7 @@ export function PaymentHistory({
               />
             </svg>
           </div>
-          <p className="text-gray-400">No payment history yet</p>
+          <p className="text-gray-200">No payment history yet</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -183,27 +183,27 @@ export function PaymentHistory({
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-sm text-gray-400">
+                    <div className="space-y-1 text-sm text-gray-200">
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">Order ID:</span>
+                        <span className="text-gray-300">Order ID:</span>
                         <code className="bg-bg-tertiary px-1.5 py-0.5 rounded text-xs">
                           {payment.orderId}
                         </code>
                       </div>
                       {payment.transactionId && (
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-500">Transaction ID:</span>
+                          <span className="text-gray-300">Transaction ID:</span>
                           <span className="font-mono text-xs">{payment.transactionId}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">Payment Method:</span>
+                        <span className="text-gray-300">Payment Method:</span>
                         <span className="text-sm">
                           {getPaymentMethodName(payment.paymentMethod, payment.paymentMethodDetail)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-gray-500">Date:</span>
+                        <span className="text-gray-300">Date:</span>
                         <span>
                           {new Date(payment.createdAt).toLocaleDateString('en-US', {
                             year: 'numeric',
@@ -216,7 +216,7 @@ export function PaymentHistory({
                       </div>
                       {payment.verifiedAt && (
                         <div className="flex items-center gap-2">
-                          <span className="text-gray-500">Verified:</span>
+                          <span className="text-gray-300">Verified:</span>
                           <span>
                             {new Date(payment.verifiedAt).toLocaleDateString('en-US', {
                               year: 'numeric',

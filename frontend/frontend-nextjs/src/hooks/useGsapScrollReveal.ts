@@ -82,6 +82,15 @@ export function useGsapScrollReveal() {
         y: 0,
         duration: 0.8,
         ease: 'power2.out',
+        onComplete: () => {
+          // GSAP leaves an identity transform + `will-change: transform` inline once
+          // the reveal finishes. Either of those turns the grid into a CSS "backdrop
+          // root", which makes `backdrop-filter` on the cards inside blur an empty
+          // surface instead of the page background — i.e. the frosted-glass effect
+          // silently does nothing. Clearing them restores a normal stacking context
+          // so the cards can sample (and blur) the animated background behind them.
+          gsap.set(grid, { clearProps: 'willChange,transform,translate,rotate,scale' });
+        },
         scrollTrigger: {
           trigger: grid,
           start: 'top 88%',

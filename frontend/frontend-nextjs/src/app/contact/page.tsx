@@ -72,7 +72,7 @@ export default function ContactPage() {
               <h2 className="text-2xl font-bold tracking-tight mb-3 text-white">
                 Get in Touch
               </h2>
-              <p className="text-white/60 text-base mb-8 font-light">
+              <p className="text-white/75 text-base mb-8 font-light">
                 Have questions about Aivory? Want to discuss a custom plan or partnership? We&apos;d love to hear from you.
               </p>
 
@@ -164,12 +164,12 @@ export default function ContactPage() {
           ) : (
             <div className="bg-[#111111] rounded-xl border border-white/10 p-12 text-center shadow-2xl">
               <h3 className="text-2xl font-normal mb-4 text-white">✓ Thank you for your interest!</h3>
-              <p className="text-white/60 text-lg mb-8 font-light">
+              <p className="text-white/75 text-lg mb-8 font-light">
                 We&apos;ll be in touch soon to discuss your needs.
               </p>
               <button
                 onClick={() => setIsSubmitted(false)}
-                className="flex items-center justify-center gap-2 mx-auto px-8 py-3.5 border border-white text-white font-semibold hover:bg-white hover:text-black transition-all text-sm"
+                className="flex items-center justify-center gap-2 mx-auto px-8 py-3.5 border border-white/20 text-white font-semibold hover:border-[#a3aa96] hover:bg-white/5 transition-all text-sm"
               >
                 <svg
                   width="14"

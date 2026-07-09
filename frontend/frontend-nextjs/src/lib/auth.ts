@@ -1,19 +1,17 @@
 /**
- * Centralized Supabase authentication.
+ * Centralized authentication (Postgres-backed).
  *
- * Auth is centralized on Supabase across the whole platform (homepage, user
- * dashboard and admin dashboard). The Supabase browser client persists the
- * session in localStorage (storageKey "aivory_auth"), so the access token is
+ * Auth runs on the backend auth service (Postgres). login/signup call the
+ * backend and persist the returned session (access token + user) to
+ * localStorage under storageKey "aivory_auth", so the access token is
  * available synchronously and can be sent as a Bearer token to the backing
- * microservices, which all verify Supabase JWTs. This works seamlessly across
- * separate domains because the token is a self-contained JWT.
+ * microservices, which all verify the same self-contained JWT. This works
+ * seamlessly across separate domains because the token is a self-contained JWT.
  *
  * The synchronous helpers (`getToken`, `getUser`, `isAuthenticated`) read the
- * persisted Supabase session from localStorage to preserve the existing call
- * sites; `getCurrentUser` performs a fresh async fetch.
+ * persisted session from localStorage.
  */
 
-import { supabase } from "./supabase";
 import { getServiceUrl } from "./services";
 
 const STORAGE_KEY = "aivory_auth";
@@ -60,8 +58,8 @@ function readPersistedSession(): PersistedSession | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // supabase-js stores { currentSession, expiresAt } or the session directly
-    // depending on version; normalize both.
+    // Normalize both shapes: a session stored directly, or wrapped as
+    // { currentSession, expiresAt }.
     return (parsed?.currentSession ?? parsed) as PersistedSession;
   } catch {
     return null;
@@ -273,15 +271,14 @@ export async function logout(redirect: boolean = true): Promise<void> {
   }
 }
 
-/** Fetch the current user fresh from Supabase (async). */
+/**
+ * Return the current user (async wrapper kept for API compatibility).
+ *
+ * Auth now runs entirely on the Postgres-backed backend auth service; the
+ * session (access token + user) is persisted to localStorage by login/signup.
+ * There is no separate session provider to fetch from, so this resolves the
+ * persisted user directly.
+ */
 export async function getCurrentUser(): Promise<User | null> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    return null;
-  }
-  const { data: sessionData } = await supabase.auth.getSession();
-  return mapUser(
-    data.user as PersistedSession["user"] & object,
-    sessionData.session?.access_token
-  );
+  return getUser();
 }

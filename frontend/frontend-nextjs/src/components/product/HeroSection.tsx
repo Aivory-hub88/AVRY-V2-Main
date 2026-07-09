@@ -33,7 +33,7 @@ export function HeroSection({ title, subtitle }: HeroSectionProps) {
           style={{ fontFamily: "'Doto', 'Courier New', monospace" }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-          <span className="text-[10px] tracking-[0.2em] text-[#c4c9b8] uppercase font-manrope font-light">
+          <span className="text-[10px] tracking-[0.2em] text-[#dfe2d8] uppercase font-manrope font-light">
             Aivory Suite | Architecture to Production
           </span>
         </div>
@@ -48,7 +48,7 @@ export function HeroSection({ title, subtitle }: HeroSectionProps) {
 
         {/* Subtitle */}
         <p
-          className="text-base sm:text-lg text-white/60 max-w-2xl mx-auto mb-10 font-light leading-relaxed"
+          className="text-base sm:text-lg text-white/75 max-w-2xl mx-auto mb-10 font-light leading-relaxed"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           {subtitle}
@@ -61,7 +61,7 @@ export function HeroSection({ title, subtitle }: HeroSectionProps) {
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
         <div className="w-[1px] h-20 bg-gradient-to-b from-transparent to-white/15" />
         <div
-          className="text-[9px] tracking-[0.15em] text-white/30 uppercase my-3 font-light"
+          className="text-[9px] tracking-[0.15em] text-white/50 uppercase my-3 font-light"
           style={{ fontFamily: "'Doto', 'Courier New', monospace" }}
         >
           SCROLL TO EXPLORE

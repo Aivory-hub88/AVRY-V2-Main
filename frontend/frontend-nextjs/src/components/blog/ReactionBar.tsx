@@ -186,7 +186,7 @@ export function ReactionBar({
         aria-label={`Like this post (${likeCount} likes)`}
       >
         <svg
-          className="w-4 h-4 text-gray-400 group-hover:text-[#c4c9b8] transition-colors"
+          className="w-4 h-4 text-gray-200 group-hover:text-[#dfe2d8] transition-colors"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -199,7 +199,7 @@ export function ReactionBar({
             d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zm-9 11H3a2 2 0 01-2-2v-7a2 2 0 012-2h2"
           />
         </svg>
-        <span className="text-sm text-gray-300 tabular-nums">{likeCount}</span>
+        <span className="text-sm text-gray-100 tabular-nums">{likeCount}</span>
       </button>
 
       {/* Dislike button */}
@@ -210,7 +210,7 @@ export function ReactionBar({
         aria-label={`Dislike this post (${dislikeCount} dislikes)`}
       >
         <svg
-          className="w-4 h-4 text-gray-400 group-hover:text-red-400 transition-colors"
+          className="w-4 h-4 text-gray-200 group-hover:text-red-400 transition-colors"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -223,7 +223,7 @@ export function ReactionBar({
             d="M10 15V19a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10zm9-13h2a2 2 0 012 2v7a2 2 0 01-2 2h-2"
           />
         </svg>
-        <span className="text-sm text-gray-300 tabular-nums">{dislikeCount}</span>
+        <span className="text-sm text-gray-100 tabular-nums">{dislikeCount}</span>
       </button>
     </div>
   )

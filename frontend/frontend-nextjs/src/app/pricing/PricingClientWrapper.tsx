@@ -9,12 +9,10 @@ export default function PricingClientWrapper() {
   const { language } = useLanguage();
   const [currency, setCurrency] = useState<'IDR' | 'USD' | null>(null);
 
-  // Default to LanguageContext on mount
+  // Update currency whenever language changes
   useEffect(() => {
-    if (!currency) {
-      setCurrency(language === 'id' ? 'IDR' : 'USD');
-    }
-  }, [language, currency]);
+    setCurrency(language === 'id' ? 'IDR' : 'USD');
+  }, [language]);
 
   // If still detecting, default to something to avoid hydration mismatch
   const activeCurrency = currency || 'USD';

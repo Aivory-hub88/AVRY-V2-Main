@@ -34,7 +34,7 @@ export function FeaturedProduct({
         }`}
       >
         <p
-          className="text-[#c4c9b8] text-sm uppercase tracking-widest mb-4 font-light"
+          className="text-[#dfe2d8] text-sm uppercase tracking-widest mb-4 font-light"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           {tagline}
@@ -46,7 +46,7 @@ export function FeaturedProduct({
           {title}
         </h2>
         <p
-          className="text-lg text-white/70 max-w-2xl mb-8 font-light leading-relaxed"
+          className="text-lg text-white/85 max-w-2xl mb-8 font-light leading-relaxed"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           {description}

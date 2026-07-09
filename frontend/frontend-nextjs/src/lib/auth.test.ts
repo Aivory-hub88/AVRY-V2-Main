@@ -1,38 +1,22 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { isAuthenticated, getUser, getToken } from "./auth";
-
-// Mock supabase module
-vi.mock("./supabase", () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-      getSession: vi.fn(),
-    },
-  },
-}));
-
 // Mock services module
 vi.mock("./services", () => ({
   getServiceUrl: vi.fn(() => "http://localhost:8081"),
 }));
-
 const STORAGE_KEY = "aivory_auth";
-
-describe("Auth (Supabase-based)", () => {
+describe("Auth (Postgres-backed)", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
   });
-
   afterEach(() => {
     localStorage.clear();
   });
-
   describe("isAuthenticated", () => {
     it("should return false when no session is stored", () => {
       expect(isAuthenticated()).toBe(false);
     });
-
     it("should return true when a valid session is in localStorage", () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -43,7 +27,6 @@ describe("Auth (Supabase-based)", () => {
       );
       expect(isAuthenticated()).toBe(true);
     });
-
     it("should return false when session has no access_token", () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -54,12 +37,10 @@ describe("Auth (Supabase-based)", () => {
       expect(isAuthenticated()).toBe(false);
     });
   });
-
   describe("getUser", () => {
     it("should return null when no session is stored", () => {
       expect(getUser()).toBeNull();
     });
-
     it("should return a User object from persisted session", () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -77,7 +58,6 @@ describe("Auth (Supabase-based)", () => {
           },
         })
       );
-
       const user = getUser();
       expect(user).not.toBeNull();
       expect(user!.user_id).toBe("user-123");
@@ -86,7 +66,6 @@ describe("Auth (Supabase-based)", () => {
       expect(user!.company_name).toBe("Test Corp");
       expect(user!.token).toBe("test-token");
     });
-
     it("should return null when session has no user", () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -95,12 +74,10 @@ describe("Auth (Supabase-based)", () => {
       expect(getUser()).toBeNull();
     });
   });
-
   describe("getToken", () => {
     it("should return null when no session is stored", () => {
       expect(getToken()).toBeNull();
     });
-
     it("should return the access_token from persisted session", () => {
       localStorage.setItem(
         STORAGE_KEY,

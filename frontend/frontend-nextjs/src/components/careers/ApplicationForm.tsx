@@ -299,12 +299,12 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
     return (
       <div className="rounded-xl border border-[#c4c9b8]/30 bg-[#c4c9b8]/10 p-8 text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#c4c9b8]/20 flex items-center justify-center">
-          <svg className="w-8 h-8 text-[#c4c9b8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-8 h-8 text-[#dfe2d8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <h3 className="text-xl font-semibold text-white mb-2">Application Submitted</h3>
-        <p className="text-gray-400">
+        <p className="text-gray-200">
           Thank you for your application. We&apos;ll review your submission and get back to you soon.
         </p>
       </div>
@@ -453,7 +453,7 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
             />
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-white/[0.05] flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
@@ -461,9 +461,9 @@ export function ApplicationForm({ vacancyId }: ApplicationFormProps) {
                 {cvFile ? (
                   <p className="text-sm text-white truncate">{cvFile.name}</p>
                 ) : (
-                  <p className="text-sm text-gray-400">Click to upload or drag and drop</p>
+                  <p className="text-sm text-gray-200">Click to upload or drag and drop</p>
                 )}
-                <p className="text-xs text-gray-500 mt-0.5">PDF, DOC, or DOCX (max 10 MB)</p>
+                <p className="text-xs text-gray-300 mt-0.5">PDF, DOC, or DOCX (max 10 MB)</p>
               </div>
             </div>
           </div>

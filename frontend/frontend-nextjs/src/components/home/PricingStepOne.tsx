@@ -45,6 +45,7 @@ interface PricingCard {
   features: string[];
   cta: string;
   savings?: string;
+  mostPopular?: boolean;
 }
 
 const cards: PricingCard[] = [
@@ -86,6 +87,7 @@ const cards: PricingCard[] = [
     features: ['• Deep Diagnostic', '• Blueprint', '• Roadmap'],
     cta: 'View Deployment Plans',
     savings: 'Save 13%',
+    mostPopular: true,
   },
 ];
 
@@ -148,11 +150,18 @@ export default function PricingStepOne({ currency }: { currency?: 'IDR' | 'USD' 
               {/* Title area */}
               <div className="flex-grow flex flex-col">
                 <div className="min-h-[96px] pb-6">
+                  <div className="h-7 mb-4">
+                    {card.mostPopular && (
+                      <span className="inline-flex items-center px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#494949] border border-[#494949] rounded-full">
+                        Most Popular
+                      </span>
+                    )}
+                  </div>
                   <h3 className="max-w-[410px] text-[22px] md:text-[24px] lg:text-[26px] font-normal leading-[1.05] text-[#494949] whitespace-pre-line">
                     {card.title}
                   </h3>
                   {card.subtitle && (
-                    <p className="mt-3 text-[14px] md:text-[15px] font-bold leading-tight text-[#8a8f8e]">
+                    <p className="mt-3 text-[14px] md:text-[15px] font-bold leading-tight text-[#8a8f8d]">
                       {card.subtitle}
                     </p>
                   )}

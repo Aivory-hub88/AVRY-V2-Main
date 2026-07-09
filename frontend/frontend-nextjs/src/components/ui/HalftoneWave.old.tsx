@@ -67,21 +67,15 @@ export function HalftoneWave() {
           float topLightDiff = max(0.0, dot(normal, topLightDir));
           // Fade spotlight heavily on scroll to protect readability in lower sections
           float spotlightFade = 1.0 - smoothstep(0.0, 0.4, uScroll);
-          float spotlight = pow(topLightDiff, 2.6) * 0.58 * spotlightFade; // broader + stronger top-down key light
+          float spotlight = pow(topLightDiff, 3.2) * 0.42 * spotlightFade;
           
           // Enhanced density for subtle but more 3D ASCII
           // Reduced spotlight influence on density to avoid solid bright blocks
           float density = 1.0 - normalizedDepth + (rim * 0.5) + (spotlight * 0.2);
+          density -= uScroll * 0.3; // Fade out slightly as it spreads
           density = clamp(density, 0.0, 0.9); // Clamp below 1.0 to prevent full solid blocks
           
           // 2. ASCII SCREEN-SPACE GRID
-          // LIGHT ordered (4x4 Bayer) dither on the character selection, keyed to
-          // the glyph cell — softens the hard level-boundary contours (the
-          // "pembatas") so the shading spreads smoothly. Kept light (0.12 vs the
-          // earlier heavy 0.167 that dulled the color); on the current rich
-          // palette this smooths banding without flattening. Color + silhouette
-          // still use the raw, undithered density.
-          vec2 cell = floor(gl_FragCoord.xy / uPixelSize);
           vec2 local = fract(gl_FragCoord.xy / uPixelSize);
           vec2 p5 = floor(local * 5.0); 
           
@@ -165,7 +159,7 @@ export function HalftoneWave() {
     // ==========================================
     // 1. MAIN 6-LOBE FLOWER (Base)
     // ==========================================
-    const geometry = new THREE.SphereGeometry(1, 128, 128);
+    const geometry = new THREE.SphereGeometry(1, 96, 96);
     const material = new THREE.ShaderMaterial({
       uniforms,
       side: THREE.FrontSide, 
@@ -208,10 +202,8 @@ export function HalftoneWave() {
           float idleBloom = (sin(uTime * 1.5) * 0.5 + 0.5) * 0.1;
           float spread = smoothstep(0.0, 1.0, uScroll) + (idleBloom * (1.0 - smoothstep(0.0, 1.0, uScroll)));
           
-          // Extremely gentle spread + bend on scroll so the petals maintain
-          // a highly stable, solid 3D silhouette instead of separating into pieces.
-          float radius = 2.5 + (petalDepth * 2.0) + (petalDepth * spread * 0.25);
-          float bend = spread * 0.15;
+          float radius = 2.5 + (petalDepth * 2.0) + (petalDepth * spread * 1.5);
+          float bend = spread * 0.8;
           
           vec3 displacedPos = p * radius;
           displacedPos.y -= bend * petalDepth;

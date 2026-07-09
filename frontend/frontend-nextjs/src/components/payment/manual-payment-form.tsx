@@ -101,7 +101,7 @@ export function ManualPaymentForm({
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium text-white mb-2">Manual Payment</h3>
-      <p className="text-sm text-gray-400 mb-6">
+      <p className="text-sm text-gray-200 mb-6">
         Send proof of payment to our team for manual verification.
         <br />
         <span className="text-brand-mint">Amount: ${amount.toFixed(2)} for {product}</span>
@@ -110,7 +110,7 @@ export function ManualPaymentForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Payment Proof Upload */}
         <div className="space-y-2">
-          <label htmlFor="payment-proof" className="block text-sm font-medium text-gray-300">
+          <label htmlFor="payment-proof" className="block text-sm font-medium text-gray-100">
             Payment Proof / Screenshot
           </label>
           <div className="relative">
@@ -120,7 +120,7 @@ export function ManualPaymentForm({
               name="payment-proof"
               accept="image/*"
               onChange={handleFileChange}
-              className="block w-full text-sm text-gray-400
+              className="block w-full text-sm text-gray-200
                 file:mr-4 file:py-2 file:px-4
                 file:rounded-lg file:border-0
                 file:text-sm file:font-semibold
@@ -130,19 +130,19 @@ export function ManualPaymentForm({
               "
             />
             {formData.paymentProof && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-300 mt-1">
                 Selected: {formData.paymentProof.name}
               </p>
             )}
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-300">
             Accepted formats: PNG, JPG, JPEG (max 5MB)
           </p>
         </div>
 
         {/* Transaction ID */}
         <div className="space-y-2">
-          <label htmlFor="transaction-id" className="block text-sm font-medium text-gray-300">
+          <label htmlFor="transaction-id" className="block text-sm font-medium text-gray-100">
             Transaction ID / Reference Number
           </label>
           <input
@@ -163,7 +163,7 @@ export function ManualPaymentForm({
 
         {/* Payment Method */}
         <div className="space-y-2">
-          <label htmlFor="payment-method" className="block text-sm font-medium text-gray-300">
+          <label htmlFor="payment-method" className="block text-sm font-medium text-gray-100">
             Payment Method
           </label>
           <select

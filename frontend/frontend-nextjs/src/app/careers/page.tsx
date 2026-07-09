@@ -95,11 +95,11 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
       className="block group rounded-xl border border-white/10 bg-white/[0.03] p-6 transition-all hover:border-[#c4c9b8]/40 hover:bg-white/[0.05]"
     >
       <div className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold text-white group-hover:text-[#c4c9b8] transition-colors">
+        <h2 className="text-xl font-semibold text-white group-hover:text-[#dfe2d8] transition-colors">
           {vacancy.title}
         </h2>
 
-        <div className="flex flex-wrap gap-3 text-sm text-gray-400">
+        <div className="flex flex-wrap gap-3 text-sm text-gray-200">
           {vacancy.department && (
             <span className="inline-flex items-center gap-1.5">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,12 +128,12 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
         </div>
 
         {brief && (
-          <p className="text-gray-400 text-sm leading-relaxed mt-1">
+          <p className="text-gray-200 text-sm leading-relaxed mt-1">
             {brief}
           </p>
         )}
 
-        <div className="mt-3 text-sm font-medium text-[#c4c9b8] group-hover:underline">
+        <div className="mt-3 text-sm font-medium text-[#dfe2d8] group-hover:underline">
           View Details →
         </div>
       </div>
@@ -145,12 +145,12 @@ function EmptyState() {
   return (
     <div className="text-center py-16 px-6">
       <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.05] flex items-center justify-center">
-        <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       </div>
       <h2 className="text-xl font-semibold text-white mb-2">No Open Positions</h2>
-      <p className="text-gray-400 max-w-md mx-auto">
+      <p className="text-gray-200 max-w-md mx-auto">
         We don&apos;t have any open positions at the moment. Check back soon — we&apos;re always growing and new opportunities may open up.
       </p>
     </div>
@@ -179,7 +179,7 @@ export default async function CareersPage() {
         <div className="max-w-5xl mx-auto">
           <div className="mb-12 text-center mt-12">
             <h1 className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90" style={{ fontFamily: "'Manrope', sans-serif" }}>Careers at Aivory</h1>
-            <p className="text-[#c4c9b8] text-lg max-w-2xl mx-auto font-light">
+            <p className="text-[#dfe2d8] text-lg max-w-2xl mx-auto font-light">
               Join our team and help shape the future of AI readiness. We&apos;re looking for passionate people to build the next generation of intelligent tools.
             </p>
           </div>

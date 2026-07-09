@@ -35,13 +35,13 @@ function ProductCard({ product, index }: { product: ProductCardData; index: numb
         {product.tagline}
       </p>
       <p
-        className="text-white/70 text-sm mb-4 font-light leading-relaxed"
+        className="text-white/85 text-sm mb-4 font-light leading-relaxed"
         style={{ fontFamily: "'Manrope', sans-serif" }}
       >
         {product.description}
       </p>
       <p
-        className="text-white/50 text-xs font-light"
+        className="text-white/70 text-xs font-light"
         style={{ fontFamily: "'Manrope', sans-serif" }}
       >
         {product.features.join(' • ')}
@@ -67,7 +67,7 @@ export function ProductGrid({ products, sectionTitle = 'And much more' }: Produc
           {sectionTitle}
         </h2>
         <p
-          className="text-white/60 text-center max-w-2xl mx-auto mb-16 text-lg font-light"
+          className="text-white/75 text-center max-w-2xl mx-auto mb-16 text-lg font-light"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           Explore the full suite of tools designed to accelerate your AI adoption journey.

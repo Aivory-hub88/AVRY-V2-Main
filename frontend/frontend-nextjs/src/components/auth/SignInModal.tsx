@@ -82,7 +82,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors p-1"
+          className="absolute top-5 right-5 text-white/60 hover:text-white transition-colors p-1"
           aria-label="Close"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,7 +113,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="email" className="block text-[13px] font-medium text-white/70 mb-2">
+            <label htmlFor="email" className="block text-[13px] font-medium text-white/85 mb-2">
               Email address
             </label>
             <input
@@ -130,7 +130,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label htmlFor="password" className="block text-[13px] font-medium text-white/70">
+              <label htmlFor="password" className="block text-[13px] font-medium text-white/85">
                 Password
               </label>
               <a href="#" className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
@@ -166,7 +166,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         </form>
 
         <div className="mt-8 text-center">
-          <p className="text-[13px] text-white/40">
+          <p className="text-[13px] text-white/60">
             Don&apos;t have a subscription yet?{' '}
             <a href="/product" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
               Explore plans &rarr;

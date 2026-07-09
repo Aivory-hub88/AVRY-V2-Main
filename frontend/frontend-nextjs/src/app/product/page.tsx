@@ -6,6 +6,7 @@ import { InteractiveGridShowcase } from '@/components/product/InteractiveGridSho
 import { InteractiveGrid } from '@/components/product/InteractiveGrid';
 import { TechLabSection } from '@/components/product/TechLabSection';
 import { CTAFooter } from '@/components/product/CTAFooter';
+import { DarkSectionSpotlight } from '@/components/ui/DarkSectionSpotlight';
 
 export const metadata: Metadata = {
   title: 'Products — Aivory',
@@ -15,7 +16,8 @@ export const metadata: Metadata = {
 
 export default function ProductPage() {
   return (
-    <main className="relative bg-black min-h-screen">
+    <DarkSectionSpotlight className="relative bg-black min-h-screen flex flex-col">
+      <main className="flex-1 flex flex-col relative z-10 w-full h-full">
       {/* Sticky navigation bar */}
       <Navbar />
 
@@ -42,6 +44,7 @@ export default function ProductPage() {
 
       {/* Standard Footer */}
       <Footer />
-    </main>
+      </main>
+    </DarkSectionSpotlight>
   );
 }

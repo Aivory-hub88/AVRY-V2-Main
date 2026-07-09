@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, type ReactNode } from 'react';
 
 // ============================================================================
 // TYPES
@@ -23,6 +23,7 @@ interface DimensionInfo {
 interface InsightItem {
   title: string;
   desc: string;
+  type: 'strength' | 'blocker';
 }
 
 // ============================================================================
@@ -241,6 +242,13 @@ function getNarrative(companyName: string, score: number, maturity: string): str
   return templates[maturity] || '';
 }
 
+// Bolds the score fraction and day-range callouts inside the narrative
+// (e.g. "42/100", "30–90 days"), matching the reference design's emphasis.
+function renderNotesWithBold(text: string): ReactNode[] {
+  const parts = text.split(/(\d+\/100|\d+(?:–\d+)?\s*days)/g);
+  return parts.map((part, i) => (/^\d+\/100$|days$/.test(part) ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>));
+}
+
 function generateDiagnosticId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let r = '';
@@ -304,7 +312,17 @@ export default function FreeDiagnosticPage() {
         { ref: slide2Ref, suffix: 'Card_2' },
       ];
 
-      // Make sure web fonts are loaded before capturing
+      // document.fonts.ready only resolves fonts the page has *already*
+      // triggered a load for — if a specific weight (e.g. Doto 600) hasn't
+      // been rendered anywhere yet when this runs, it can resolve before
+      // that weight is actually available, and html-to-image captures
+      // whatever the browser falls back to. Explicitly request every
+      // family/weight the card actually uses before capturing.
+      const fontSpecs = [
+        '400 16px Manrope', '500 16px Manrope', '600 16px Manrope', '700 16px Manrope',
+        '400 16px Doto', '600 16px Doto', '700 16px Doto',
+      ];
+      await Promise.all(fontSpecs.map(spec => document.fonts.load(spec)));
       await document.fonts.ready;
 
       for (const slide of slides) {
@@ -317,8 +335,8 @@ export default function FreeDiagnosticPage() {
         const dataUrl = await toPng(node, {
           width: 1080,
           height: 1350,
-          pixelRatio: 2,
-          backgroundColor: '#ffffff',
+          pixelRatio: 3,
+          backgroundColor: '#f2f0ea',
           cacheBust: true,
           // Capture the node at its native size, ignoring the preview
           // transform:scale applied by the parent wrapper.
@@ -363,7 +381,8 @@ export default function FreeDiagnosticPage() {
   if (primaryStrength) {
     insightItems.push({
       title: primaryStrength.label,
-      desc: INSIGHT_DESCRIPTIONS[primaryStrength.id]?.strength || "Strong capability in this dimension provides a solid foundation for scaling AI initiatives."
+      desc: INSIGHT_DESCRIPTIONS[primaryStrength.id]?.strength || "Strong capability in this dimension provides a solid foundation for scaling AI initiatives.",
+      type: 'strength'
     });
   }
   blockers.forEach((blocker, index) => {
@@ -372,13 +391,14 @@ export default function FreeDiagnosticPage() {
       title: blocker.label,
       desc: INSIGHT_DESCRIPTIONS[blocker.id]?.blocker || (index === 0
         ? "Critical gap in this area creates operational friction that must be addressed to ensure AI success."
-        : "Addressing this constraint will unlock significant efficiency gains and improve overall AI readiness.")
+        : "Addressing this constraint will unlock significant efficiency gains and improve overall AI readiness."),
+      type: 'blocker'
     });
   });
   if (insightItems.length < 3) {
     const secondaryStrength = strengths.find(item => !insightItems.some(ins => ins.title === item.label));
     if (secondaryStrength) {
-      insightItems.push({ title: secondaryStrength.label, desc: INSIGHT_DESCRIPTIONS[secondaryStrength.id]?.strength || "Solid performance here accelerates your ability to deploy practical AI initiatives." });
+      insightItems.push({ title: secondaryStrength.label, desc: INSIGHT_DESCRIPTIONS[secondaryStrength.id]?.strength || "Solid performance here accelerates your ability to deploy practical AI initiatives.", type: 'strength' });
     }
   }
 
@@ -506,49 +526,65 @@ export default function FreeDiagnosticPage() {
               {/* Slide 1 */}
               <div className="ig-slide-wrapper" style={{ width: previewWidth, height: previewHeight, maxWidth: '100%', overflow: 'auto', display: 'flex', justifyContent: 'flex-start', background: '#ffffff', padding: 0, border: '1px solid #d8e0e0', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                 <div style={{ width: 1080, height: 1350, flexShrink: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-                  <div ref={slide1Ref} id="ig-slide-1" style={{ width: 1080, height: 1350, overflow: 'hidden', background: '#ffffff', padding: '80px 90px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
+                  <div ref={slide1Ref} id="ig-slide-1" style={{ width: 1080, height: 1350, overflow: 'hidden', background: 'radial-gradient(120% 90% at 28% 0%, #ffffff 0%, #fbfaf7 45%, #f2f0ea 100%)', padding: '80px 90px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "var(--font-manrope), 'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
                     <div>
-                      {/* Logo placeholder */}
-                      <div style={{ height: 60, width: 290, marginBottom: 36, display: 'flex', alignItems: 'center' }}>
-                        <svg viewBox="0 0 382.6 79.4" style={{ height: '36px', width: 'auto', display: 'block' }}>
-                          <path fill="#5b5b5b" d="M104.8,65.4V20.7h8.9v44.7h-8.9Z"/>
-                          <path fill="#5b5b5b" d="M182.2,20.5l-19.6,32.6c-5.9,9.8-9.8,12.1-25,12.1h-17.3V20.5h8.9v39.2c13.3,0,17.7.6,26.5-13.4l15.3-25.8s11.1,0,11.1,0Z"/>
-                          <path fill="#5b5b5b" d="M240.4,43c0,12.7-4.8,22.8-30.2,22.8h-1.3c-25.2,0-30.2-10.1-30.2-22.8s4.8-22.8,30.2-22.8h1.3c25.2,0,30.2,10.1,30.2,22.8ZM230.1,43c0-16.3-8.9-17.2-18-17.2h-4.6c-9.1,0-18,1-18,17.2s9.1,17.7,18,17.7h4.6c9.2,0,18-1.4,18-17.7Z"/>
-                          <path fill="#5b5b5b" d="M300.8,65.4h-5.6c-4.5,0-8.9-2.6-14.6-8.8l-3-3.3h-24.2v12.1h-9.4V20.7h36.1c14.4,0,17.9,5.6,17.6,16.4-.1,5.6-1.6,12.8-10.5,15.3l13.7,13h0ZM289.2,37.3c0-6.9-1.3-11-9.7-11h-26.1v20.3h26.1c4.6,0,9.7-1.4,9.7-9.4Z"/>
-                          <path fill="#5b5b5b" d="M350.1,20.5l-22.9,28.7v16h-8.8v-15.7l-23.4-29h10.1l17.9,22.4,17-22.4h10.1Z"/>
-                          <path fill="#5b5b5b" d="M36.1,65.5l19.8-32.9c5.9-10,10-12.3,25.1-12.3h17.5v45.2h-9.1V28.3c-16.7,0-20.1-1.9-28.1,11.1l-15.4,26.1h-9.8.1Z"/>
-                          <path fill="#9cb77e" d="M77.4,56.2v9.4h-16.3l1.6-3c1.2-2,2.2-4,3.9-4.9,0,0,2-1.3,5.5-1.3h5.5-.1Z"/>
-                        </svg>
+                      {/* Header — logo left, title right, matching the report spec */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '46px', width: 'auto', display: 'block', flexShrink: 0 }} />
+                        <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>Quick Assessment<br />of AI Readiness</div>
                       </div>
-                      <h1 style={{ fontSize: 64, fontWeight: 400, lineHeight: 1.05, letterSpacing: '-0.03em', marginBottom: 30, color: '#111' }}>AI Readiness<br />Quick Diagnostic</h1>
+                      <div style={{ borderBottom: '1px solid #111', marginBottom: 32 }} />
 
                       {/* Company info grid */}
-                      <div style={{ border: '2px solid #111', padding: '28px 36px', background: '#ffffff', marginBottom: 28, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Company Name<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry category<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLabel}</div></div>
-                        <div style={{ fontSize: 19, fontWeight: 700, color: '#111' }}>Industry Size<div style={{ fontSize: 17, fontWeight: 400, color: '#333', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sizeLabel}</div></div>
+                      <div style={{ paddingBottom: 22, marginBottom: 40, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Company Name<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Industry Category<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLabel}</div></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Industry Size<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sizeLabel}</div></div>
                       </div>
 
-                      {/* Score section */}
-                      <div style={{ border: '2px solid #111', padding: '36px 40px 40px', background: '#ffffff', marginBottom: 28, position: 'relative' }}>
-                        <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontFamily: "'Doto', monospace", fontSize: 16, padding: '6px 16px', borderRadius: 9999, marginBottom: 20 }}>&gt;&gt; {maturity} &lt;&lt;</div>
+                      {/* Score section — no box, soft tactile dial */}
+                      <div style={{ marginBottom: 40 }}>
+                        <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontFamily: "var(--font-doto), 'Doto', monospace", fontSize: 15, letterSpacing: '0.04em', padding: '7px 18px', borderRadius: 9999, marginBottom: 28 }}>&gt;&gt; {maturity.toUpperCase()} &lt;&lt;</div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginBottom: 24 }}>
-                          {/* Gauge */}
-                          <div style={{ position: 'relative', width: 160, height: 160, flexShrink: 0 }}>
-                            <svg width="160" height="160" viewBox="0 0 200 200">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
+                          {/* Gauge — dotted ring + single needle tick, soft raised disc */}
+                          <div style={{ position: 'relative', width: 176, height: 176, flexShrink: 0, filter: 'drop-shadow(0 12px 20px rgba(17,17,17,0.14))' }}>
+                            <svg width="176" height="176" viewBox="0 0 200 200">
+                              <defs>
+                                {/* Soft embossed dome — top-left light source, like a physical dial */}
+                                <radialGradient id="dialDome" cx="35%" cy="28%" r="75%">
+                                  <stop offset="0%" stopColor="#ffffff" />
+                                  <stop offset="55%" stopColor="#faf9f6" />
+                                  <stop offset="100%" stopColor="#eae8e2" />
+                                </radialGradient>
+                                <linearGradient id="dialBevelLight" x1="10%" y1="0%" x2="90%" y2="100%">
+                                  <stop offset="0%" stopColor="#ffffff" />
+                                  <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
+                                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+                                </linearGradient>
+                                <linearGradient id="dialBevelShadow" x1="10%" y1="0%" x2="90%" y2="100%">
+                                  <stop offset="0%" stopColor="#c7c5bb" stopOpacity="0" />
+                                  <stop offset="55%" stopColor="#c7c5bb" stopOpacity="0" />
+                                  <stop offset="100%" stopColor="#c7c5bb" />
+                                </linearGradient>
+                              </defs>
                               <g transform="translate(100,100)">
-                                {Array.from({ length: 40 }).map((_, i) => {
-                                  const angle = (i / 40) * 360;
-                                  const isActive = (i / 40) * 100 <= score;
-                                  return <line key={i} x1="0" y1="-90" x2="0" y2="-78" stroke={isActive ? '#ff5757' : '#cccccc'} strokeWidth="4" transform={`rotate(${angle})`} />;
+                                {Array.from({ length: 60 }).map((_, i) => {
+                                  const angle = (i / 60) * 360;
+                                  return <line key={i} x1="0" y1="-92" x2="0" y2="-84" stroke="#d6d6d1" strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle})`} />;
                                 })}
                               </g>
-                              <circle cx="100" cy="100" r="68" fill="#111111" />
+                              <g transform={`translate(100,100) rotate(${(score / 100) * 360})`}>
+                                <line x1="0" y1="-96" x2="0" y2="-79" stroke="#ff5757" strokeWidth="4" strokeLinecap="round" />
+                              </g>
+                              <circle cx="100" cy="100" r="70" fill="url(#dialDome)" />
+                              <circle cx="100" cy="100" r="69" fill="none" stroke="url(#dialBevelShadow)" strokeWidth="2" />
+                              <circle cx="100" cy="100" r="69" fill="none" stroke="url(#dialBevelLight)" strokeWidth="2" />
                             </svg>
-                            <div style={{ position: 'absolute', top: 0, left: 0, width: '160px', height: '160px' }}>
-                              <div style={{ position: 'absolute', top: '44px', width: '100%', textAlign: 'center', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.15em', opacity: 0.8, color: '#ffffff' }}>score</div>
-                              <div style={{ position: 'absolute', top: '64px', width: '100%', textAlign: 'center', fontFamily: "'Doto', monospace", fontSize: 50, fontWeight: 700, lineHeight: 1, color: '#ffffff' }}>{score}</div>
+                            <div style={{ position: 'absolute', top: 0, left: 0, width: '176px', height: '176px' }}>
+                              <div style={{ position: 'absolute', top: '58px', width: '100%', textAlign: 'center', fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.18em', color: '#999' }}>score</div>
+                              <div style={{ position: 'absolute', top: '78px', width: '100%', textAlign: 'center', fontFamily: "var(--font-doto), 'Doto', monospace", fontSize: 46, fontWeight: 700, lineHeight: 1, color: '#111' }}>{score}</div>
                             </div>
                           </div>
                           <div>
@@ -556,50 +592,21 @@ export default function FreeDiagnosticPage() {
                             <p style={{ fontSize: 17, color: '#333', lineHeight: 1.4 }}>{quickNote.body}</p>
                           </div>
                         </div>
-
-                        {/* Maturity stages */}
-                        <div style={{ marginTop: 20 }}>
-                          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                            {MATURITY_STAGES.map((stage) => {
-                              const isActive = stage.toLowerCase() === maturity.toLowerCase();
-                              return (
-                                <div key={stage} style={{ flex: 1, textAlign: 'center' }}>
-                                  <div style={{ height: 6, background: isActive ? '#ff5757' : '#111111', marginBottom: 10, borderRadius: 3 }} />
-                                  <div style={{ fontSize: 15, fontWeight: isActive ? 700 : 500, color: '#111' }}>{stage}</div>
-                                  {isActive ? (
-                                    <div style={{ display: 'inline-block', background: '#111', color: '#fff', fontSize: 12, fontStyle: 'italic', padding: '0 10px', height: '24px', lineHeight: '24px', borderRadius: 6, marginTop: 6 }}>You are here</div>
-                                  ) : (
-                                    <div style={{ height: 32 }} />
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {/* Tick marks */}
-                          <div style={{ position: 'relative', height: 36, marginTop: 8 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: 20, borderBottom: '2px solid #999', paddingBottom: 4 }}>
-                              {Array.from({ length: 51 }).map((_, i) => (
-                                <div key={i} style={{ width: 2, height: i % 10 === 0 ? 16 : 8, background: '#999' }} />
-                              ))}
-                            </div>
-                            <div style={{ position: 'absolute', top: 0, left: `${indicatorPercent}%`, width: 3, height: 32, background: '#ff5757', transform: 'translateX(-50%)' }} />
-                          </div>
-                        </div>
                       </div>
 
-                      {/* Dimension grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 36 }}>
+                      {/* Dimension grid — plain, airy, no boxes */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 26, columnGap: 40, marginBottom: 36 }}>
                         {[...top, ...bottom].map(d => {
                           let iconChar = '→';
-                          let iconColor = '#ffb020';
-                          if (d.score >= 2) { iconChar = '↗'; iconColor = '#c4c9b8'; }
+                          let iconColor = '#d9942f';
+                          if (d.score >= 2) { iconChar = '↗'; iconColor = '#6b9b5e'; }
                           else if (d.score === 0) { iconChar = '↓'; iconColor = '#ff5757'; }
                           return (
-                            <div key={d.id} style={{ border: '2px solid #111', minHeight: 96, padding: '20px 24px', background: '#f8fafa', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRadius: 8 }}>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: '#111', textTransform: 'lowercase' }}>{d.label}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-                                <span style={{ fontSize: 20, color: iconColor, fontWeight: 700 }}>{iconChar}</span>
-                                <span style={{ fontFamily: "'Doto', monospace", fontSize: 18, fontWeight: 600, color: '#111' }}>Score {d.score}/3</span>
+                            <div key={d.id}>
+                              <div style={{ fontSize: 17, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 8 }}>{d.label}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 18, color: iconColor, fontWeight: 700 }}>{iconChar}</span>
+                                <span style={{ fontFamily: "var(--font-doto), 'Doto', monospace", fontSize: 17, fontWeight: 600, color: '#333' }}>Score {d.score}/3</span>
                               </div>
                             </div>
                           );
@@ -607,9 +614,8 @@ export default function FreeDiagnosticPage() {
                       </div>
                     </div>
 
-                    <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-                      <div style={{ fontSize: 20, fontWeight: 500, color: '#111', marginBottom: 20 }}>© 2026 Aivory. All rights reserved.</div>
-                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
+                    <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #dcdcd7' }}>
+                      <div style={{ fontSize: 20, fontWeight: 500, color: '#111', paddingTop: 20 }}>© 2026 Aivory. All rights reserved.</div>
                     </div>
                   </div>
                 </div>
@@ -618,11 +624,11 @@ export default function FreeDiagnosticPage() {
               {/* Slide 2 */}
               <div className="ig-slide-wrapper" style={{ width: previewWidth, height: previewHeight, maxWidth: '100%', overflow: 'auto', display: 'flex', justifyContent: 'flex-start', background: '#ffffff', padding: 0, border: '1px solid #d8e0e0', borderRadius: 12, boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                 <div style={{ width: 1080, height: 1350, flexShrink: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-                  <div ref={slide2Ref} id="ig-slide-2" style={{ width: 1080, height: 1350, background: '#ffffff', padding: '100px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
+                  <div ref={slide2Ref} id="ig-slide-2" style={{ width: 1080, height: 1350, background: 'radial-gradient(120% 90% at 28% 0%, #ffffff 0%, #fbfaf7 45%, #f2f0ea 100%)', padding: '100px 100px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontFamily: "var(--font-manrope), 'Manrope', sans-serif", color: '#111111', position: 'relative' }}>
                     <div>
                       {/* Strengths & Blockers table */}
                       <div style={{ marginBottom: 50 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, paddingBottom: 16, borderBottom: '2px solid #111', fontSize: 24, fontWeight: 700, color: '#111' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, paddingBottom: 16, borderBottom: '1px solid #111', fontSize: 24, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                           <div>Strength</div>
                           <div>Blocker</div>
                         </div>
@@ -630,7 +636,7 @@ export default function FreeDiagnosticPage() {
                           const s = strengths[i]?.label || '-';
                           const b = blockers[i]?.label || '-';
                           return (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, padding: '20px 0', borderBottom: '1px solid #111', fontSize: 22, color: '#111', fontWeight: 500 }}>
+                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40, padding: '20px 0', borderBottom: '1px solid #dcdcd7', fontSize: 22, color: '#111', fontWeight: 500 }}>
                               <div>{s}</div>
                               <div>{b}</div>
                             </div>
@@ -639,42 +645,32 @@ export default function FreeDiagnosticPage() {
                       </div>
 
                       {/* Insight items */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 40, marginBottom: 50 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 36, marginBottom: 50 }}>
                         {insightItems.map((ins, i) => (
                           <div key={i}>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 12 }}>{ins.title}</div>
-                            <div style={{ borderBottom: '2px solid #111', marginBottom: 12 }} />
-                            <div style={{ fontSize: 20, color: '#333', lineHeight: 1.4 }}>{ins.desc}</div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.01em', marginBottom: 10 }}>{ins.title}</div>
+                            <div style={{ borderBottom: '1px solid #111', marginBottom: 12 }} />
+                            <div style={{ fontSize: 20, color: '#333', lineHeight: 1.4, display: 'flex', gap: 10 }}>
+                              {ins.type === 'blocker' && <span style={{ color: '#ff5757', fontWeight: 700, flexShrink: 0 }}>→</span>}
+                              <span>{ins.desc}</span>
+                            </div>
                           </div>
                         ))}
                       </div>
 
                       {/* Notes */}
                       <div style={{ marginBottom: 40 }}>
-                        <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 12 }}>Notes</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.01em', marginBottom: 12 }}>Notes</div>
                         <div style={{ fontSize: 20, color: '#111', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' }}>
-                          For {companyName.trim() || 'your company'}, a score of {score}/100 shows the foundation is beginning to take shape, but critical gaps remain. Organizations at this stage benefit most from quick wins — choose an AI use case where ROI can be demonstrated in 90 days.
+                          {renderNotesWithBold(getNarrative(companyName.trim() || 'your company', score, maturity))}
                         </div>
                       </div>
                     </div>
 
-                    <div style={{ marginTop: 'auto' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
-                        <div style={{ fontSize: 20, fontWeight: 500, color: '#111' }}>© 2026 Aivory. All rights reserved.</div>
-                        <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 12 }}>Diagnose by</div>
-                          <svg viewBox="0 0 382.6 79.4" style={{ height: '32px', width: 'auto', display: 'block' }}>
-                            <path fill="#5b5b5b" d="M104.8,65.4V20.7h8.9v44.7h-8.9Z"/>
-                            <path fill="#5b5b5b" d="M182.2,20.5l-19.6,32.6c-5.9,9.8-9.8,12.1-25,12.1h-17.3V20.5h8.9v39.2c13.3,0,17.7.6,26.5-13.4l15.3-25.8s11.1,0,11.1,0Z"/>
-                            <path fill="#5b5b5b" d="M240.4,43c0,12.7-4.8,22.8-30.2,22.8h-1.3c-25.2,0-30.2-10.1-30.2-22.8s4.8-22.8,30.2-22.8h1.3c25.2,0,30.2,10.1,30.2,22.8ZM230.1,43c0-16.3-8.9-17.2-18-17.2h-4.6c-9.1,0-18,1-18,17.2s9.1,17.7,18,17.7h4.6c9.2,0,18-1.4,18-17.7Z"/>
-                            <path fill="#5b5b5b" d="M300.8,65.4h-5.6c-4.5,0-8.9-2.6-14.6-8.8l-3-3.3h-24.2v12.1h-9.4V20.7h36.1c14.4,0,17.9,5.6,17.6,16.4-.1,5.6-1.6,12.8-10.5,15.3l13.7,13h0ZM289.2,37.3c0-6.9-1.3-11-9.7-11h-26.1v20.3h26.1c4.6,0,9.7-1.4,9.7-9.4Z"/>
-                            <path fill="#5b5b5b" d="M350.1,20.5l-22.9,28.7v16h-8.8v-15.7l-23.4-29h10.1l17.9,22.4,17-22.4h10.1Z"/>
-                            <path fill="#5b5b5b" d="M36.1,65.5l19.8-32.9c5.9-10,10-12.3,25.1-12.3h17.5v45.2h-9.1V28.3c-16.7,0-20.1-1.9-28.1,11.1l-15.4,26.1h-9.8.1Z"/>
-                            <path fill="#9cb77e" d="M77.4,56.2v9.4h-16.3l1.6-3c1.2-2,2.2-4,3.9-4.9,0,0,2-1.3,5.5-1.3h5.5-.1Z"/>
-                          </svg>
-                        </div>
-                      </div>
-                      <div style={{ borderTop: '2px solid #111', paddingTop: 20, fontSize: 20, fontWeight: 500, color: '#111' }}>www.aivory.uk</div>
+                    <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #dcdcd7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: 20, fontWeight: 500, color: '#111' }}>© 2026 Aivory. All rights reserved.</div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '24px', width: 'auto', display: 'block' }} />
                     </div>
                   </div>
                 </div>

@@ -47,7 +47,7 @@ function BlogPostCard({ post }: { post: BlogPost }) {
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <svg
-              className="w-12 h-12 text-white/20"
+              className="w-12 h-12 text-white/40"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -66,17 +66,17 @@ function BlogPostCard({ post }: { post: BlogPost }) {
 
       {/* Content */}
       <div className="flex flex-col flex-1 p-5">
-        <h2 className="text-lg font-semibold text-white mb-2 group-hover:text-[#c4c9b8] transition-colors line-clamp-2">
+        <h2 className="text-lg font-semibold text-white mb-2 group-hover:text-[#dfe2d8] transition-colors line-clamp-2">
           {post.title}
         </h2>
 
         {post.excerpt && (
-          <p className="text-sm text-gray-400 mb-4 line-clamp-3 flex-1">
+          <p className="text-sm text-gray-200 mb-4 line-clamp-3 flex-1">
             {post.excerpt}
           </p>
         )}
 
-        <div className="flex items-center justify-between text-xs text-gray-500 mt-auto pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between text-xs text-gray-300 mt-auto pt-3 border-t border-white/5">
           <span>{post.author_name}</span>
           <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
         </div>
@@ -89,7 +89,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <svg
-        className="w-16 h-16 text-white/20 mb-6"
+        className="w-16 h-16 text-white/40 mb-6"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -103,7 +103,7 @@ function EmptyState() {
         />
       </svg>
       <h2 className="text-xl font-semibold text-white mb-2">No posts yet</h2>
-      <p className="text-gray-400 max-w-sm">
+      <p className="text-gray-200 max-w-sm">
         We&apos;re working on some great content. Check back soon for articles about
         AI, technology, and how Aivory can help your business.
       </p>
@@ -164,7 +164,7 @@ function PaginationControls({
         </button>
       )}
 
-      <span className="text-sm text-gray-400">
+      <span className="text-sm text-gray-200">
         Page {page} of {totalPages}
       </span>
 
@@ -221,7 +221,7 @@ export default async function BlogPage(props: {
           {/* Header */}
           <div className="mb-12 text-center mt-12">
             <h1 className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90" style={{ fontFamily: "'Manrope', sans-serif" }}>Blog</h1>
-            <p className="text-[#c4c9b8] text-lg max-w-2xl mx-auto font-light">
+            <p className="text-[#dfe2d8] text-lg max-w-2xl mx-auto font-light">
               Insights, updates, and guides on AI readiness and how Aivory can
               transform your business.
             </p>
@@ -233,7 +233,7 @@ export default async function BlogPage(props: {
               <p className="text-red-400 mb-4">{error}</p>
               <Link
                 href="/blog"
-                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
                 style={{
                   padding: '0.75rem 1.5rem',
                   fontFamily: "'Manrope', sans-serif",

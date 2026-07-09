@@ -1,11 +1,22 @@
 import type { Metadata } from 'next';
-import { Manrope } from 'next/font/google';
+import { Manrope, Doto } from 'next/font/google';
 import './globals.css';
 import { SITE_URL, ORGANIZATION, JsonLd } from '@/lib/seo';
 
 const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope',
+  display: 'swap',
+});
+
+// Self-hosted (like Manrope above) so the diagnostic-card PNG export never
+// depends on a live fetch to Google Fonts at capture time -- the previous
+// setup only pulled Doto from a remote <link>, which is the likely cause of
+// wrong-weight/fallback-font glyphs in the exported cards.
+const doto = Doto({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '900'],
+  variable: '--font-doto',
   display: 'swap',
 });
 
@@ -52,7 +63,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={manrope.variable}>
+    <html lang="en" className={`${manrope.variable} ${doto.variable}`}>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Doto:wght@400;700;900&display=swap"
