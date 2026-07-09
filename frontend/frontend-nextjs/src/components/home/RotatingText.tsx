@@ -62,7 +62,7 @@ export default function RotatingText() {
     >
       <p
         ref={textRef}
-        className="text-[21px] md:text-[33.6px] font-light text-[#a3a59d] text-center w-full leading-tight"
+        className="text-[21px] md:text-[33.6px] font-light text-[#d2d4cc] text-center w-full leading-tight"
         style={{
           fontFamily: "'Manrope', sans-serif",
           position: 'absolute',

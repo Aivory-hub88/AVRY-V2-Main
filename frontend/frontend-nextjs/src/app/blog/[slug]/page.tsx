@@ -82,7 +82,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
         aria-label="Content redacted"
       >
         <div className="w-1 h-8 bg-gray-500 rounded-full" />
-        <span className="text-gray-500 text-sm italic">Content redacted</span>
+        <span className="text-gray-300 text-sm italic">Content redacted</span>
       </div>
     )
   }
@@ -110,7 +110,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
     case "paragraph":
       return (
         <p
-          className="text-gray-300 leading-relaxed mb-4"
+          className="text-gray-100 leading-relaxed mb-4"
           dangerouslySetInnerHTML={{ __html: formatInlineMarkup(block.text || "") }}
         />
       )
@@ -118,7 +118,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
     case "code": {
       return (
         <pre className="my-4 rounded-lg bg-[#0a0a0a] border border-white/10 p-4 overflow-x-auto">
-          <code className="text-sm text-gray-300 font-mono whitespace-pre-wrap">
+          <code className="text-sm text-gray-100 font-mono whitespace-pre-wrap">
             {block.text}
           </code>
         </pre>
@@ -133,7 +133,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
         ? "list-decimal list-inside mb-4 space-y-1"
         : "list-disc list-inside mb-4 space-y-1"
       return (
-        <ListTag className={`${listClass} text-gray-300`}>
+        <ListTag className={`${listClass} text-gray-100`}>
           {items.map((item, idx) => (
             <li key={idx} dangerouslySetInnerHTML={{ __html: formatInlineMarkup(item) }} />
           ))}
@@ -150,7 +150,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
             className="w-full rounded-lg border border-white/10"
           />
           {block.alt && (
-            <figcaption className="text-center text-xs text-gray-500 mt-2">
+            <figcaption className="text-center text-xs text-gray-300 mt-2">
               {block.alt}
             </figcaption>
           )}
@@ -164,7 +164,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
             href={block.href || "#"}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#c4c9b8] underline hover:text-[#b2b8a6] transition-colors"
+            className="text-[#dfe2d8] underline hover:text-[#d8dccd] transition-colors"
           >
             {block.text || block.href}
           </a>
@@ -176,7 +176,7 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
       if (block.text) {
         return (
           <p
-            className="text-gray-300 leading-relaxed mb-4"
+            className="text-gray-100 leading-relaxed mb-4"
             dangerouslySetInnerHTML={{ __html: formatInlineMarkup(block.text) }}
           />
         )
@@ -201,7 +201,7 @@ function formatInlineMarkup(text: string): string {
   // Inline code: `text`
   html = html.replace(
     /`(.+?)`/g,
-    '<code class="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-sm font-mono text-[#c4c9b8]">$1</code>'
+    '<code class="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-sm font-mono text-[#dfe2d8]">$1</code>'
   )
   return html
 }
@@ -238,7 +238,7 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
             <p className="text-red-400 mb-4">{error}</p>
             <Link
               href="/blog"
-              className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+              className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
               style={{
                 padding: '0.75rem 1.5rem',
                 fontFamily: "'Manrope', sans-serif",
@@ -285,7 +285,7 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
             {/* Back link */}
             <Link
               href="/blog"
-              className="inline-flex items-center text-sm text-gray-400 hover:text-[#c4c9b8] transition-colors mb-8"
+              className="inline-flex items-center text-sm text-gray-200 hover:text-[#dfe2d8] transition-colors mb-8"
             >
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -299,9 +299,9 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
             </h1>
 
             {/* Meta */}
-            <div className="flex items-center gap-4 text-sm text-gray-400 mb-8 pb-6 border-b border-white/10">
-              <span className="font-medium text-gray-300">{post.author_name}</span>
-              <span className="text-white/20">•</span>
+            <div className="flex items-center gap-4 text-sm text-gray-200 mb-8 pb-6 border-b border-white/10">
+              <span className="font-medium text-gray-100">{post.author_name}</span>
+              <span className="text-white/40">•</span>
               <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
             </div>
 

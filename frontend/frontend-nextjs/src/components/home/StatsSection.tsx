@@ -62,7 +62,7 @@ function StatCounter({ stat, active, delay }: { stat: StatItem; active: boolean;
         {value}{stat.suffix}
       </div>
       <div
-        className="font-light text-[8px] sm:text-[10px] md:text-[0.85rem] text-white/45 tracking-normal md:tracking-[0.08em] whitespace-nowrap"
+        className="font-light text-[8px] sm:text-[10px] md:text-[0.85rem] text-white/65 tracking-normal md:tracking-[0.08em] whitespace-nowrap"
         style={{ fontFamily: "'Manrope', sans-serif" }}
       >
         {stat.label}
@@ -103,7 +103,7 @@ export default function StatsSection() {
   }, []);
 
   return (
-    <div ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full relative overflow-hidden`} style={{ padding: '0 0 120px 0' }}>
+    <div ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full relative overflow-hidden`} style={{ padding: '110px 0 120px 0' }}>
 
       <div className="relative z-[1] max-w-[1340px] mx-auto px-4 lg:px-6">
         {/* Stats Row */}

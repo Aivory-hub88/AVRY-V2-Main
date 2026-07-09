@@ -19,18 +19,17 @@ export function HalftoneWave() {
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.z = 15;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', stencil: false });
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'high-performance', stencil: false });
     renderer.setSize(width, height);
     
     const isMobile = window.innerWidth < 1024;
-    const baseDPR = isMobile ? 1 : Math.min(window.devicePixelRatio, 2);
-    renderer.setPixelRatio(baseDPR);
+    renderer.setPixelRatio(isMobile ? 0.5 : Math.min(window.devicePixelRatio, 1));
     
     mountRef.current.appendChild(renderer.domElement);
 
     const uniforms = {
       uTime: { value: 0.0 },
-      uResolution: { value: new THREE.Vector2(width * baseDPR, height * baseDPR) },
+      uResolution: { value: new THREE.Vector2(width, height) },
       uPixelSize: { value: isMobile ? 5.0 : 6.0 }, 
       uScroll: { value: 0.0 }, // Used to trigger the spreading petals effect
       uMouse: { value: new THREE.Vector2(0, 0) }
@@ -67,21 +66,15 @@ export function HalftoneWave() {
           float topLightDiff = max(0.0, dot(normal, topLightDir));
           // Fade spotlight heavily on scroll to protect readability in lower sections
           float spotlightFade = 1.0 - smoothstep(0.0, 0.4, uScroll);
-          float spotlight = pow(topLightDiff, 2.6) * 0.58 * spotlightFade; // broader + stronger top-down key light
+          float spotlight = pow(topLightDiff, 3.2) * 0.42 * spotlightFade;
           
           // Enhanced density for subtle but more 3D ASCII
           // Reduced spotlight influence on density to avoid solid bright blocks
           float density = 1.0 - normalizedDepth + (rim * 0.5) + (spotlight * 0.2);
+          density -= uScroll * 0.3; // Fade out slightly as it spreads
           density = clamp(density, 0.0, 0.9); // Clamp below 1.0 to prevent full solid blocks
           
           // 2. ASCII SCREEN-SPACE GRID
-          // LIGHT ordered (4x4 Bayer) dither on the character selection, keyed to
-          // the glyph cell — softens the hard level-boundary contours (the
-          // "pembatas") so the shading spreads smoothly. Kept light (0.12 vs the
-          // earlier heavy 0.167 that dulled the color); on the current rich
-          // palette this smooths banding without flattening. Color + silhouette
-          // still use the raw, undithered density.
-          vec2 cell = floor(gl_FragCoord.xy / uPixelSize);
           vec2 local = fract(gl_FragCoord.xy / uPixelSize);
           vec2 p5 = floor(local * 5.0); 
           
@@ -152,20 +145,14 @@ export function HalftoneWave() {
           float vignette = smoothstep(0.85, 0.35, distFromCenter);
           finalColor *= vignette * 1.05; // 5% brighter
 
-          // Soft alpha falloff at the true silhouette: fades opacity out as
-          // density approaches 0 (the outer edge of the bloom), instead of the
-          // dot grid winking off at full opacity. Purely alpha -- no color or
-          // glow change -- so it just smooths the blocky boundary.
-          float silhouetteAlpha = smoothstep(0.0, 0.12, density);
-
-          gl_FragColor = vec4(finalColor, silhouetteAlpha);
+          gl_FragColor = vec4(finalColor, 1.0);
         }
     `;
 
     // ==========================================
     // 1. MAIN 6-LOBE FLOWER (Base)
     // ==========================================
-    const geometry = new THREE.SphereGeometry(1, 128, 128);
+    const geometry = new THREE.SphereGeometry(1, 96, 96);
     const material = new THREE.ShaderMaterial({
       uniforms,
       side: THREE.FrontSide, 
@@ -208,10 +195,8 @@ export function HalftoneWave() {
           float idleBloom = (sin(uTime * 1.5) * 0.5 + 0.5) * 0.1;
           float spread = smoothstep(0.0, 1.0, uScroll) + (idleBloom * (1.0 - smoothstep(0.0, 1.0, uScroll)));
           
-          // Extremely gentle spread + bend on scroll so the petals maintain
-          // a highly stable, solid 3D silhouette instead of separating into pieces.
-          float radius = 2.5 + (petalDepth * 2.0) + (petalDepth * spread * 0.25);
-          float bend = spread * 0.15;
+          float radius = 2.5 + (petalDepth * 2.0) + (petalDepth * spread * 1.5);
+          float bend = spread * 0.8;
           
           vec3 displacedPos = p * radius;
           displacedPos.y -= bend * petalDepth;
@@ -552,11 +537,6 @@ export function HalftoneWave() {
     };
 
     let scrollTicking = false;
-    // NOTE: We intentionally do NOT change renderer.setPixelRatio() during
-    // scroll. setPixelRatio() reallocates the WebGL drawing buffer, which
-    // stalls the GPU pipeline for a frame — doing that at the start of every
-    // scroll gesture (and again 200ms after it ends) was the main cause of the
-    // visible scroll stutter. The DPR is fixed to baseDPR for the whole session.
     const onScroll = () => {
       if (!scrollTicking) {
         scrollTicking = true;
@@ -634,12 +614,9 @@ export function HalftoneWave() {
     const renderLoop = (timestamp: number) => {
       animationFrameId = requestAnimationFrame(renderLoop);
       if (isVisible) {
-        // Constant 60fps cadence. Previously this stepped from 60→30fps the
-        // instant scrollY crossed 400px, which halved the frame rate (and the
-        // per-frame position/scale easing below) right in the middle of the
-        // hero transition — reading as a scroll stutter. A fixed cadence keeps
-        // the motion smooth through the whole scroll gesture.
-        const fpsLimit = 16.66;
+        // Dynamic FPS Throttle: Run at 60fps in the hero section, but drop to 30fps (33.3ms) 
+        // when scrolled down into heavy DOM animation areas to prevent stuttering.
+        const fpsLimit = window.scrollY > 400 ? 33.33 : 16.66;
         const elapsed = timestamp - lastRenderTime;
         if (elapsed < fpsLimit) return;
         // Align to the frame grid so throttled sections pace evenly
@@ -737,7 +714,7 @@ export function HalftoneWave() {
       renderer.setSize(rect.width, rect.height);
       camera.aspect = rect.width / rect.height;
       camera.updateProjectionMatrix();
-      uniforms.uResolution.value.set(rect.width * renderer.getPixelRatio(), rect.height * renderer.getPixelRatio());
+      uniforms.uResolution.value.set(rect.width, rect.height);
       computeAnchors();
     };
     window.addEventListener('resize', handleResize);

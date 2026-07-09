@@ -126,7 +126,7 @@ function CommentForm({
           <button
             type="button"
             onClick={onCancel}
-            className={`${compact ? "px-3 py-1.5 text-sm" : "px-4 py-2"} rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors`}
+            className={`${compact ? "px-3 py-1.5 text-sm" : "px-4 py-2"} rounded-lg text-gray-200 hover:text-white hover:bg-white/5 transition-colors`}
           >
             Cancel
           </button>
@@ -179,7 +179,7 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
     <div className="group">
       <div className="flex gap-3">
         {/* Avatar circle */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/70">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white/85">
           {comment.author_name.charAt(0).toUpperCase()}
         </div>
 
@@ -191,14 +191,14 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
             </span>
             <time
               dateTime={comment.created_at}
-              className="text-xs text-gray-500"
+              className="text-xs text-gray-300"
             >
               {formatRelativeTime(comment.created_at)}
             </time>
           </div>
 
           {/* Body */}
-          <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">
+          <p className="text-sm text-gray-100 whitespace-pre-wrap break-words">
             {comment.body}
           </p>
 
@@ -206,7 +206,7 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
           <div className="flex items-center gap-3 mt-2">
             <button
               onClick={handleLike}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-[#c4c9b8] transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-300 hover:text-[#dfe2d8] transition-colors"
               aria-label={`Like comment by ${comment.author_name}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -217,7 +217,7 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
 
             <button
               onClick={handleDislike}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-400 transition-colors"
+              className="flex items-center gap-1 text-xs text-gray-300 hover:text-red-400 transition-colors"
               aria-label={`Dislike comment by ${comment.author_name}`}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -228,7 +228,7 @@ function SingleComment({ comment, postId, onNewReply, onReactionUpdate }: Single
 
             <button
               onClick={() => setShowReplyForm(!showReplyForm)}
-              className="text-xs text-gray-500 hover:text-white transition-colors"
+              className="text-xs text-gray-300 hover:text-white transition-colors"
             >
               Reply
             </button>
@@ -414,7 +414,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
     <section aria-label="Comments" className="mt-10">
       <h2 className="text-xl font-semibold text-white mb-6">
         Comments{" "}
-        <span className="text-gray-500 font-normal text-base">
+        <span className="text-gray-300 font-normal text-base">
           ({countAllComments(comments)})
         </span>
       </h2>
@@ -447,13 +447,13 @@ export function CommentSection({ postId }: CommentSectionProps) {
           <p className="text-red-400 text-sm mb-3">{error}</p>
           <button
             onClick={fetchComments}
-            className="text-sm text-[#c4c9b8] hover:underline"
+            className="text-sm text-[#dfe2d8] hover:underline"
           >
             Try again
           </button>
         </div>
       ) : comments.length === 0 ? (
-        <p className="text-gray-500 text-sm text-center py-8">
+        <p className="text-gray-300 text-sm text-center py-8">
           No comments yet. Be the first to share your thoughts!
         </p>
       ) : (

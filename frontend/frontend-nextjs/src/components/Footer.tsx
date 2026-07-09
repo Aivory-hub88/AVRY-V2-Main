@@ -38,11 +38,11 @@ export default function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-12 md:gap-8 mb-16 md:mb-32">
             {/* Product */}
             <div className="col-span-1">
-              <h4 className="text-gray-500 text-sm font-normal mb-4">Product</h4>
+              <h4 className="text-gray-300 text-sm font-normal mb-4">Product</h4>
               <ul className="space-y-3 text-sm">
                 {productLinks.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-white/90 hover:text-[#939393] transition-colors">
+                    <Link href={link.href} className="text-white/90 hover:text-[#c9c9c9] transition-colors">
                       {link.label}
                     </Link>
                   </li>
@@ -52,11 +52,11 @@ export default function Footer() {
 
             {/* Company */}
             <div className="col-span-1">
-              <h4 className="text-gray-500 text-sm font-normal mb-4">Company</h4>
+              <h4 className="text-gray-300 text-sm font-normal mb-4">Company</h4>
               <ul className="space-y-3 text-sm">
                 {companyLinks.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-white/90 hover:text-[#939393] transition-colors">
+                    <Link href={link.href} className="text-white/90 hover:text-[#c9c9c9] transition-colors">
                       {link.label}
                     </Link>
                   </li>
@@ -66,11 +66,11 @@ export default function Footer() {
 
             {/* Legal */}
             <div className="col-span-1">
-              <h4 className="text-gray-500 text-sm font-normal mb-4">Legal</h4>
+              <h4 className="text-gray-300 text-sm font-normal mb-4">Legal</h4>
               <ul className="space-y-3 text-sm">
                 {legalLinks.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-white/90 hover:text-[#939393] transition-colors">
+                    <Link href={link.href} className="text-white/90 hover:text-[#c9c9c9] transition-colors">
                       {link.label}
                     </Link>
                   </li>
@@ -80,10 +80,10 @@ export default function Footer() {
 
             {/* Get in touch */}
             <div className="col-span-1">
-              <h4 className="text-gray-500 text-sm font-normal mb-4">Get in touch</h4>
+              <h4 className="text-gray-300 text-sm font-normal mb-4">Get in touch</h4>
               <ul className="space-y-3 text-sm">
                 <li>
-                  <a href="mailto:hello@aivory.uk" className="text-white/90 hover:text-[#939393] transition-colors">
+                  <a href="mailto:hello@aivory.uk" className="text-white/90 hover:text-[#c9c9c9] transition-colors">
                     hello@aivory.uk
                   </a>
                 </li>
@@ -93,11 +93,9 @@ export default function Footer() {
             {/* Logo */}
             <div className="col-span-2 md:col-span-1 flex md:justify-end mt-8 md:mt-0">
               <div className="flex flex-col items-start">
-                <Image
+                <img
                   src="/Aivory_logo_2_2026.svg"
                   alt="Aivory Logo"
-                  width={345}
-                  height={72}
                   className="h-[48px] md:h-[72px] w-auto opacity-90"
                 />
               </div>
@@ -108,7 +106,15 @@ export default function Footer() {
           <div className="pb-6 text-sm text-white/80">
             &copy; 2026 Aivory. All rights reserved.
           </div>
-          {/* Divider removed */}
+          {/* Scraper Trap - Invisible Link */}
+          <a 
+            href="/api/internal/trap" 
+            style={{ display: 'none', visibility: 'hidden', position: 'absolute', left: '-9999px' }} 
+            aria-hidden="true" 
+            rel="nofollow"
+          >
+            System Configuration
+          </a>
         </div>
       </div>
     </footer>

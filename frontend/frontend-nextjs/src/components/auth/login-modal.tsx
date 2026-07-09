@@ -143,7 +143,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <button
             onClick={onClose}
             type="button"
-            className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
+            className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center text-gray-200 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
             aria-label="Close modal"
             style={{ fontSize: "24px", lineHeight: "1" }}
           >

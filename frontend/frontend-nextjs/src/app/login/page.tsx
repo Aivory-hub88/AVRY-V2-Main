@@ -78,7 +78,7 @@ export default function LoginPage() {
         {/* Close button */}
         <button
           onClick={() => router.push("/")}
-          className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors p-1"
+          className="absolute top-5 right-5 text-white/60 hover:text-white transition-colors p-1"
           aria-label="Close"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -89,7 +89,7 @@ export default function LoginPage() {
 
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <Image src="/Aivory_logo_2_2026.svg" alt="Aivory" width={100} height={32} className="h-[32px] w-auto opacity-90" priority />
+            <img src="/Aivory_logo_2_2026.svg" alt="Aivory" className="h-[32px] w-auto opacity-90" />
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
             Welcome back
@@ -101,7 +101,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="login-email" className="block text-[13px] font-medium text-white/70 mb-2">
+            <label htmlFor="login-email" className="block text-[13px] font-medium text-white/85 mb-2">
               Email address
             </label>
             <input
@@ -117,7 +117,7 @@ export default function LoginPage() {
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label htmlFor="login-password" className="block text-[13px] font-medium text-white/70">
+              <label htmlFor="login-password" className="block text-[13px] font-medium text-white/85">
                 Password
               </label>
               <a href="#" onClick={(e) => e.preventDefault()} className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
@@ -157,7 +157,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-8 text-center">
-          <p className="text-[13px] text-white/40">
+          <p className="text-[13px] text-white/60">
             Don&apos;t have a subscription yet?{" "}
             <a href="/product" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
               Explore plans &rarr;

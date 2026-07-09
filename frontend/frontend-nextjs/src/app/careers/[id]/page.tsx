@@ -118,7 +118,7 @@ export async function generateMetadata(
 function renderRichContentBlock(block: unknown, index: number): React.ReactNode {
   if (typeof block === "string") {
     return (
-      <p key={index} className="text-gray-300 leading-relaxed mb-4">
+      <p key={index} className="text-gray-100 leading-relaxed mb-4">
         {block}
       </p>
     )
@@ -151,7 +151,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
 
     case "paragraph":
       return (
-        <p key={index} className="text-gray-300 leading-relaxed mb-4">
+        <p key={index} className="text-gray-100 leading-relaxed mb-4">
           {text || renderInlineContent(b.content as unknown[])}
         </p>
       )
@@ -161,8 +161,8 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
       const isOrdered = b.style === "ordered" || b.ordered === true
       const ListTag = isOrdered ? "ol" : "ul"
       const listClass = isOrdered
-        ? "list-decimal list-inside text-gray-300 mb-4 space-y-1 pl-2"
-        : "list-disc list-inside text-gray-300 mb-4 space-y-1 pl-2"
+        ? "list-decimal list-inside text-gray-100 mb-4 space-y-1 pl-2"
+        : "list-disc list-inside text-gray-100 mb-4 space-y-1 pl-2"
       return (
         <ListTag key={index} className={listClass}>
           {items.map((item, i) => (
@@ -178,7 +178,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
     case "codeBlock":
       return (
         <pre key={index} className="bg-white/[0.05] border border-white/10 rounded-lg p-4 mb-4 overflow-x-auto">
-          <code className="text-sm text-gray-300 font-mono">
+          <code className="text-sm text-gray-100 font-mono">
             {text || (b.code as string) || ""}
           </code>
         </pre>
@@ -187,7 +187,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
     case "quote":
     case "blockquote":
       return (
-        <blockquote key={index} className="border-l-4 border-[#c4c9b8]/50 pl-4 mb-4 italic text-gray-400">
+        <blockquote key={index} className="border-l-4 border-[#c4c9b8]/50 pl-4 mb-4 italic text-gray-200">
           {text}
         </blockquote>
       )
@@ -201,7 +201,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
             className="rounded-lg max-w-full"
           />
           {typeof b.caption === "string" && (
-            <figcaption className="text-sm text-gray-500 mt-2 text-center">
+            <figcaption className="text-sm text-gray-300 mt-2 text-center">
               {b.caption}
             </figcaption>
           )}
@@ -212,7 +212,7 @@ function renderRichContentBlock(block: unknown, index: number): React.ReactNode 
       // Fallback: treat as paragraph if text content exists
       if (text) {
         return (
-          <p key={index} className="text-gray-300 leading-relaxed mb-4">
+          <p key={index} className="text-gray-100 leading-relaxed mb-4">
             {text}
           </p>
         )
@@ -259,7 +259,7 @@ function renderInlineContent(content: unknown[] | undefined): React.ReactNode {
       if (inline.code) return <code key={i} className="bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono">{text}</code>
       if (inline.link || inline.href) {
         return (
-          <a key={i} href={(inline.link as string) || (inline.href as string)} className="text-[#c4c9b8] hover:underline" target="_blank" rel="noopener noreferrer">
+          <a key={i} href={(inline.link as string) || (inline.href as string)} className="text-[#dfe2d8] hover:underline" target="_blank" rel="noopener noreferrer">
             {text}
           </a>
         )
@@ -280,7 +280,7 @@ function RichContentRenderer({ content }: { content: unknown }) {
   if (typeof content === "string") {
     return (
       <div className="prose prose-invert max-w-none">
-        <p className="text-gray-300 leading-relaxed">{content}</p>
+        <p className="text-gray-100 leading-relaxed">{content}</p>
       </div>
     )
   }
@@ -323,7 +323,7 @@ function formatEmploymentType(type: string | null): string {
 
 function MetadataBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/10 text-sm text-gray-300">
+    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.05] border border-white/10 text-sm text-gray-100">
       {icon}
       {label}
     </span>
@@ -337,17 +337,17 @@ function NotFoundState() {
       <main className="flex-1 px-6 py-24">
         <div className="max-w-3xl mx-auto text-center">
           <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.05] flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white mb-3">Position Not Found</h1>
-          <p className="text-gray-400 mb-8">
+          <p className="text-gray-200 mb-8">
             This vacancy may have been closed or doesn&apos;t exist. Browse our current openings to find a role that fits.
           </p>
           <Link
             href="/careers"
-            className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+            className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
             style={{
               padding: '0.75rem 1.5rem',
               fontFamily: "'Manrope', sans-serif",
@@ -412,7 +412,7 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
           {/* Back link */}
           <Link
             href="/careers"
-            className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-[#c4c9b8] transition-colors mb-8"
+            className="inline-flex items-center gap-2 text-sm text-gray-200 hover:text-[#dfe2d8] transition-colors mb-8"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -430,7 +430,7 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
             {vacancy.department && (
               <MetadataBadge
                 icon={
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
                 }
@@ -440,7 +440,7 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
             {vacancy.location && (
               <MetadataBadge
                 icon={
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -451,7 +451,7 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
             {vacancy.employment_type && (
               <MetadataBadge
                 icon={
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
@@ -478,13 +478,13 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-white mb-1">Interested in this role?</h3>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-200 text-sm">
                   Submit your application and we&apos;ll review it shortly.
                 </p>
               </div>
               <Link
                 href={`/careers/${vacancy.id}/apply`}
-                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:bg-white hover:text-black hover:border-white min-h-[44px]"
+                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
                 style={{
                   padding: '0.75rem 1.5rem',
                   fontFamily: "'Manrope', sans-serif",

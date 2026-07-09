@@ -44,6 +44,7 @@ interface Plan {
   features: string[];
   cta: string;
   overageUSD?: number;
+  mostPopular?: boolean;
 }
 
 const plans: Plan[] = [
@@ -77,7 +78,8 @@ const plans: Plan[] = [
       'Multi-step agent flows'
     ],
     cta: 'Start With Pro',
-    overageUSD: 0.012
+    overageUSD: 0.012,
+    mostPopular: true
   },
   {
     name: 'Enterprise',
@@ -173,6 +175,13 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
               {/* Title */}
               <div className="flex-grow flex flex-col">
                 <div className="min-h-[96px] pb-6">
+                  <div className="h-7 mb-4">
+                    {plan.mostPopular && (
+                      <span className="inline-flex items-center px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[#494949] border border-[#494949] rounded-full">
+                        Most Popular
+                      </span>
+                    )}
+                  </div>
                   <h3 className="max-w-[380px] text-[22px] md:text-[24px] lg:text-[26px] font-normal leading-[1.05] text-[#494949]">
                     {plan.name}
                   </h3>
@@ -196,7 +205,7 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
 
               {/* Overage */}
               {overageText ? (
-                <div className="mt-4 text-[13px] font-semibold text-[#8a8f8e] transition-opacity duration-300">
+                <div className="mt-4 text-[13px] font-semibold text-[#8a8f8d] transition-opacity duration-300">
                   Overage: {overageText}
                 </div>
               ) : (

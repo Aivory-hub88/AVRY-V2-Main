@@ -15,7 +15,7 @@ export function CompanyContent() {
           className={`animate-on-scroll ${missionVisible ? 'is-visible' : ''}`}
         >
           <div className="flex flex-col items-center text-center mb-16">
-            <span className="text-[#c4c9b8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
+            <span className="text-[#dfe2d8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
               MISSION & VISION
             </span>
           </div>
@@ -46,7 +46,7 @@ export function CompanyContent() {
           className={`animate-on-scroll ${valuesVisible ? 'is-visible' : ''}`}
         >
           <div className="flex flex-col items-center text-center mb-16">
-            <span className="text-[#c4c9b8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
+            <span className="text-[#dfe2d8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
               VALUES / WHAT WE BELIEVE
             </span>
           </div>

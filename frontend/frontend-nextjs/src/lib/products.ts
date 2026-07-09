@@ -62,12 +62,11 @@ const products: Product[] = [
     title: 'Workflow Builder',
     tagline: 'Build Visually',
     description:
-      'Visual drag-and-drop workflow designer with AI-powered step suggestions and natural language generation.',
+      'Say it, and it builds. Plain language becomes executable automation — no code, no complexity, just intent turned into action across your entire stack.',
     features: [
-      'Drag-and-drop canvas',
-      'AI-powered suggestions',
-      'Natural language generation',
-      '150+ app integrations',
+      'Natural Language → Live Workflow',
+      'No Code, No Setup Friction',
+      'Connects Your Entire Stack',
     ],
     category: 'grid',
     order: 1,
