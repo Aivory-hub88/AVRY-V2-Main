@@ -41,6 +41,7 @@ const AGENT_PROMPTS = {
   customer_service: `You are an Aivory Customer Service Agent working on behalf of a business, embedded in their chat platform. Handle inbound support: triage the issue, resolve what you can, and use your tools to create tickets for real issues and escalate to a human when needed. Be warm, efficient, and solution-first. Always confirm to the customer when a ticket has been created or an escalation filed, including its reference id.`,
   leads_qualifier: `You are an Aivory Leads Qualifier Agent working on behalf of a business, embedded in their chat platform. Qualify inbound leads using the BANT framework (Budget, Authority, Need, Timeline). Ask one focused question at a time. Once you have enough signal, save the lead with your save_lead tool (status qualified / unqualified / needs_followup) and run the lead-qualified workflow so sales is notified. Tell the lead a human will follow up when qualified.`,
   finance_invoice_ops: `You are an Aivory Finance & Invoice Ops Agent working on behalf of a business, embedded in their chat platform. Help with invoice processing, anomaly detection, and approval routing. Record invoices you are given with record_invoice, flag suspicious ones with flag_invoice_anomaly, and use the invoice-approval workflow to determine the approval tier. Be precise with numbers — use the calculator tool for any arithmetic — and always show your reasoning for flags.`,
+  office_assistant: `You are an Aivory Office Assistant working on behalf of a business, embedded in their chat platform. Your job: turn meeting notes, minutes, and transcripts (typed or attached as documents) into structured outcomes — decisions made, action items with owners and due dates, and risks raised. Always save processed meetings with record_meeting_summary, resolving relative dates ("next Friday") to real dates first. When the operator has connected their workspace integrations, sync outcomes where asked (Notion pages, Slack channel updates, spreadsheet logs). Confirm what was extracted and where it was synced.`,
 };
 
 const COMMON_RULES = `
@@ -141,8 +142,9 @@ const COMPOSIO_BASE = 'https://backend.composio.dev/api/v3';
 const COMPOSIO_CURATED = {
   gmail: ['GMAIL_SEND_EMAIL'],
   googlesheets: ['GOOGLESHEETS_SPREADSHEETS_VALUES_APPEND', 'GOOGLESHEETS_SEARCH_SPREADSHEETS'],
-  notion: ['NOTION_SEARCH_NOTION_PAGE', 'NOTION_APPEND_BLOCK_CHILDREN'],
+  notion: ['NOTION_SEARCH_NOTION_PAGE', 'NOTION_APPEND_BLOCK_CHILDREN', 'NOTION_CREATE_NOTION_PAGE'],
   hubspot: ['HUBSPOT_CREATE_CONTACT'],
+  slack: ['SLACK_CHAT_POST_MESSAGE'],
 };
 
 const _composioSchemaCache = new Map(); // slug -> OpenAI tool def
@@ -298,7 +300,63 @@ const CORE_TOOLS = {
     },
     ['invoice_ref', 'anomaly_type', 'details', 'severity']
   ),
+  record_meeting_summary: fn(
+    'record_meeting_summary',
+    'Persist a structured meeting summary to the operator dashboard: decisions made, action items with owners and due dates, and risks raised. Use when the user shares meeting notes, minutes, or a transcript (typed or as an attached document) and wants it processed.',
+    {
+      title: { type: 'string', description: 'Meeting title or topic' },
+      meeting_date: { type: 'string', description: 'ISO date of the meeting if known' },
+      duration_minutes: { type: 'number' },
+      participants: { type: 'array', items: { type: 'string' } },
+      decisions: { type: 'array', items: { type: 'string' }, description: 'Decisions that were made' },
+      action_items: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            task: { type: 'string' },
+            owner: { type: 'string' },
+            due_date: { type: 'string', description: 'ISO date; resolve relative dates first' },
+          },
+          required: ['task'],
+        },
+      },
+      risks: { type: 'array', items: { type: 'string' }, description: 'Risks or blockers raised' },
+      summary: { type: 'string', description: '2-4 sentence overall summary' },
+    },
+    ['title', 'summary']
+  ),
 };
+
+// Tools only available on the Enterprise tier (checked against user_tiers)
+const ENTERPRISE_TOOLS = new Set(['record_meeting_summary']);
+
+const ENTERPRISE_HINT = `
+You also have a meeting-summary capability (structured extraction of decisions, action items, and risks from meeting notes or transcripts, saved to the operator dashboard) — available on the Aivory Enterprise plan.`;
+
+const NON_ENTERPRISE_HINT = `
+IMPORTANT: you CANNOT save or record meeting summaries — that capability requires the Aivory Enterprise plan and its tool is not available to you. Never say or imply you will save, record, or store meeting notes, and do not collect details "before saving". If asked to process meeting notes: summarize helpfully in the chat reply itself, then mention once, politely, that saved structured summaries with action-item tracking are available on the Enterprise plan.`;
+
+const _tierCache = new Map(); // user_id -> { at, tier }
+const TIER_TTL_MS = 5 * 60 * 1000;
+
+async function getUserTier(userId) {
+  const cached = _tierCache.get(userId);
+  if (cached && Date.now() - cached.at < TIER_TTL_MS) return cached.tier;
+  let tier = 'foundation'; // base paid tier — Aivory has no free tier
+  try {
+    // Lazy require: resolves on the VPS next to server.js; fail closed to base tier
+    const { getUserEntitlements } = require('./lib/supabase');
+    const ent = await getUserEntitlements(userId);
+    if (ent && ent.tier && (!ent.expires_at || new Date(ent.expires_at) > new Date())) {
+      tier = String(ent.tier).toLowerCase();
+    }
+  } catch (err) {
+    console.error('[telegram-agent] tier lookup failed (treating as free):', err.message);
+  }
+  _tierCache.set(userId, { at: Date.now(), tier });
+  return tier;
+}
 
 function triggerWorkflowDef(agentType) {
   const keys = Object.keys(WORKFLOWS).filter((k) => WORKFLOWS[k].agents.includes(agentType));
@@ -318,19 +376,35 @@ function triggerWorkflowDef(agentType) {
   );
 }
 
-// Which static tools each agent type gets
+// Which static tools each agent type gets (Enterprise-only ones are filtered
+// by tier inside buildToolset)
 const TOOL_REGISTRY = {
   autonomous: ['get_current_datetime', 'calculator', 'web_search', 'save_lead', 'create_ticket', 'escalate_to_human', 'record_invoice', 'flag_invoice_anomaly'],
   customer_service: ['get_current_datetime', 'web_search', 'create_ticket', 'escalate_to_human'],
   leads_qualifier: ['get_current_datetime', 'calculator', 'web_search', 'save_lead'],
   finance_invoice_ops: ['get_current_datetime', 'calculator', 'record_invoice', 'flag_invoice_anomaly'],
+  office_assistant: ['get_current_datetime', 'record_meeting_summary'],
 };
 
 // Which agent types may use Composio integration tools
-const COMPOSIO_AGENTS = new Set(['autonomous', 'customer_service', 'leads_qualifier', 'finance_invoice_ops']);
+const COMPOSIO_AGENTS = new Set(['autonomous', 'customer_service', 'leads_qualifier', 'finance_invoice_ops', 'office_assistant']);
 
 async function buildToolset(agentType, userId) {
-  const names = TOOL_REGISTRY[agentType] || TOOL_REGISTRY.autonomous;
+  let names = TOOL_REGISTRY[agentType] || TOOL_REGISTRY.autonomous;
+
+  // Enterprise-only tools: include only when the user's tier allows them;
+  // otherwise hand the model an upsell hint so it doesn't fake the feature.
+  let tierHint = '';
+  if (names.some((n) => ENTERPRISE_TOOLS.has(n))) {
+    const tier = await getUserTier(userId);
+    if (tier === 'enterprise') {
+      tierHint = ENTERPRISE_HINT;
+    } else {
+      names = names.filter((n) => !ENTERPRISE_TOOLS.has(n));
+      tierHint = NON_ENTERPRISE_HINT;
+    }
+  }
+
   const tools = names.map((n) => CORE_TOOLS[n]);
 
   const wf = triggerWorkflowDef(agentType);
@@ -348,7 +422,7 @@ async function buildToolset(agentType, userId) {
       }
     }
   }
-  return tools;
+  return { tools, tierHint };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -433,6 +507,7 @@ async function executeTool(name, args, ctx) {
       };
     }
     case 'calculator':
+    case 'calculate': // models occasionally guess this name; same safe evaluator
       return { expression: args.expression, result: calculate(args.expression) };
     case 'web_search':
       return { answer: await webSearch(args.query, ctx.orKey) };
@@ -446,6 +521,13 @@ async function executeTool(name, args, ctx) {
       return { recorded: true, reference: await recordAction(ctx, 'invoice', args) };
     case 'flag_invoice_anomaly':
       return { flagged: true, reference: await recordAction(ctx, 'anomaly', args) };
+    case 'record_meeting_summary':
+      return {
+        saved: true,
+        reference: await recordAction(ctx, 'meeting', args),
+        decisions: (args.decisions || []).length,
+        action_items: (args.action_items || []).length,
+      };
     case 'trigger_workflow':
       return { workflow: args.workflow, result: await triggerWorkflow(args.workflow, args.payload, ctx) };
     default: {
@@ -560,7 +642,6 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
     }
 
     const agentType = AGENT_PROMPTS[agent_type] ? agent_type : 'autonomous';
-    const systemPrompt = AGENT_PROMPTS[agentType] + COMMON_RULES;
     const historyKey = session_id || String(chat_id);
     const history = histories.get(historyKey) || [];
     const userText = String(text).slice(0, 8000);
@@ -575,7 +656,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
     };
 
     try {
-      const tools = await buildToolset(agentType, ctx.user_id);
+      const { tools, tierHint } = await buildToolset(agentType, ctx.user_id);
+      const systemPrompt = AGENT_PROMPTS[agentType] + COMMON_RULES + tierHint;
       const reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
 
       histories.set(
