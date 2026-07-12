@@ -345,14 +345,28 @@ async function getUserTier(userId) {
   if (cached && Date.now() - cached.at < TIER_TTL_MS) return cached.tier;
   let tier = 'foundation'; // base paid tier — Aivory has no free tier
   try {
-    // Lazy require: resolves on the VPS next to server.js; fail closed to base tier
-    const { getUserEntitlements } = require('./lib/supabase');
-    const ent = await getUserEntitlements(userId);
-    if (ent && ent.tier && (!ent.expires_at || new Date(ent.expires_at) > new Date())) {
-      tier = String(ent.tier).toLowerCase();
+    // Lazy require: resolves on the VPS next to server.js; fail closed to base tier.
+    // lib/db is the local avry-postgres pool (lib/supabase is a legacy-name shim).
+    let db;
+    try { db = require('./lib/db'); } catch { db = require('./lib/supabase'); }
+    if (typeof db.getUserAccess === 'function') {
+      const acc = await db.getUserAccess(userId);
+      if (acc) {
+        // Superadmins bypass tier gates (monitoring + feature testing)
+        if (acc.is_superadmin || String(acc.account_type || '').toLowerCase() === 'superadmin') {
+          tier = 'enterprise';
+        } else if (acc.tier && (!acc.expires_at || new Date(acc.expires_at) > new Date())) {
+          tier = String(acc.tier).toLowerCase();
+        }
+      }
+    } else {
+      const ent = await db.getUserEntitlements(userId);
+      if (ent && ent.tier && (!ent.expires_at || new Date(ent.expires_at) > new Date())) {
+        tier = String(ent.tier).toLowerCase();
+      }
     }
   } catch (err) {
-    console.error('[telegram-agent] tier lookup failed (treating as free):', err.message);
+    console.error('[telegram-agent] tier lookup failed (treating as base tier):', err.message);
   }
   _tierCache.set(userId, { at: Date.now(), tier });
   return tier;
