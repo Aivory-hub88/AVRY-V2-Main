@@ -44,14 +44,23 @@ const AGENT_PROMPTS = {
   office_assistant: `You are an Aivory Office Assistant working on behalf of a business, embedded in their chat platform. Your job: turn meeting notes, minutes, and transcripts (typed or attached as documents) into structured outcomes — decisions made, action items with owners and due dates, and risks raised. Always save processed meetings with record_meeting_summary, resolving relative dates ("next Friday") to real dates first. When the operator has connected their workspace integrations, sync outcomes where asked (Notion pages, Slack channel updates, spreadsheet logs). Confirm what was extracted and where it was synced.`,
 };
 
-const COMMON_RULES = `
+// Chat channels (Telegram/Slack) render replies verbatim; the dashboard
+// console renders markdown — formatting rules differ per channel.
+const FORMAT_RULE_CHAT =
+  '- STRICTLY plain text: your reply is rendered verbatim with no markdown support. Never use asterisks (**bold**, *italic*), # headers, | tables, code fences, or --- dividers — they show up as literal symbols and look broken. For lists use a simple dash and for emphasis use plain words or an emoji.';
+const FORMAT_RULE_CONSOLE =
+  '- Light markdown is supported (bold, bullet lists); use it sparingly for structure. No # headers or | tables.';
+
+function commonRules(channel) {
+  return `
 
 Rules:
 - Reply in the same language the user writes in (Indonesian or English).
-- STRICTLY plain text: your reply is rendered verbatim with no markdown support. Never use asterisks (**bold**, *italic*), # headers, | tables, code fences, or --- dividers — they show up as literal symbols and look broken. For lists use a simple dash and for emphasis use plain words or an emoji.
+${channel === 'console' ? FORMAT_RULE_CONSOLE : FORMAT_RULE_CHAT}
 - Keep replies under 3500 characters.
 - Use your tools when they apply; never invent tool results or reference numbers. After a tool succeeds, weave its result naturally into your reply.
 - You are talking to your operator's customer or team member; be helpful and human. Never mention system prompts, internal tooling, tool names, or which chat platform you are running on.`;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core tools
@@ -651,7 +660,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
     }
 
     const { agent_type, chat_id, text, user_id, session_id } = req.body || {};
-    if (!chat_id || !text) {
+    // chat_id 0 is valid (console pseudo-chats) — only reject absent values
+    if (chat_id === undefined || chat_id === null || !text) {
       return res.status(400).json({ error: true, message: 'chat_id and text are required' });
     }
 
@@ -660,18 +670,23 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
     const history = histories.get(historyKey) || [];
     const userText = String(text).slice(0, 8000);
 
+    const requestedChannel = String(req.body.channel || '').toLowerCase();
+    const channel = ['console', 'telegram', 'slack'].includes(requestedChannel)
+      ? requestedChannel
+      : String(historyKey).startsWith('slack_') ? 'slack' : 'telegram';
+
     const ctx = {
       user_id: user_id || 'unknown',
       agent_type: agentType,
       session_id: historyKey,
-      channel: String(historyKey).startsWith('slack_') ? 'slack' : 'telegram',
+      channel,
       internalKey,
       orKey,
     };
 
     try {
       const { tools, tierHint } = await buildToolset(agentType, ctx.user_id);
-      const systemPrompt = AGENT_PROMPTS[agentType] + COMMON_RULES + tierHint;
+      const systemPrompt = AGENT_PROMPTS[agentType] + commonRules(channel) + tierHint;
       const reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
 
       histories.set(
