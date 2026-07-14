@@ -366,7 +366,7 @@ const PROFILE_FIELDS = [
   ['agent_name', 'Agent name', 80],
   ['business_name', 'Business name', 120],
   ['tone', 'Tone of voice', 200],
-  ['language_pref', 'Preferred language', 60],
+  ['language_pref', 'Preferred languages', 200],
   ['business_description', 'About the business', 1500],
   ['knowledge', 'Business knowledge / FAQ', 4000],
   ['custom_instructions', 'Extra style notes from the operator', 1500],
@@ -424,7 +424,7 @@ Operator configuration — the business you work for filled in this form. Every 
 <operator_config>
 ${lines.join('\n')}
 </operator_config>
-Adopt this identity naturally: introduce yourself with the configured agent/business name, answer from the business knowledge when relevant (it is your primary source about this business), follow the configured tone, and prefer the configured language unless the customer clearly uses another.`;
+Adopt this identity naturally: introduce yourself with the configured agent/business name, answer from the business knowledge when relevant (it is your primary source about this business), and follow the configured tone. Language: when preferred languages are configured, open in the first one listed; if the customer writes in another of the listed languages, mirror them; if they write in an unlisted language, politely continue in the first listed one.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
