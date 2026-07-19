@@ -163,7 +163,10 @@ const COMPOSIO_CURATED = {
   googlesheets: ['GOOGLESHEETS_SPREADSHEETS_VALUES_APPEND', 'GOOGLESHEETS_SEARCH_SPREADSHEETS'],
   notion: ['NOTION_SEARCH_NOTION_PAGE', 'NOTION_APPEND_BLOCK_CHILDREN', 'NOTION_CREATE_NOTION_PAGE'],
   hubspot: ['HUBSPOT_CREATE_CONTACT'],
-  slack: ['SLACK_CHAT_POST_MESSAGE'],
+  // SLACK_CHAT_POST_MESSAGE is deprecated by Composio ("use send message
+  // instead") — SLACK_SEND_MESSAGE is the current tool (channel +
+  // markdown_text). Confirmed via GET /v3/tools/<slug> 2026-07-19.
+  slack: ['SLACK_SEND_MESSAGE'],
 };
 
 const _composioSchemaCache = new Map(); // slug -> OpenAI tool def
