@@ -1,6 +1,6 @@
 # Aivory Cerveau — Build Status & Handoff
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-21
 **Purpose:** single source of truth to resume work safely in a fresh session. Pairs with the phased plan ([DEPLOYABLE_AGENT_RUNTIME_PLANNING.md](DEPLOYABLE_AGENT_RUNTIME_PLANNING.md)) and ADRs 001–004.
 
 ---
@@ -13,7 +13,7 @@ Aivory Cerveau = Aivory's fork of [zeroclaw-labs/zeroclaw](https://github.com/ze
 
 | Thing | State |
 |---|---|
-| **Cerveau instance** | `zeroclaw-cerveau.service` (systemd), **127.0.0.1:3100**, side-by-side, self-built v0.8.3 binary at `/usr/local/bin/zeroclaw-cerveau`. **Deployed 2026-07-20:** patches 0007–0010 are live (binary built by CI from commit `7d637607`, code-equivalent to `a5967200`/patch 0010 — `7d637607` itself only added skill content, no `.rs` changes). sha256 `d86c78ec…be6fc5`, checksum-verified against the CI artifact before cutover. `doctor` ran clean against the real config (78 ok/9 warnings/0 errors) pre-deploy. Post-restart: all 9 runtime components `ok`, 0 restarts, no error/panic/fatal in logs after ~2 min observed. Prior binary backed up at `/usr/local/bin/zeroclaw-cerveau.bak-pre-0007-0010` (sha256 `4f233dc4…6838b`) for rollback. |
+| **Cerveau instance** | `zeroclaw-cerveau.service` (systemd), **127.0.0.1:3100**, side-by-side, self-built v0.8.3 binary at `/usr/local/bin/zeroclaw-cerveau`. **Deployed 2026-07-21:** patch 0011 is live (binary built by CI from commit `55112091`), sha256 `1f0a58fc…4b3ab8`, checksum-verified before cutover. `doctor` clean pre-deploy (78 ok/9 warnings/0 errors). Post-restart: 0 systemd restarts, no error/panic/fatal in logs after ~2 min observed, `/health` 200 throughout. Rollback chain: `zeroclaw-cerveau.bak-pre-0011` (patch 0007–0010 binary, sha256 `d86c78ec…be6fc5`) → `zeroclaw-cerveau.bak-pre-0007-0010` (patch 0006 binary, sha256 `4f233dc4…6838b`). Patches 0007–0010 were deployed 2026-07-20 the same way — see git history of this file for that cutover's detail. |
 | **Memory backend** | `postgres` → **production `avry-postgres`**, schema **`cerveau`** (auto-created: agents/memories/schema_version), dims 768, `vector_enabled=false` — deliberately still false: patch 0008's code fix is now live, but `vector_enabled=true` has **not yet been verified live** (next action) and the pgvector extension is still not installed on the `avry-postgres` image either way (see §6) |
 | **Config dir** | `~/.zeroclaw-cerveau/` (isolated copy of prod zeroclaw config, storage/mcp stripped, memory.backend=postgres) |
 | **Env file** | `/etc/zeroclaw-cerveau.env` (mode 600): `CERVEAU_TENANT_DB_URL` (→ aivory DB) + `CERVEAU_WEBHOOK_SECRET` |
@@ -48,7 +48,7 @@ Verified live E2E: two data-row-only tenants adopt distinct personas; cross-tena
 | 0008 | Upstream bug fix: pgvector-init-thread crash-loop — unblocks vectors | ✅ CI-green (commit `f3d11104`), **live on `:3100` since 2026-07-20** (code deployed; `vector_enabled=true` not yet exercised live — see §5) |
 | 0009 | P-consolidation cost knob (`consolidation_enabled` + `consolidation_sample_rate`) | ✅ CI-green (commit `359d965b`), **live on `:3100` since 2026-07-20** |
 | 0010 | Phase 4.1 slice 1: tenant-entity-scoped MCP servers (Composio-as-MCP groundwork) | ✅ CI-green (commit `a5967200`), **live on `:3100` since 2026-07-20** |
-| 0011 | Phase 4.1 follow-on: tenant-agent-type-driven skill bundles (`TenantContext::agent_type`, `[agent_type_skill_bundles.*]`, `Config::skill_bundle_aliases_for_tenant`) | ✅ CI-green (commit `55112091`), **not yet deployed** |
+| 0011 | Phase 4.1 follow-on: tenant-agent-type-driven skill bundles (`TenantContext::agent_type`, `[agent_type_skill_bundles.*]`, `Config::skill_bundle_aliases_for_tenant`) | ✅ CI-green (commit `55112091`), **live on `:3100` since 2026-07-21** |
 | — | `cerveau-skills/finance-invoice-ops/invoice-processing/` — jurisdiction-agnostic invoice skill + Composio toolkit checklist (content, not engine code) | ✅ pushed (commit `7d637607`), parse-verified, **not installed to any running instance** |
 | — | `cerveau-skills/office-assistant/meeting-outcomes/` — meeting → decisions/action-items/risks skill, syncs to Notion/Slack/Sheets via toolkits already in `COMPOSIO_CURATED` (content, not engine code) | ✅ pushed (commit `815caf14`), parse-verified, **not installed to any running instance** |
 | — | `cerveau-skills/customer-service/ticket-triage/` — triage/resolve/log/escalate skill; Zendesk/Freshdesk/Intercom toolkits verified enabled (content, not engine code) | ✅ pushed (commit `ee685555`), parse-verified, **not installed to any running instance** |
@@ -63,25 +63,26 @@ Verified live E2E: two data-row-only tenants adopt distinct personas; cross-tena
 5. ~~Deploy the `telegram-agent.js` Slack-tool fix~~ ✅ **DONE 2026-07-20:** patched in place on the VPS (`/home/ubuntu/AVRY/vps-bridge/telegram-agent.js`, which had NOT diverged from the `fc7a765` fix at the relevant lines — verified before patching, per the local↔VPS divergence gotcha). Backup taken (`telegram-agent.js.bak-pre-slack-fix-20260720`), syntax-checked, PM2 process `vps-bridge` restarted (`server.js`, which requires this file), health check `200 ok` post-restart.
 6. ~~Author `customer_service`/`leads_qualifier` skills~~ ✅ **DONE 2026-07-20:** `ticket-triage` and `bant-qualification`, same rigor as the other two (real Composio schemas verified live: Zendesk/Freshdesk/Intercom, HubSpot/Salesforce/Pipedrive). All four Aivory deployable-agent skills now exist except `autonomous` (which inherits from the others per its superset tool set).
 7. ~~🔴 Resolve the host-agent-alias mapping~~ ✅ **DONE 2026-07-20 (patch 0011):** not a product decision after all — traced the current bridge's own design (per-request data value, not a provisioning axis) and ported it: `TenantContext::agent_type` + `[agent_type_skill_bundles.<agent_type>]`, resolved per turn, additive on top of the host alias's own bundles. 7 new tests, CI-green.
-8. **Configure `[agent_type_skill_bundles.*]` + `[skill_bundles.*]` on the live `:3100` config** and install the 4 drafted skills for real — this is now just config + deploy, no more engineering blocker.
-9. **Wire a real Composio toolkit connection** per agent type — start with `finance_invoice_ops` (Stripe or QuickBooks first, see `invoice-processing`'s reference doc) since it has the most groundwork already.
-10. **E2E-test each installed skill** against a real tenant webhook call + real connection, same rigor as the 0008 vector-fallback proof.
-11. **Then choose:** continue Phase 4 (4.2 capability graph / 4.3 approval tiering) vs. finishing the deferred durability/memory items below (§6).
+8. ~~Deploy patch 0011 to `:3100`~~ ✅ **DONE 2026-07-21:** checksum-verified artifact from CI (commit `55112091`), `doctor` clean pre-deploy (0 errors), backup taken (`zeroclaw-cerveau.bak-pre-0011`), cutover executed, verified stable 2+ min post-restart (0 restarts, `/health` 200, no error/panic in logs).
+9. **Configure `[agent_type_skill_bundles.*]` + `[skill_bundles.*]` on the live `:3100` config** and install the 4 drafted skills for real — the engine-side mechanism is live; this is now just config authoring + a reload/restart.
+10. **Wire a real Composio toolkit connection** per agent type — start with `finance_invoice_ops` (Stripe or QuickBooks first, see `invoice-processing`'s reference doc) since it has the most groundwork already.
+11. **E2E-test each installed skill** against a real tenant webhook call + real connection, same rigor as the 0008 vector-fallback proof.
+12. **Then choose:** continue Phase 4 (4.2 capability graph / 4.3 approval tiering) vs. finishing the deferred durability/memory items below (§6).
 
 **Still needing a human, not further agent work this session:** the three secret rotations (§8) require GitHub/Composio web-console access this session doesn't have; the pgvector extension install needs an infra maintenance window; F-1/F-2 durability wiring and the 500-tenant load test are multi-day engineering efforts, not something to rush through in one pass.
 
 ## 6. Queued fork patches / known gaps (honest list)
 
-- ~~**pgvector-init-thread fix**~~ ✅ fixed, patch 0008 (not yet deployed — see §5).
+- ~~**pgvector-init-thread fix**~~ ✅ fixed, patch 0008, live on `:3100` since 2026-07-20.
 - **pgvector extension not installed:** the `avry-postgres` image has no `vector` extension; enabling real vector search needs an image swap to `pgvector/pgvector` (maintenance window) **and** an embedding API key (OpenAI — OpenRouter has no embeddings API; not present on the VPS yet). This is now the *only* remaining vector blocker — the code-level crash-loop (patch 0008) is fixed.
 - **F-1 auto-resume** of crashed in-flight tasks (needs a goal-execution driver seam) — ADR-003.
 - **F-2 hot-loop wiring** — thread the idempotency ledger into `execute_one_tool`, gated on a side-effect taxonomy — ADR-003.
 - **halfvec** — `ALTER COLUMN embedding TYPE halfvec(768)` (non-re-embedding) once vectors are on.
-- ~~**Upstream bug (upstreamable): v3 migration schema scope**~~ ✅ fixed, patch 0007 (not yet deployed — see §5).
-- ~~**P-consolidation cost knob**~~ ✅ landed, patch 0009 (not yet deployed — see §5).
+- ~~**Upstream bug (upstreamable): v3 migration schema scope**~~ ✅ fixed, patch 0007, live on `:3100` since 2026-07-20.
+- ~~**P-consolidation cost knob**~~ ✅ landed, patch 0009, live on `:3100` since 2026-07-20.
 - **90-day flat-disk simulation** — the Phase 3 exit-gate demo, run once auto-consolidation + lifecycle have fed a synthetic tenant.
 - **Phase 4.1 follow-through** — the tenant-entity-scoping *primitive* landed (patch 0010), but no Composio toolkit is actually wired in yet: action-subset curation per toolkit, then either a `tenant_entity_query_param`-gated `[[mcp.servers]]` entry or a REST integration path (mirroring `telegram-agent.js`'s `composioExecute`) still need building. See the `invoice-processing` skill's reference doc for the concrete checklist.
-- ~~**Host-agent-alias mapping undecided**~~ ✅ resolved same day, patch 0011 (not yet deployed — see §5). See `cerveau-skills/README.md` for the `[agent_type_skill_bundles.*]` install instructions.
+- ~~**Host-agent-alias mapping undecided**~~ ✅ resolved, patch 0011, live on `:3100` since 2026-07-21. See `cerveau-skills/README.md` for the `[agent_type_skill_bundles.*]` install instructions — configuring those entries + installing the 4 skills for real is the remaining step.
 
 ## 7. Operational notes & gotchas
 
