@@ -4,7 +4,7 @@ import Navbar from '@/components/home/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Investor Relations — Aivory',
+  title: 'Investor Relations',
   description: 'Investor relations and investment information for Aivory.',
 };
 
@@ -70,7 +70,7 @@ export default function InvestorRelationsPage() {
               If you are an institutional investor or fund and wish to open a conversation about Aivory&apos;s future, we are open to hearing from the right partners at the right time.
             </p>
             <p>
-              Reach us at <a href="mailto:hello@aivory.uk" className="text-white underline hover:text-white/85 transition-colors">hello@aivory.uk</a> and we&apos;ll take it from there.
+              Reach us at <a href="mailto:investors@aivory.uk" className="text-white underline hover:text-white/85 transition-colors">investors@aivory.uk</a>{" "}and we&apos;ll take it from there.
             </p>
           </section>
 

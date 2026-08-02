@@ -1,16 +1,29 @@
 'use client';
 
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
+
+import { trackEvent } from '@/lib/analytics';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 type Step = 'profile' | 'question' | 'results';
 
+/**
+ * The paid product's scoring dimensions. Every free question maps to one, so
+ * the free profile and the paid radar speak the same language and the upgrade
+ * reads as "same instrument, more depth" rather than a second, unrelated quiz.
+ *
+ * `security` is deliberately absent: it is a paid-only depth area, and one of
+ * the honest "what you are not seeing yet" lines.
+ */
+type Dimension = 'process' | 'data' | 'strategy' | 'governance' | 'people';
+
 interface Question {
   id: string;
   question: string;
   options: string[];
+  dim: Dimension;
 }
 
 interface DimensionInfo {
@@ -20,44 +33,94 @@ interface DimensionInfo {
   weight: number;
 }
 
+/** One of the five aggregated dimensions, plus the questions behind it. */
+interface DimensionScore {
+  key: Dimension;
+  label: string;
+  score: number;   // 0-100, the mean of its member answers rescaled
+  mean: number;    // 0-3, on the raw answer scale
+  weakest: DimensionInfo;
+  strongest: DimensionInfo;
+  members: DimensionInfo[];
+}
+
 interface InsightItem {
   title: string;
+  driver: string;  // the question that drove the dimension's position
   desc: string;
   type: 'strength' | 'blocker';
+}
+
+interface CapturedCard {
+  suffix: string;
+  fileName: string;
+  dataUrl: string;
 }
 
 // ============================================================================
 // DATA
 // ============================================================================
+/**
+ * Twelve operational questions — no question mentions AI.
+ *
+ * The free tier's job is to answer two of the five executive questions ("where
+ * are we today", "what is slowing us down") credibly, and to leave the other
+ * three ("what should change first", "what is it worth", "where does AI help
+ * most") visibly unanswered. Those three are what the paid Business Operations
+ * Assessment sells, so any question that would let a visitor answer them on
+ * their own belongs in the paid intake, not here.
+ *
+ * Grouped as: baseline (1-4), friction (5-8), capacity to change (9-12). The
+ * grouping is internal — the UI still shows one question per screen.
+ */
 const QUESTIONS: Question[] = [
-  { id: 'business_objective', question: 'What is your primary business objective for AI?', options: ['No clear goal yet', 'Vague / directional goals', 'Specific goal defined', 'Quantified goal with KPIs'] },
-  { id: 'current_ai_usage', question: 'Where is your organization on AI today?', options: ['No AI usage at all', 'Exploring / reading about it', 'Running pilots or experiments', 'AI deployed in production'] },
-  { id: 'data_availability', question: 'How is your business data organized and accessible?', options: ['No centralized data', 'Siloed across systems', 'Partially centralized', 'Fully centralized and clean'] },
-  { id: 'process_documentation', question: 'How well are your business processes documented?', options: ['Nothing documented', "Informal / in people's heads", 'Some SOPs exist', 'Comprehensive SOPs and runbooks'] },
-  { id: 'workflow_standardization', question: 'How standardized are your day-to-day workflows?', options: ['Ad-hoc, varies per person', 'Some consistency', 'Mostly standardized', 'Fully standardized across teams'] },
-  { id: 'erp_integration', question: 'How integrated are your core business systems (ERP, CRM, etc.)?', options: ['No systems in place', 'Disconnected / manual sync', 'Partially integrated', 'Fully integrated with APIs'] },
-  { id: 'automation_level', question: 'What percentage of repetitive tasks are currently automated?', options: ['Fully manual', 'Less than 10%', '10–50% automated', 'Over 50% automated'] },
-  { id: 'decision_speed', question: 'How quickly does your team make key business decisions?', options: ['Takes months', 'Takes weeks', 'Takes days', 'Same day or within hours'] },
-  { id: 'leadership_alignment', question: 'How aligned is your leadership team on AI adoption?', options: ['No alignment or interest', 'Some interest, not committed', 'Supportive and budgeting', 'Actively championing AI'] },
-  { id: 'budget_ownership', question: 'What is your current budget situation for AI investment?', options: ['No budget discussed', 'Exploring options', 'Budget allocated', 'Dedicated AI budget with an owner'] },
-  { id: 'change_readiness', question: 'How open is your organization to changing how work gets done?', options: ['Resistant to change', 'Cautious', 'Open to it', 'Actively embracing change'] },
-  { id: 'internal_capability', question: "How strong is your internal team's AI or technical capability?", options: ['No technical team', 'Limited digital skills', 'Some AI exposure', 'Dedicated AI / data team'] },
+  { id: 'process_documentation', dim: 'process', question: 'How are your core processes captured today?', options: ['Nothing written down', "In people's heads, informally", 'Some SOPs, partly current', 'Documented and kept current'] },
+  { id: 'workflow_standardization', dim: 'process', question: 'If two people do the same task, how similar is the result?', options: ['Completely different', 'Broadly similar', 'Mostly consistent', 'Identical, by design'] },
+  { id: 'data_availability', dim: 'data', question: 'Where does the data you run the business on live?', options: ['Nowhere central', 'Scattered across tools and spreadsheets', 'Partly consolidated', 'One system of record'] },
+  { id: 'systems_integration', dim: 'data', question: 'Do your core systems pass information to each other?', options: ['No real systems yet', 'People move data by hand', 'Some connected, some manual', 'Connected end to end'] },
+  { id: 'manual_workload', dim: 'process', question: "How much of your team's week goes to repetitive manual work?", options: ['Most of it', 'About half', 'Some, but contained', 'Very little'] },
+  { id: 'rework_rate', dim: 'governance', question: 'How often does completed work have to be corrected or redone?', options: ['Constantly', 'Weekly', 'Occasionally', 'Rarely'] },
+  { id: 'handoff_delay', dim: 'process', question: 'When work passes between teams or systems, what happens?', options: ['It stalls, often for days', 'It waits, then someone chases', 'Minor delays', 'It moves without waiting'] },
+  { id: 'decision_latency', dim: 'strategy', question: 'From "we need to decide this" to an actual decision, how long?', options: ['Months', 'Weeks', 'Days', 'Same day'] },
+  { id: 'ownership_clarity', dim: 'governance', question: 'Does each core workflow have a named owner?', options: ['No one owns them', 'Ownership is implied, not stated', 'Most have an owner', 'Every one, and they are accountable'] },
+  { id: 'improvement_mandate', dim: 'strategy', question: 'Is there budget and a mandate to change how work gets done?', options: ['Neither', 'Interest, but nothing committed', 'Budget being discussed', 'Funded, with an owner'] },
+  { id: 'change_readiness', dim: 'people', question: 'How does the organisation react to changing how work is done?', options: ['Resists it', 'Cautious', 'Open to it', 'Actively pushes for it'] },
+  { id: 'internal_capability', dim: 'people', question: 'Do you have people who can implement operational change?', options: ['No one', 'Limited digital skills', 'Some capable people', 'A dedicated team'] },
 ];
 
+/**
+ * Carried over verbatim wherever a question survived the rework, so scores
+ * stay comparable across the cutover: the total is still 13.7, exactly as it
+ * was under the AI-readiness set.
+ */
 const WEIGHTS: Record<string, number> = {
-  business_objective: 1.5, current_ai_usage: 1.0, data_availability: 1.5,
-  process_documentation: 1.0, workflow_standardization: 1.0, erp_integration: 0.8,
-  automation_level: 1.2, decision_speed: 0.8, leadership_alignment: 1.5,
-  budget_ownership: 1.2, change_readiness: 1.0, internal_capability: 1.2,
+  process_documentation: 1.0, workflow_standardization: 1.0, data_availability: 1.5,
+  systems_integration: 0.8, manual_workload: 1.2, rework_rate: 1.2,
+  handoff_delay: 1.0, decision_latency: 0.8, ownership_clarity: 1.5,
+  improvement_mandate: 1.5, change_readiness: 1.0, internal_capability: 1.2,
 };
-const MAX_RAW = 43.5;
 
+/** Bumped whenever the question set changes shape. Stored with every lead so
+ *  future analysis never silently mixes two incompatible instruments. */
+const QUESTION_SET_VERSION = 2;
+// Derived, never hard-coded: the previous literal (43.5) did not match the
+// weights above, so a perfect run topped out at 94/100 and 100 was unreachable.
+// Deriving it means the ceiling follows the weights whenever questions change.
+const MAX_RAW = Object.values(WEIGHTS).reduce((sum, w) => sum + w, 0) * 3;
+
+/** The five aggregated dimensions, named exactly as the paid radar names them. */
+const DIM_LABELS: Record<Dimension, string> = {
+  process: 'Process', data: 'Data', strategy: 'Strategy',
+  governance: 'Governance', people: 'People',
+};
+
+/** Per-question labels — the traceability line under each dimension. */
 const DIMENSION_LABELS: Record<string, string> = {
-  business_objective: 'Business Objective', current_ai_usage: 'Current AI Usage',
-  data_availability: 'Data Availability', process_documentation: 'Process Documentation',
-  workflow_standardization: 'Workflow Standardization', erp_integration: 'System Integration',
-  automation_level: 'Automation Level', decision_speed: 'Decision Speed',
-  leadership_alignment: 'Leadership Alignment', budget_ownership: 'Budget Ownership',
+  process_documentation: 'Process Documentation', workflow_standardization: 'Workflow Consistency',
+  data_availability: 'Data Availability', systems_integration: 'Systems Integration',
+  manual_workload: 'Manual Workload', rework_rate: 'Rework Rate',
+  handoff_delay: 'Handoff Flow', decision_latency: 'Decision Speed',
+  ownership_clarity: 'Ownership Clarity', improvement_mandate: 'Improvement Mandate',
   change_readiness: 'Change Readiness', internal_capability: 'Internal Capability',
 };
 
@@ -72,6 +135,9 @@ const INDUSTRIES = [
   { value: 'property', label: 'Property & construction' },
   { value: 'technology', label: 'Technology' },
   { value: 'education', label: 'Education' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'advertising', label: 'Advertising' },
+  { value: 'food_beverage', label: 'Food & Beverages' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -84,57 +150,68 @@ const SIZES = [
   { value: 'enterprise', label: '1000+ (Enterprise)' },
 ];
 
-const MATURITY_STAGES = ['Initial', 'Developing', 'Defined', 'Managed', 'Optimizing'];
-const FALLBACK_BLOCKER_IDS = ['business_objective', 'decision_speed', 'erp_integration'];
+// Matches the paid product's `maturityFromScore` (avry-user-dashboard
+// services/deepDiagnostic.ts) name for name. The two tiers previously used
+// different ladders, so the same word sat at a different position in each — a
+// visitor scoring "Defined" free and "Developing" paid read the upgrade as a
+// downgrade. Both tiers spell the top band "Optimising"; leads captured before
+// 2026-08-02 carry the old "Optimizing" in assessment_leads.maturity.
+const MATURITY_STAGES = ['Nascent', 'Initiating', 'Developing', 'Defined', 'Optimising'];
 
+/**
+ * Cause → effect, in operational terms. Same explanatory shape as the paid
+ * product's DIM_CONSEQUENCE_CHAINS (readinessNarrative.ts), so a weak area is
+ * explained the same way in both tiers. Nothing here names a remedy — naming
+ * what to fix first is what the paid assessment sells.
+ */
 const INSIGHT_DESCRIPTIONS: Record<string, { strength: string; blocker: string }> = {
-  business_objective: {
-    strength: "Clear, quantified AI objectives ensure every project aligns directly with bottom-line revenue and operational efficiency.",
-    blocker: "Without clear, quantified KPIs, AI projects risk becoming disconnected science experiments with no measurable ROI."
-  },
-  current_ai_usage: {
-    strength: "Active AI deployment creates internal momentum, upskills teams, and establishes proven operational frameworks.",
-    blocker: "Staying in the exploratory phase while competitors deploy AI creates an expanding operational capability gap."
-  },
-  data_availability: {
-    strength: "Centralized, clean data pipelines provide the essential fuel needed for advanced AI models and automated workflows.",
-    blocker: "Data siloed across legacy systems prevents AI from seeing the full operational picture, limiting ROI significantly."
-  },
   process_documentation: {
-    strength: "Comprehensive SOPs and runbooks make it easy to identify automation bottlenecks and deploy agentic workflows.",
-    blocker: "Informal, undocumented processes make it nearly impossible to map and automate complex operational workflows."
+    strength: "Written, current processes make operations repeatable — new people get productive faster, and improvements stick instead of decaying back.",
+    blocker: "Undocumented processes live in individual heads, so operations stay person-dependent and every absence or departure becomes an outage."
   },
   workflow_standardization: {
-    strength: "Standardized day-to-day workflows allow AI solutions to scale seamlessly across multiple teams and departments.",
-    blocker: "Ad-hoc, inconsistent workflows mean AI solutions must be custom-tailored for individual users, destroying scalability."
+    strength: "The same task produces the same result whoever runs it, so quality is predictable and capacity can be added without diluting output.",
+    blocker: "The same task produces a different result depending on who does it, so quality stays unpredictable and no fix can be rolled out reliably."
   },
-  erp_integration: {
-    strength: "Fully integrated core systems via APIs allow AI agents to take direct action and synchronize data instantly.",
-    blocker: "Disconnected systems require manual data entry and synchronization, creating friction that negates automation gains."
+  data_availability: {
+    strength: "One system of record means everyone argues from the same numbers, and decisions stop waiting on someone to reconcile spreadsheets.",
+    blocker: "Data scattered across tools and spreadsheets means nobody sees the whole picture, and every decision starts by rebuilding the same view by hand."
   },
-  automation_level: {
-    strength: "High automation of repetitive tasks frees up valuable human capital for high-leverage strategic initiatives.",
-    blocker: "Heavy reliance on manual, repetitive tasks drains team energy and creates unnecessary operational overhead."
+  systems_integration: {
+    strength: "Systems that pass information to each other remove an entire class of manual re-entry, along with the errors and delay it introduces.",
+    blocker: "Moving data between systems by hand costs hours nobody tracks, and introduces errors that surface downstream after they have already cost something."
   },
-  decision_speed: {
-    strength: "Rapid decision-making cycles allow your organization to iterate quickly and capitalize on new AI advancements.",
-    blocker: "Slow, bureaucratic decision loops prevent your team from deploying and iterating on AI solutions effectively."
+  manual_workload: {
+    strength: "Little of the week goes to repetitive work, so the team's hours are spent on judgement rather than keystrokes.",
+    blocker: "Repetitive work consumes most of the week, so capacity goes to maintaining the business rather than improving it."
   },
-  leadership_alignment: {
-    strength: "Your C-suite is actively championing AI adoption, this is the hardest thing to build and you have it.",
-    blocker: "Lack of leadership buy-in and alignment starves AI initiatives of the essential resources and strategic focus needed."
+  rework_rate: {
+    strength: "Work is rarely redone, which means problems are caught where they start rather than after the cost is already sunk.",
+    blocker: "Frequent rework is the clearest sign quality is inspected in at the end rather than built in, and every correction is paid for twice."
   },
-  budget_ownership: {
-    strength: "Dedicated AI budget with clear ownership ensures continuous funding and accountability for strategic deployment.",
-    blocker: "Without a dedicated AI budget or clear ownership, initiatives get stalled in endless financial approval cycles."
+  handoff_delay: {
+    strength: "Work moves between teams without waiting, so elapsed time reflects the actual work rather than the queue between the steps.",
+    blocker: "Work stalls every time it changes hands, so most of the elapsed time on a task is spent waiting rather than being worked on."
+  },
+  decision_latency: {
+    strength: "Decisions land in days, so improvements start paying back while the reason for them is still current.",
+    blocker: "Decisions that take weeks or months mean improvements are stale by the time they are approved, and the cost of waiting never appears on any report."
+  },
+  ownership_clarity: {
+    strength: "Every core workflow has a named, accountable owner — which is what makes an improvement hold after the attention moves elsewhere.",
+    blocker: "Workflows with no named owner have nobody to notice when they drift, so problems only escalate once a customer feels them."
+  },
+  improvement_mandate: {
+    strength: "Funded change with a named owner means an identified improvement can actually be executed rather than added to a list.",
+    blocker: "Without committed budget and a clear mandate, identified improvements stay identified — the diagnosis costs nothing, the delay does."
   },
   change_readiness: {
-    strength: "An organization open to embracing change can seamlessly adopt AI-driven operating models without cultural friction.",
-    blocker: "Internal resistance to change creates cultural inertia that can sabotage even the most well-designed AI tools."
+    strength: "An organisation that pushes for better ways of working adopts change under its own momentum instead of having to be driven through it.",
+    blocker: "Resistance to changing how work is done means even well-designed improvements are quietly abandoned once the rollout attention ends."
   },
   internal_capability: {
-    strength: "Strong internal technical capability enables rapid prototyping, custom integration, and secure AI governance.",
-    blocker: "Limited internal digital capability forces over-reliance on external vendors and slows down execution speed."
+    strength: "Having people who can implement operational change means improvements get built and maintained in-house rather than rented indefinitely.",
+    blocker: "With nobody able to implement change, every improvement depends on an outside vendor, which caps both the pace and the depth of what is possible."
   }
 };
 
@@ -149,12 +226,18 @@ function computeScore(answers: Record<string, number>): number {
   return Math.round((rawScore / MAX_RAW) * 100);
 }
 
+/** Start of the Defined band. A dimension at or above this is not a constraint. */
+const DEFINED_BAND_FLOOR = 65;
+/** Start of the Developing band. Below this, a dimension is not a strength. */
+const DEVELOPING_BAND_FLOOR = 50;
+
+// Thresholds mirror the paid `maturityFromScore` exactly (80 / 65 / 50 / 35).
 function getMaturityLevel(score: number): string {
-  if (score <= 39) return 'Initial';
-  if (score <= 59) return 'Developing';
-  if (score <= 74) return 'Defined';
-  if (score <= 89) return 'Managed';
-  return 'Optimizing';
+  if (score >= 80) return 'Optimising';
+  if (score >= 65) return 'Defined';
+  if (score >= 50) return 'Developing';
+  if (score >= 35) return 'Initiating';
+  return 'Nascent';
 }
 
 function getMaturityIndicatorPercent(level: string): number {
@@ -162,82 +245,105 @@ function getMaturityIndicatorPercent(level: string): number {
   return ((stageIndex + 0.5) / MATURITY_STAGES.length) * 100;
 }
 
-function getFramingSentence(level: string, score: number): string {
-  const sentences: Record<string, string> = {
-    Initial: `A score of ${score}/100 means you're at the starting line — but that's a valid place to begin.`,
-    Developing: `At ${score}/100, the foundation is forming. Focus on quick wins to build momentum.`,
-    Defined: `${score}/100 — solid ground. You're ready to move from experiments to structured implementation.`,
-    Managed: `${score}/100 puts you ahead of most. Time to scale what's working and optimize further.`,
-    Optimizing: `${score}/100 — elite territory. AI is part of your operational DNA.`
-  };
-  return sentences[level] || '';
+/**
+ * The twelve answers aggregated into the paid product's five dimensions.
+ *
+ * This is the point of the whole rework: the free card becomes a smaller
+ * version of the paid radar rather than a different artefact, so upgrading
+ * reads as "same instrument, more depth" instead of "another quiz". Every
+ * dimension is shown — five rows, not a top-3/bottom-3 slice of twelve.
+ *
+ * `driver` is the member question that most explains the dimension's position
+ * (its weakest answer for a low dimension, its strongest for a high one), a
+ * light version of the paid product's score traceability.
+ */
+function getDimensionProfile(answers: Record<string, number>): DimensionScore[] {
+  return (Object.keys(DIM_LABELS) as Dimension[]).map(key => {
+    const members: DimensionInfo[] = QUESTIONS
+      .filter(q => q.dim === key)
+      .map(q => ({ id: q.id, label: DIMENSION_LABELS[q.id] || q.id, score: answers[q.id] ?? 0, weight: WEIGHTS[q.id] || 1 }));
+
+    const mean = members.reduce((sum, m) => sum + m.score, 0) / members.length;
+    // Heavier weight breaks ties, so the driver cited is the one that matters most.
+    const byWeakest = [...members].sort((a, b) => a.score !== b.score ? a.score - b.score : b.weight - a.weight);
+
+    return {
+      key,
+      label: DIM_LABELS[key],
+      score: Math.round((mean / 3) * 100),
+      mean,
+      weakest: byWeakest[0],
+      strongest: byWeakest[byWeakest.length - 1],
+      members,
+    };
+  });
 }
 
-function getTopAndBottom(answers: Record<string, number>): { top: DimensionInfo[]; bottom: DimensionInfo[] } {
-  const dims: DimensionInfo[] = Object.entries(answers).map(([id, score]) => ({
-    id, score, label: DIMENSION_LABELS[id] || id, weight: WEIGHTS[id] || 1
-  }));
-  dims.sort((a, b) => b.score !== a.score ? b.score - a.score : b.weight - a.weight);
-  return { top: dims.slice(0, 3), bottom: dims.slice(-3).reverse() };
+/**
+ * The three weakest dimensions, weakest first.
+ *
+ * Phase 1 replaced a fallback list that could never fire (it filtered to the
+ * weakest answers first, then "topped up" from ids the filter had already
+ * taken). Selection now happens across the five dimensions rather than the
+ * twelve questions, so a gap is reported where the paid product would report
+ * it.
+ *
+ * A dimension sitting in the Defined band or above is not a constraint, so it
+ * is never listed as one. This matters more here than it did over twelve
+ * questions: the weakest three of five is a majority, and without the cut-off
+ * a perfectly healthy 67/100 dimension gets called a blocker. Most real runs
+ * still return three; a genuinely strong operation returns fewer, which is the
+ * honest answer.
+ */
+function getBlockers(profile: DimensionScore[]): DimensionScore[] {
+  return profile
+    .filter(d => d.score < DEFINED_BAND_FLOOR)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 3);
 }
 
-function getStrengths(answers: Record<string, number>): DimensionInfo[] {
-  return Object.entries(answers)
-    .filter(([, v]) => v >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([id, score]) => ({ id, label: DIMENSION_LABELS[id] || id, score, weight: WEIGHTS[id] || 1 }));
+/**
+ * The strongest remaining dimensions, blockers excluded so nothing is listed
+ * as both.
+ *
+ * A floor matters as much here as the ceiling does for blockers. Without it,
+ * a run answered 1/3 across the board hands its least-bad dimension the
+ * strength treatment — the card would claim "work is rarely redone" off the
+ * back of an answer that said the opposite. Below Developing, a dimension is
+ * simply not a strength, and the STRENGTH column is left empty rather than
+ * filled with something the answers do not support.
+ */
+function getStrengths(profile: DimensionScore[], exclude: Set<string>): DimensionScore[] {
+  return profile
+    .filter(d => !exclude.has(d.key) && d.score >= DEVELOPING_BAND_FLOOR)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
 }
 
-function getBlockers(answers: Record<string, number>): DimensionInfo[] {
-  const scoredBlockers: DimensionInfo[] = Object.entries(answers)
-    .filter(([, v]) => v <= 1)
-    .sort((a, b) => a[1] !== b[1] ? a[1] - b[1] : (WEIGHTS[b[0]] || 1) - (WEIGHTS[a[0]] || 1))
-    .map(([id, score]) => ({ id, label: DIMENSION_LABELS[id] || id, score, weight: WEIGHTS[id] || 1 }));
-
-  for (const id of FALLBACK_BLOCKER_IDS) {
-    if (scoredBlockers.length >= 3) break;
-    if (scoredBlockers.some(item => item.id === id)) continue;
-    if ((answers[id] ?? 3) > 1) continue;
-    scoredBlockers.push({ id, label: DIMENSION_LABELS[id] || id, score: answers[id] ?? 1, weight: WEIGHTS[id] || 1 });
-  }
-
-  return scoredBlockers.slice(0, 3);
-}
-
-function getImprovementAreas(answers: Record<string, number>, blockers: DimensionInfo[]): DimensionInfo[] {
-  if (blockers.length) return blockers;
-  return Object.entries(answers)
-    .filter(([, score]) => score < 3)
-    .sort((a, b) => a[1] !== b[1] ? a[1] - b[1] : (WEIGHTS[b[0]] || 1) - (WEIGHTS[a[0]] || 1))
-    .slice(0, 2)
-    .map(([id, score]) => ({ id, label: DIMENSION_LABELS[id] || id, score, weight: WEIGHTS[id] || 1 }));
-}
-
-function getQuickNote(score: number, maturity: string, strengths: DimensionInfo[], improvementAreas: DimensionInfo[]): { title: string; body: string } {
+function getQuickNote(score: number, maturity: string, strengths: DimensionScore[], blockers: DimensionScore[]): { title: string; body: string } {
   const strongest = strengths[0];
-  const improvementText = improvementAreas.map(item => `${item.label} (${item.score}/3)`).join(', ');
+  const improvementText = blockers.map(d => `${d.label} (${d.score}/100)`).join(', ');
 
-  if (!improvementAreas.length) {
+  if (!blockers.length) {
     return {
       title: `Quick note: ${score}/100 — ${maturity}`,
-      body: `All tracked dimensions are scoring strongly. ${strongest ? `${strongest.label} is the clearest current strength.` : 'The current answers show a balanced AI readiness base.'}`
+      body: `All five dimensions are scoring strongly. ${strongest ? `${strongest.label} is the clearest current strength.` : 'The current answers show a balanced operational base.'}`
     };
   }
 
   return {
     title: `Quick note: ${score}/100 — ${maturity}`,
-    body: `${strongest ? `Strongest signal: ${strongest.label} (${strongest.score}/3). ` : ''}Needs improvement: ${improvementText}.`
+    body: `${strongest ? `Strongest dimension: ${strongest.label} (${strongest.score}/100). ` : ''}Needs improvement: ${improvementText}.`
   };
 }
 
 function getNarrative(companyName: string, score: number, maturity: string): string {
   const templates: Record<string, string> = {
-    Initial: `For ${companyName}, the current score of ${score}/100 indicates an early stage of AI readiness. This is a valid starting point — many successful organizations began here. The recommendation is to start with one small, well-scoped pilot, measure results, then scale gradually.`,
-    Developing: `For ${companyName}, a score of ${score}/100 shows the foundation is beginning to take shape, but critical gaps remain. Organizations at this stage benefit most from quick wins — choose an AI use case where ROI can be demonstrated within 30–90 days.`,
-    Defined: `For ${companyName}, a score of ${score}/100 indicates solid readiness — processes are defined and several foundations are in place. This is the right moment to move from experimentation to structured implementation with measurable business targets.`,
-    Managed: `For ${companyName}, a score of ${score}/100 reflects advanced maturity — AI is managed and delivering real value. The next step is expanding into more complex use cases and building tighter ROI monitoring systems.`,
-    Optimizing: `For ${companyName}, a score of ${score}/100 places you among elite organizations that have made AI a core part of their operational DNA. The focus now is generative AI, agentic workflows, and AI-driven competitive differentiation.`
+    Nascent: `For ${companyName}, a score of ${score}/100 points to an early stage of operational maturity. That is a valid starting point — many well-run organisations began here. The groundwork comes first: pick one core workflow, write down how it actually runs today, and make it consistent before changing anything else.`,
+    Initiating: `For ${companyName}, a score of ${score}/100 shows the foundation beginning to take shape while critical gaps remain. Organisations at this stage gain most from one narrow, visible win — a single handoff or a single source of rework, fixed where the result can be measured within 30–90 days.`,
+    Developing: `For ${companyName}, a score of ${score}/100 indicates solid ground — core processes are defined and several foundations are in place. This is the moment to move from isolated fixes to a structured improvement plan with targets attached to it.`,
+    Defined: `For ${companyName}, a score of ${score}/100 reflects advanced operational maturity — work is standardised, owned, and measured. The next step is scaling what already works into the areas it has not reached yet, and tightening how outcomes are tracked.`,
+    Optimising: `For ${companyName}, a score of ${score}/100 places you among organisations whose operations are genuinely well-run. At this level the remaining gains compound: shortening the distance between deciding and acting, and removing the last places where work still waits on a person.`
   };
   return templates[maturity] || '';
 }
@@ -247,6 +353,40 @@ function getNarrative(companyName: string, score: number, maturity: string): str
 function renderNotesWithBold(text: string): ReactNode[] {
   const parts = text.split(/(\d+\/100|\d+(?:–\d+)?\s*days)/g);
   return parts.map((part, i) => (/^\d+\/100$|days$/.test(part) ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>));
+}
+
+/**
+ * Re-encodes a card PNG at a smaller width for email.
+ *
+ * The download-grade capture is 3240x4050 — far too heavy to attach. A single
+ * canvas draw is orders of magnitude cheaper than asking html-to-image for a
+ * second, smaller render of the same DOM. Falls back to the original data URL
+ * if anything about the decode fails, so the email still goes out.
+ */
+async function downscalePng(dataUrl: string, targetWidth: number): Promise<string> {
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('card image failed to decode'));
+      img.src = dataUrl;
+    });
+
+    if (!img.naturalWidth || img.naturalWidth <= targetWidth) return dataUrl;
+
+    const scale = targetWidth / img.naturalWidth;
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  } catch (err) {
+    console.error('Could not downscale report card, sending original:', err);
+    return dataUrl;
+  }
 }
 
 function generateDiagnosticId(): string {
@@ -268,6 +408,12 @@ export default function FreeDiagnosticPage() {
   const [industry, setIndustry] = useState('');
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [downloading, setDownloading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
+  const [submittingLead, setSubmittingLead] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [deliveryStatus, setDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
 
   const slide1Ref = useRef<HTMLDivElement>(null);
   const slide2Ref = useRef<HTMLDivElement>(null);
@@ -276,6 +422,7 @@ export default function FreeDiagnosticPage() {
 
   const handleProfileContinue = () => {
     if (!isProfileValid) return;
+    trackEvent('assessment_start', { industry, company_size: companySize });
     setStep('question');
     setQuestionIndex(0);
   };
@@ -303,85 +450,224 @@ export default function FreeDiagnosticPage() {
     }
   };
 
-  const downloadDiagnosticCards = useCallback(async () => {
+  // Per-screen funnel events. Without these there is no way to see which
+  // question people abandon the assessment on.
+  useEffect(() => {
+    if (step !== 'question') return;
+    trackEvent('assessment_step', {
+      step_number: questionIndex + 1,
+      question_id: QUESTIONS[questionIndex].id,
+    });
+  }, [step, questionIndex]);
+
+  /**
+   * Renders both report cards to PNG data URLs.
+   *
+   * This is the expensive step — the cost is dominated by serialising the card
+   * DOM and its embedded fonts, not by pixelRatio, so it is worth doing once
+   * per click and reusing the result rather than capturing again per consumer.
+   */
+  const captureCards = useCallback(async (pixelRatio: number) => {
+    const { toPng } = await import('html-to-image');
+    const slides = [
+      { ref: slide1Ref, suffix: 'Card_1' },
+      { ref: slide2Ref, suffix: 'Card_2' },
+    ];
+
+    // document.fonts.ready only resolves fonts the page has *already*
+    // triggered a load for — if a specific weight (e.g. Doto 600) hasn't
+    // been rendered anywhere yet when this runs, it can resolve before
+    // that weight is actually available, and html-to-image captures
+    // whatever the browser falls back to. Explicitly request every
+    // family/weight the card actually uses before capturing.
+    const fontSpecs = [
+      '400 16px Manrope', '500 16px Manrope', '600 16px Manrope', '700 16px Manrope',
+      '400 16px Doto', '600 16px Doto', '700 16px Doto',
+    ];
+    await Promise.all(fontSpecs.map(spec => document.fonts.load(spec)));
+    await document.fonts.ready;
+
+    const captured: CapturedCard[] = [];
+    for (const slide of slides) {
+      const node = slide.ref.current;
+      if (!node) continue;
+
+      // html-to-image renders through the browser's own engine (SVG
+      // foreignObject), so text baselines, ellipsis, line-clamp and web
+      // fonts come out exactly as on screen — unlike html2canvas.
+      const dataUrl = await toPng(node, {
+        width: 1080,
+        height: 1350,
+        pixelRatio,
+        backgroundColor: '#f2f0ea',
+        cacheBust: true,
+        // Capture the node at its native size, ignoring the preview
+        // transform:scale applied by the parent wrapper.
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          margin: '0',
+        },
+      });
+
+      captured.push({
+        suffix: slide.suffix,
+        fileName: `${companyName.trim() || 'Company'}_Business_Operations_Assessment_${slide.suffix}.png`,
+        dataUrl,
+      });
+    }
+    return captured;
+  }, [companyName]);
+
+  const downloadDiagnosticCards = useCallback(async (): Promise<CapturedCard[]> => {
     setDownloading(true);
+    trackEvent('assessment_download');
     try {
-      const { toPng } = await import('html-to-image');
-      const slides = [
-        { ref: slide1Ref, suffix: 'Card_1' },
-        { ref: slide2Ref, suffix: 'Card_2' },
-      ];
-
-      // document.fonts.ready only resolves fonts the page has *already*
-      // triggered a load for — if a specific weight (e.g. Doto 600) hasn't
-      // been rendered anywhere yet when this runs, it can resolve before
-      // that weight is actually available, and html-to-image captures
-      // whatever the browser falls back to. Explicitly request every
-      // family/weight the card actually uses before capturing.
-      const fontSpecs = [
-        '400 16px Manrope', '500 16px Manrope', '600 16px Manrope', '700 16px Manrope',
-        '400 16px Doto', '600 16px Doto', '700 16px Doto',
-      ];
-      await Promise.all(fontSpecs.map(spec => document.fonts.load(spec)));
-      await document.fonts.ready;
-
-      for (const slide of slides) {
-        const node = slide.ref.current;
-        if (!node) continue;
-
-        // html-to-image renders through the browser's own engine (SVG
-        // foreignObject), so text baselines, ellipsis, line-clamp and web
-        // fonts come out exactly as on screen — unlike html2canvas.
-        const dataUrl = await toPng(node, {
-          width: 1080,
-          height: 1350,
-          pixelRatio: 3,
-          backgroundColor: '#f2f0ea',
-          cacheBust: true,
-          // Capture the node at its native size, ignoring the preview
-          // transform:scale applied by the parent wrapper.
-          style: {
-            transform: 'none',
-            transformOrigin: 'top left',
-            margin: '0',
-          },
-        });
-
+      const cards = await captureCards(3);
+      for (const card of cards) {
         const link = document.createElement('a');
-        link.download = `${companyName.trim() || 'Company'}_AI_Diagnostic_${slide.suffix}.png`;
-        link.href = dataUrl;
+        link.download = card.fileName;
+        link.href = card.dataUrl;
         link.click();
 
         // Small delay between downloads
         await new Promise(resolve => setTimeout(resolve, 800));
       }
+      return cards;
     } catch (err) {
       console.error('Failed to generate images:', err);
       alert('Failed to generate images. Please try again.');
+      return [];
     } finally {
       setDownloading(false);
     }
-  }, [companyName]);
+  }, [captureCards]);
 
   // Compute results
   const score = computeScore(answers);
   const maturity = getMaturityLevel(score);
-  const { top, bottom } = getTopAndBottom(answers);
-  const strengths = getStrengths(answers);
-  const blockers = getBlockers(answers);
-  const improvementAreas = getImprovementAreas(answers, blockers);
-  const quickNote = getQuickNote(score, maturity, strengths, improvementAreas);
+  const profile = getDimensionProfile(answers);
+  const blockers = getBlockers(profile);
+  const strengths = getStrengths(profile, new Set(blockers.map(b => b.key)));
+  const quickNote = getQuickNote(score, maturity, strengths, blockers);
   const indicatorPercent = getMaturityIndicatorPercent(maturity);
   const industryLabel = INDUSTRIES.find(i => i.value === industry)?.label || industry;
   const sizeLabel = SIZES.find(s => s.value === companySize)?.label || companySize;
 
-  // Build insight items for slide 2
+  useEffect(() => {
+    if (step !== 'results') return;
+    trackEvent('assessment_complete', { score, maturity, industry, company_size: companySize });
+    // Fire once on arrival at the results screen, not on every score recompute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  /**
+   * Email gate. The score, maturity and strengths/blockers are already visible
+   * above — this trades the downloadable report cards for an address, at the
+   * point where the visitor has seen what they are getting.
+   *
+   * A failed submission still unlocks the download: the visitor kept their side
+   * of the deal, and a backend problem is ours to see in the logs, not theirs.
+   */
+  const handleUnlock = async () => {
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) {
+      setEmailError('Enter a valid email address.');
+      return;
+    }
+    setEmailError('');
+    setSubmittingLead(true);
+
+    try {
+      const res = await fetch('/api/assessment-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmed,
+          companyName: companyName.trim(),
+          industry: industryLabel,
+          companySize: sizeLabel,
+          score,
+          maturity,
+          answers,
+          strengths: strengths.map(s => s.label),
+          blockers: blockers.map(b => b.label),
+          source: 'free-assessment',
+          questionSetVersion: QUESTION_SET_VERSION,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) throw new Error(`lead capture responded ${res.status}`);
+      trackEvent('assessment_lead_submitted', { score, maturity, industry });
+    } catch (err) {
+      console.error('Lead capture failed:', err);
+      trackEvent('assessment_lead_error', { score, maturity, industry });
+    } finally {
+      setSubmittingLead(false);
+    }
+
+    setSubmittedEmail(trimmed);
+    setUnlocked(true);
+
+    // The download runs first and the emailed copy reuses its output, so the
+    // visitor waits for exactly one capture rather than two.
+    void downloadDiagnosticCards().then(cards => emailReportCards(trimmed, cards));
+  };
+
+  /**
+   * Ships a copy of the cards to the n8n workflow that emails them.
+   *
+   * The cards only exist in this browser tab, so delivery has to start here.
+   * Never blocks the download — the visitor already has the files either way,
+   * so a delivery failure is a background problem, not theirs.
+   */
+  const emailReportCards = async (recipient: string, cards: CapturedCard[]) => {
+    if (cards.length === 0) {
+      setDeliveryStatus('failed');
+      return;
+    }
+    setDeliveryStatus('sending');
+    try {
+      const emailCards = await Promise.all(
+        cards.map(async card => ({
+          fileName: card.fileName,
+          dataUrl: await downscalePng(card.dataUrl, 1080),
+        })),
+      );
+      const res = await fetch('/api/assessment-report-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: recipient,
+          companyName: companyName.trim(),
+          score,
+          maturity,
+          strengths: strengths.map(s => s.label),
+          blockers: blockers.map(b => b.label),
+          questionSetVersion: QUESTION_SET_VERSION,
+          cards: emailCards,
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (!res.ok) throw new Error(`report email responded ${res.status}`);
+      setDeliveryStatus('sent');
+      trackEvent('assessment_report_emailed', { score, maturity });
+    } catch (err) {
+      console.error('Report card email failed:', err);
+      setDeliveryStatus('failed');
+      trackEvent('assessment_report_email_error', { score, maturity });
+    }
+  };
+
+  // Insight items for slide 2 — one dimension per item, each naming the
+  // question that drove it so the reader can see what the score rests on.
   const insightItems: InsightItem[] = [];
-  const primaryStrength = strengths[0] || (top[0]?.score >= 2 ? top[0] : null);
+  const primaryStrength = strengths[0];
   if (primaryStrength) {
     insightItems.push({
       title: primaryStrength.label,
-      desc: INSIGHT_DESCRIPTIONS[primaryStrength.id]?.strength || "Strong capability in this dimension provides a solid foundation for scaling AI initiatives.",
+      driver: `${primaryStrength.strongest.label} — ${primaryStrength.strongest.score}/3`,
+      desc: INSIGHT_DESCRIPTIONS[primaryStrength.strongest.id]?.strength || "Strength here is a foundation the rest of the operation can be built on rather than worked around.",
       type: 'strength'
     });
   }
@@ -389,16 +675,22 @@ export default function FreeDiagnosticPage() {
     if (insightItems.length >= 3) return;
     insightItems.push({
       title: blocker.label,
-      desc: INSIGHT_DESCRIPTIONS[blocker.id]?.blocker || (index === 0
-        ? "Critical gap in this area creates operational friction that must be addressed to ensure AI success."
-        : "Addressing this constraint will unlock significant efficiency gains and improve overall AI readiness."),
+      driver: `${blocker.weakest.label} — ${blocker.weakest.score}/3`,
+      desc: INSIGHT_DESCRIPTIONS[blocker.weakest.id]?.blocker || (index === 0
+        ? "A gap here creates friction that everything downstream has to absorb, usually as time nobody is measuring."
+        : "This constraint quietly caps how much any other improvement can deliver."),
       type: 'blocker'
     });
   });
   if (insightItems.length < 3) {
-    const secondaryStrength = strengths.find(item => !insightItems.some(ins => ins.title === item.label));
+    const secondaryStrength = strengths.find(d => !insightItems.some(ins => ins.title === d.label));
     if (secondaryStrength) {
-      insightItems.push({ title: secondaryStrength.label, desc: INSIGHT_DESCRIPTIONS[secondaryStrength.id]?.strength || "Solid performance here accelerates your ability to deploy practical AI initiatives.", type: 'strength' });
+      insightItems.push({
+        title: secondaryStrength.label,
+        driver: `${secondaryStrength.strongest.label} — ${secondaryStrength.strongest.score}/3`,
+        desc: INSIGHT_DESCRIPTIONS[secondaryStrength.strongest.id]?.strength || "Solid performance here removes one of the constraints that usually slows operational change down.",
+        type: 'strength'
+      });
     }
   }
 
@@ -508,16 +800,61 @@ export default function FreeDiagnosticPage() {
           <>
             {/* Action Header */}
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '1.5rem' }}>Your AI Readiness Diagnostic Report</h1>
-              <button
-                className="btn-primary"
-                onClick={downloadDiagnosticCards}
-                disabled={downloading}
-                style={{ maxWidth: 400, margin: '0 auto' }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                {downloading ? 'Generating PNGs...' : 'Download Diagnostic Cards (PNG)'}
-              </button>
+              <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.75rem' }}>Your Business Operations Assessment Report</h1>
+              <p className="results-subhead">
+                Score <strong>{score}/100</strong> · <strong>{maturity}</strong> maturity — your full breakdown is below.
+              </p>
+
+              {unlocked ? (
+                <>
+                  <button
+                    className="btn-primary"
+                    onClick={downloadDiagnosticCards}
+                    disabled={downloading}
+                    style={{ maxWidth: 400, margin: '0 auto' }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                    {downloading ? 'Generating PNGs...' : 'Download report cards again (PNG)'}
+                  </button>
+                  {deliveryStatus !== 'idle' && (
+                    <div className={`delivery-status delivery-${deliveryStatus}`} role="status">
+                      {deliveryStatus === 'sending' && `Emailing a copy to ${submittedEmail}…`}
+                      {deliveryStatus === 'sent' && `A copy is on its way to ${submittedEmail}.`}
+                      {deliveryStatus === 'failed' && 'We could not email a copy just now — your download above has the full report.'}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="email-gate">
+                  <div className="email-gate-label">Where should we send a copy of this report?</div>
+                  <div className="email-gate-row">
+                    <input
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="you@company.com"
+                      aria-label="Work email"
+                      aria-invalid={emailError ? true : undefined}
+                      value={email}
+                      onChange={e => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+                      onKeyDown={e => { if (e.key === 'Enter' && !submittingLead) handleUnlock(); }}
+                      disabled={submittingLead || downloading}
+                    />
+                    <button
+                      className="btn-primary"
+                      onClick={handleUnlock}
+                      disabled={submittingLead || downloading}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                      {submittingLead || downloading ? 'Preparing…' : 'Get my report cards'}
+                    </button>
+                  </div>
+                  {emailError && <div className="email-gate-error" role="alert">{emailError}</div>}
+                  <div className="email-gate-note">
+                    Unlocks the downloadable report cards below. No spam — we use this to send your report and nothing else.
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Card Previews */}
@@ -532,7 +869,7 @@ export default function FreeDiagnosticPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '46px', width: 'auto', display: 'block', flexShrink: 0 }} />
-                        <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>Quick Assessment<br />of AI Readiness</div>
+                        <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>Quick Assessment<br />of Business Operations</div>
                       </div>
                       <div style={{ borderBottom: '1px solid #111', marginBottom: 32 }} />
 
@@ -594,19 +931,30 @@ export default function FreeDiagnosticPage() {
                         </div>
                       </div>
 
-                      {/* Dimension grid — plain, airy, no boxes */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 26, columnGap: 40, marginBottom: 36 }}>
-                        {[...top, ...bottom].map(d => {
+                      {/* Dimension profile — all five, each with the question driving it.
+                          One row per dimension rather than a 2-up grid: five is an odd
+                          count, and a full-width bar reads as a profile instead of a list. */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 30 }}>
+                        {profile.map(d => {
                           let iconChar = '→';
                           let iconColor = '#d9942f';
-                          if (d.score >= 2) { iconChar = '↗'; iconColor = '#6b9b5e'; }
-                          else if (d.score === 0) { iconChar = '↓'; iconColor = '#ff5757'; }
+                          if (d.score >= 67) { iconChar = '↗'; iconColor = '#6b9b5e'; }
+                          else if (d.score <= 33) { iconChar = '↓'; iconColor = '#ff5757'; }
+                          const driver = d.score >= 67 ? d.strongest : d.weakest;
                           return (
-                            <div key={d.id}>
-                              <div style={{ fontSize: 17, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: 8 }}>{d.label}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 18, color: iconColor, fontWeight: 700 }}>{iconChar}</span>
-                                <span style={{ fontFamily: "var(--font-doto), 'Doto', monospace", fontSize: 17, fontWeight: 600, color: '#333' }}>Score {d.score}/3</span>
+                            <div key={d.key}>
+                              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, marginBottom: 6 }}>
+                                <span style={{ fontSize: 17, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.02em' }}>{d.label}</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                  <span style={{ fontSize: 16, color: iconColor, fontWeight: 700 }}>{iconChar}</span>
+                                  <span style={{ fontFamily: "var(--font-doto), 'Doto', monospace", fontSize: 17, fontWeight: 600, color: '#333' }}>{d.score}/100</span>
+                                </span>
+                              </div>
+                              <div style={{ height: 5, background: '#e4e2dc', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
+                                <div style={{ width: `${d.score}%`, height: '100%', background: iconColor, borderRadius: 3 }} />
+                              </div>
+                              <div style={{ fontSize: 13, color: '#777', letterSpacing: '0.01em' }}>
+                                {driver.label} · {driver.score}/3
                               </div>
                             </div>
                           );
@@ -648,7 +996,10 @@ export default function FreeDiagnosticPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 36, marginBottom: 50 }}>
                         {insightItems.map((ins, i) => (
                           <div key={i}>
-                            <div style={{ fontSize: 22, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.01em', marginBottom: 10 }}>{ins.title}</div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 20, marginBottom: 10 }}>
+                              <span style={{ fontSize: 22, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.01em' }}>{ins.title}</span>
+                              <span style={{ fontSize: 15, color: '#777', flexShrink: 0, textAlign: 'right' }}>{ins.driver}</span>
+                            </div>
                             <div style={{ borderBottom: '1px solid #111', marginBottom: 12 }} />
                             <div style={{ fontSize: 20, color: '#333', lineHeight: 1.4, display: 'flex', gap: 10 }}>
                               {ins.type === 'blocker' && <span style={{ color: '#ff5757', fontWeight: 700, flexShrink: 0 }}>→</span>}
@@ -682,50 +1033,52 @@ export default function FreeDiagnosticPage() {
               <div className="upgrade-grid">
                 <div className="upgrade-card">
                   <div className="upgrade-eyebrow">Upgrade path 01</div>
-                  <h3>AI Readiness Deep Diagnostic</h3>
-                  <div className="upgrade-price">$29 <span>one time</span></div>
-                  <p className="upgrade-summary">Move from a quick score to a complete readiness analysis built around your specific use case and not generic.</p>
-                  <div className="comparison-note"><strong>Why it beats the free diagnostic:</strong> the free report gives a snapshot. Deep Diagnostic maps 30 data points across workflow maturity, data infrastructure, automation exposure, and organizational readiness.</div>
+                  <h3>Business Operations Assessment</h3>
+                  <div className="upgrade-price">$79 <span>one time</span></div>
+                  <p className="upgrade-summary">Move from a quick score to a complete operational analysis built around your specific use case and not generic.</p>
+                  <div className="comparison-note"><strong>Why it beats the free diagnostic:</strong> the free report gives a snapshot. The Business Operations Assessment maps 30 data points across workflow maturity, data infrastructure, automation exposure, and organisational readiness.</div>
                   <ul className="cta-features">
                     <li>Detailed gap and constraint analysis</li>
                     <li>Business objective and AI opportunity mapping</li>
                     <li>Data and process readiness breakdown</li>
-                    <li>Prioritized use-case recommendations</li>
+                    <li>Prioritised use-case recommendations</li>
                   </ul>
-                  <a href="/#pricing-section" className="btn-cta">
+                  <a
+                    href="/#pricing-section"
+                    className="btn-cta"
+                    onClick={() => trackEvent('assessment_upgrade_click', { plan: 'business_operations_assessment', score, maturity })}
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: 4 }}><path d="M7 7l10 10M17 7v10H7" /></svg>
-                    Upgrade to Deep Diagnostic
+                    Upgrade to Business Operations Assessment
                   </a>
                 </div>
 
                 <div className="upgrade-card">
                   <div className="upgrade-eyebrow">Best next step</div>
-                  <h3>Full Stack Bundle</h3>
-                  <div className="upgrade-price">$99 <span>one time</span></div>
-                  <p className="upgrade-summary">Get the complete planning stack: Deep Diagnostic + Blueprint + Roadmap in one bundled path.</p>
+                  <h3>Complete Transformation Package</h3>
+                  <div className="upgrade-price">$299 <span>one time</span></div>
+                  <p className="upgrade-summary">Get the complete planning stack: Business Operations Assessment + Transformation Blueprint + Transformation Roadmap in one bundled path.</p>
                   <div className="comparison-note"><strong>Why bundle:</strong> it connects diagnosis to execution, so you do not stop at insights. You get the system design and a phased plan to act on it.</div>
                   <ul className="cta-features">
-                    <li>Everything in Deep Diagnostic</li>
+                    <li>Everything in Business Operations Assessment</li>
                     <li>AI system blueprint and workflow architecture</li>
                     <li>Phased implementation roadmap</li>
                     <li>KPI targets and deployment priorities</li>
                   </ul>
-                  <a href="/#pricing-section" className="btn-cta">
+                  <a
+                    href="/#pricing-section"
+                    className="btn-cta"
+                    onClick={() => trackEvent('assessment_upgrade_click', { plan: 'complete_transformation_package', score, maturity })}
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: 4 }}><path d="M7 7l10 10M17 7v10H7" /></svg>
-                    Get Full Stack Bundle
+                    Start Transformation
                   </a>
                 </div>
               </div>
-
-              <div className="strategy-card">
-                <div className="upgrade-eyebrow">Prefer to talk it through?</div>
-                <h3>Schedule a debrief with an AI strategist</h3>
-                <p>Review your score, clarify what is blocking adoption, and decide whether Deep Diagnostic or the Full Stack Bundle is the right next move.</p>
-                <a href="https://calendly.com" target="_blank" rel="noopener noreferrer" className="btn-cta">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: 4 }}><path d="M7 7l10 10M17 7v10H7" /></svg>
-                  Book strategist debrief
-                </a>
-              </div>
+              {/* The "Schedule a debrief" card was removed: its CTA pointed at
+                  https://calendly.com (Calendly's own homepage), so the
+                  highest-intent button on the page went nowhere. Restore it
+                  once a real booking URL exists. */}
             </div>
           </>
         )}
@@ -1111,8 +1464,7 @@ body {
   align-items: stretch;
 }
 
-.upgrade-card,
-.strategy-card {
+.upgrade-card {
   border: 2px solid #000000;
   border-radius: var(--radius);
   padding: 2rem;
@@ -1135,8 +1487,7 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.upgrade-card h3,
-.strategy-card h3 {
+.upgrade-card h3 {
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -1160,8 +1511,7 @@ body {
   color: var(--text-muted);
 }
 
-.upgrade-summary,
-.strategy-card p {
+.upgrade-summary {
   font-size: 0.98rem;
   color: var(--text-secondary);
   line-height: 1.55;
@@ -1235,15 +1585,104 @@ body {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-.strategy-card {
-  margin-top: 1.25rem;
-  text-align: center;
+/* === RESULTS: EMAIL GATE === */
+.results-subhead {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.75rem;
 }
 
-.strategy-card .btn-cta {
-  max-width: 430px;
-  margin-left: auto;
-  margin-right: auto;
+.email-gate {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  border: 2px solid #000000;
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  text-align: left;
+}
+
+.email-gate-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.email-gate-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.email-gate-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.875rem 1rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.email-gate-row input:focus {
+  outline: none;
+  border-color: #000000;
+  box-shadow: 0 0 0 1px #000000;
+}
+
+.email-gate-row input::placeholder {
+  color: var(--text-muted);
+}
+
+.email-gate-row input[aria-invalid='true'] {
+  border-color: var(--red);
+}
+
+/* .btn-primary is full-width with a top margin for the standalone step
+   buttons; inside the gate it sits inline next to the input. */
+.email-gate-row .btn-primary {
+  width: auto;
+  flex-shrink: 0;
+  margin-top: 0;
+  padding: 0.875rem 1.5rem;
+  white-space: nowrap;
+}
+
+.email-gate-error {
+  margin-top: 0.625rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.email-gate-note {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.delivery-status {
+  max-width: 400px;
+  margin: 0.875rem auto 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.delivery-sent {
+  color: #111111;
+  font-weight: 600;
+}
+
+.delivery-failed {
+  color: var(--text-secondary);
 }
 
 /* === RESPONSIVE === */
@@ -1314,18 +1753,30 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .upgrade-card,
-  .strategy-card {
+  .upgrade-card {
     padding: 1.25rem;
   }
 
-  .upgrade-card h3,
-  .strategy-card h3 {
+  .upgrade-card h3 {
     font-size: 1.25rem;
   }
 
   .upgrade-price {
     font-size: 2rem;
+  }
+
+  .email-gate {
+    padding: 1.25rem;
+  }
+
+  /* Side-by-side input + button leaves the input too narrow to read a typed
+     address on a phone — stack them instead. */
+  .email-gate-row {
+    flex-direction: column;
+  }
+
+  .email-gate-row .btn-primary {
+    width: 100%;
   }
 
   .nav-row {

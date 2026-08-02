@@ -1,5 +1,5 @@
 /**
- * Centralized authentication (Postgres-backed).
+ * Centralised authentication (Postgres-backed).
  *
  * Auth runs on the backend auth service (Postgres). login/signup call the
  * backend and persist the returned session (access token + user) to
@@ -24,7 +24,7 @@ const STORAGE_KEY = "aivory_auth";
 export interface User {
   user_id: string;
   email: string;
-  account_type: "free" | "superadmin" | "admin";
+  account_type: "free" | "demo" | "superadmin" | "admin";
   company_name?: string;
   created_at: string;
   tier: "free" | "snapshot" | "blueprint" | "enterprise";
@@ -35,6 +35,8 @@ export interface User {
   credits: number;
   credits_max: number;
   token?: string;
+  /** Per-account module allowlist for restricted (demo) accounts. */
+  allowed_modules?: string[];
 }
 
 /** Shape of the Supabase session blob persisted in localStorage. */
@@ -91,6 +93,7 @@ function mapUser(
     credits: Number(meta.credits ?? 0),
     credits_max: Number(meta.credits_max ?? 0),
     token,
+    allowed_modules: (meta.allowed_modules as string[]) ?? undefined,
   };
 }
 
@@ -164,6 +167,7 @@ export async function signup(
         account_type: data.user?.account_type || "free",
         tier: data.user?.tier || "free",
         company_name: data.user?.company_name || company_name,
+        allowed_modules: data.user?.allowed_modules,
       },
     },
   };
@@ -178,7 +182,7 @@ export async function signup(
 
 /**
  * Set shared cookies so the user & admin dashboards (path-based, same host as
- * the landing) recognize the session without a second sign-in.
+ * the landing) recognise the session without a second sign-in.
  * - admin middleware reads `aivory_access_token` (raw JWT, decoded for account_type)
  * - user dashboard authManager reads `aivory_session_token` + `aivory_user` (JSON)
  * Host-only, path=/ so they are sent to /dashboard and /admin on the same host.
@@ -192,7 +196,14 @@ function setAuthCookies(data: any): void {
     email: data?.user?.email || "",
     account_type: acct,
     role: acct,
+    allowed_modules: data?.user?.allowed_modules,
   };
+  // Expire any legacy domain-wide variants first (older builds stamped
+  // domain=.aivory.id copies; duplicates with different scopes poisoned the
+  // dashboards), then set fresh host-only cookies.
+  for (const k of ["aivory_access_token", "aivory_session_token", "aivory_user"]) {
+    document.cookie = `${k}=; path=/; domain=.aivory.id; max-age=0; SameSite=Lax`;
+  }
   const attrs = "path=/; max-age=604800; SameSite=Lax";
   document.cookie = `aivory_access_token=${at}; ${attrs}`;
   document.cookie = `aivory_session_token=${encodeURIComponent(JSON.stringify(at))}; ${attrs}`;
@@ -203,6 +214,7 @@ function clearAuthCookies(): void {
   if (typeof document === "undefined") return;
   for (const k of ["aivory_access_token", "aivory_session_token", "aivory_user"]) {
     document.cookie = `${k}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `${k}=; path=/; domain=.aivory.id; max-age=0; SameSite=Lax`;
   }
 }
 
@@ -232,6 +244,7 @@ export async function login(email: string, password: string): Promise<User> {
         account_type: data.user?.account_type || "free",
         tier: data.user?.tier || "free",
         company_name: data.user?.company_name,
+        allowed_modules: data.user?.allowed_modules,
       },
     },
   };

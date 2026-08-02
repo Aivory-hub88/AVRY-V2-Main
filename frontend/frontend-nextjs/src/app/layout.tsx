@@ -1,7 +1,15 @@
 import type { Metadata } from 'next';
 import { Manrope, Doto } from 'next/font/google';
 import './globals.css';
-import { SITE_URL, ORGANIZATION, JsonLd } from '@/lib/seo';
+import {
+  AIVORY_UK_URL,
+  DEFAULT_OG_IMAGE,
+  JsonLd,
+  buildSiteGraph,
+} from '@/lib/seo';
+import { LanguageProvider } from '@/components/context/LanguageContext';
+import AiTrap from '@/components/security/AiTrap';
+import CanaryLink from '@/components/security/CanaryLink';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -9,10 +17,6 @@ const manrope = Manrope({
   display: 'swap',
 });
 
-// Self-hosted (like Manrope above) so the diagnostic-card PNG export never
-// depends on a live fetch to Google Fonts at capture time -- the previous
-// setup only pulled Doto from a remote <link>, which is the likely cause of
-// wrong-weight/fallback-font glyphs in the exported cards.
 const doto = Doto({
   subsets: ['latin'],
   weight: ['400', '600', '700', '900'],
@@ -20,31 +24,52 @@ const doto = Doto({
   display: 'swap',
 });
 
-const SITE_NAME = 'Aivory';
-const SITE_TITLE = 'Aivory — AI-Powered Business Transformation';
+const SITE_NAME = 'Aivory AI';
+const SITE_TITLE = 'Aivory AI: An AI-Powered Business Transformation Platform';
 const SITE_DESCRIPTION =
-  'From diagnostic to deployment — everything you need to integrate AI into your business operations.';
-
-// Default social/share image used by any page that doesn't set its own.
-const DEFAULT_OG_IMAGE = '/hero-video-poster.jpg';
+  'Aivory helps businesses assess operations, design AI transformation blueprints, and deploy governed AI agents, workflow automation and operational intelligence.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(AIVORY_UK_URL),
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/icon-16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icon.svg', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
   title: {
     default: SITE_TITLE,
-    template: '%s | Aivory',
+    template: '%s | Aivory AI',
   },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
+  verification: {
+    google: '-X46S5bMyCLH8iqPOeCooGlLGvfl2X7soGY9MuaQqt4',
+  },
   alternates: {
-    canonical: '/',
+    canonical: AIVORY_UK_URL,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
   },
   openGraph: {
     type: 'website',
     siteName: SITE_NAME,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: SITE_URL,
+    url: AIVORY_UK_URL,
     images: [{ url: DEFAULT_OG_IMAGE, width: 1200, height: 630, alt: SITE_TITLE }],
   },
   twitter: {
@@ -55,37 +80,35 @@ export const metadata: Metadata = {
   },
 };
 
-import { LanguageProvider } from '@/components/context/LanguageContext';
-
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${doto.variable}`}>
+    <html lang="en" className={`${manrope.variable} ${doto.variable} antialiased scroll-smooth`}>
       <head>
         <link
           href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Doto:wght@400;700;900&display=swap"
           rel="stylesheet"
         />
-      </head>
-      <body className="bg-background text-white font-manrope antialiased" style={{ fontFamily: 'var(--font-manrope), Manrope, sans-serif' }}>
-        <JsonLd
-          data={{
-            '@context': 'https://schema.org',
-            '@graph': [
-              { ...ORGANIZATION, description: SITE_DESCRIPTION },
-              {
-                '@type': 'WebSite',
-                name: SITE_NAME,
-                url: SITE_URL,
-                publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
-              },
-            ],
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XYJ0EDEYS8" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-XYJ0EDEYS8');
+            `,
           }}
         />
-        <LanguageProvider>
+      </head>
+      <body className="bg-background text-white font-manrope antialiased overflow-x-hidden w-full" style={{ fontFamily: 'var(--font-manrope), Manrope, sans-serif' }}>
+        <JsonLd data={buildSiteGraph(AIVORY_UK_URL)} />
+        <LanguageProvider initialLanguage="en">
+          <AiTrap />
+          <CanaryLink />
           {children}
         </LanguageProvider>
       </body>

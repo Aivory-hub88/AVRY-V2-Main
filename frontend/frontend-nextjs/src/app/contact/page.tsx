@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Navbar from '@/components/home/Navbar';
 import Footer from '@/components/Footer';
+import { SpotlightButton } from '@/components/ui/SpotlightButton';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -141,24 +142,28 @@ export default function ContactPage() {
                   />
                 </div>
 
-                <button
+                <SpotlightButton
                   type="submit"
-                  className="flex items-center justify-center gap-2 px-8 py-3.5 bg-[#a3aa96] text-[#494949] font-medium hover:bg-[#8f9681] transition-all text-sm mt-4"
+                  roundedClass="rounded-[8px]"
+                  className="mt-4"
+                  icon={
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="shrink-0 text-[#a3aa96]"
+                    >
+                      <path d="M7 7l10 10M17 7v10H7" />
+                    </svg>
+                  }
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M7 7l10 10M17 7v10H7" />
-                  </svg>
                   Send Message
-                </button>
+                </SpotlightButton>
               </form>
             </div>
           ) : (

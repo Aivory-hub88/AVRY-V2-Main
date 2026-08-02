@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/careers" },
   openGraph: {
     type: "website",
-    title: "Careers at Aivory",
+    title: "Careers",
     description: "Explore open roles and join the team building AI for business.",
     url: "/careers",
     images: [DEFAULT_OG_IMAGE],

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/blog" },
   openGraph: {
     type: "website",
-    title: "Aivory Blog",
+    title: "Blog",
     description:
       "Insights, guides, and updates on AI adoption, automation, and business transformation.",
     url: "/blog",

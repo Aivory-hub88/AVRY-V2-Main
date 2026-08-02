@@ -4,7 +4,7 @@ import Navbar from '@/components/home/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Cookie Policy — Aivory',
+  title: 'Cookie Policy',
   description: 'Cookie Policy for Aivory platform.',
 };
 

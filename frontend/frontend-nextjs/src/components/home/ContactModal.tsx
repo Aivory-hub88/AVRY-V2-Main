@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { SpotlightButton } from '@/components/ui/SpotlightButton';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
               Contact Our Team for Full Consultation
             </h1>
             <p className="text-[#555555] text-base mb-6">
-              Let&apos;s discuss how Aivory™ can help transform your organization.
+              Let&apos;s discuss how Aivory™ can help transform your organisation.
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -116,24 +117,28 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 />
               </div>
 
-              <button
+              <SpotlightButton
                 type="submit"
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-[#111111] font-semibold hover:bg-[#111111] hover:text-white transition-colors text-base border border-[#111111]"
+                roundedClass="rounded-[8px]"
+                className="w-full mt-4"
+                icon={
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="shrink-0 text-white/50"
+                  >
+                    <path d="M7 7l10 10M17 7v10H7" />
+                  </svg>
+                }
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M7 7l10 10M17 7v10H7" />
-                </svg>
                 Send Message
-              </button>
+              </SpotlightButton>
             </form>
           </>
         ) : (

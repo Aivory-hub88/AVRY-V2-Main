@@ -444,6 +444,13 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
       case 'loading':
         return renderLoading();
       case 'info':
+        // Not-logged-in also sets type 'info' (see the auth-check effect above),
+        // which otherwise fell through to renderPending()'s "payment being
+        // processed" hourglass — confusing for a visitor who hasn't paid
+        // anything yet. Route it to the actual auth-required view instead.
+        if (!isAuthenticated()) {
+          return renderPaymentOptions();
+        }
         if (redirectUrl) {
           return renderRedirect();
         }

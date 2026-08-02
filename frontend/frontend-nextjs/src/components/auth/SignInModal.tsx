@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, MouseEvent } from 'react';
 import Image from 'next/image';
 import { login } from '@/lib/auth';
+import { SpotlightButton } from '@/components/ui/SpotlightButton';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -152,17 +153,17 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           {error && (
             <p className="text-red-400 text-sm text-center" role="alert">{error}</p>
           )}
-          <button
+          <SpotlightButton
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-[#a3aa96] hover:bg-[#8f9681] text-[#494949] font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+            roundedClass="rounded-[8px]"
+            className="w-full mt-2"
+            icon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/50"><path d="M7 7l10 10M17 7v10H7" /></svg>
+            }
           >
             {isLoading ? 'Signing in...' : 'Sign In'}
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-          </button>
+          </SpotlightButton>
         </form>
 
         <div className="mt-8 text-center">

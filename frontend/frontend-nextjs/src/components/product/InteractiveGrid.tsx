@@ -2,11 +2,56 @@
 
 import { MouseEvent, useRef, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { HalftoneWave } from '@/components/ui/HalftoneWave';
+import { motion } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const HalftoneWave = dynamic(() => import('@/components/ui/HalftoneWave').then((mod) => mod.HalftoneWave), { ssr: false });
+import { SpotlightButton } from '@/components/ui/SpotlightButton';
 
 // Reusable Spotlight Card Component
 function SpotlightCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const startTime = Math.random() * 10000;
+    let animationFrameId: number;
+    let isHovering = false;
+
+    const animate = (time: number) => {
+      if (cardRef.current && !isHovering) {
+        const rect = cardRef.current.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const radiusX = rect.width / 2;
+        const radiusY = rect.height / 2;
+        const speed = 0.001; 
+        const angle = (time + startTime) * speed;
+        
+        const x = centerX + radiusX * Math.cos(angle);
+        const y = centerY - radiusY * Math.sin(angle);
+        
+        cardRef.current.style.setProperty('--mouse-x', `${x}px`);
+        cardRef.current.style.setProperty('--mouse-y', `${y}px`);
+      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    const el = cardRef.current;
+    if (el) {
+      el.addEventListener('mouseenter', () => isHovering = true);
+      el.addEventListener('mouseleave', () => isHovering = false);
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (el) {
+        el.removeEventListener('mouseenter', () => isHovering = true);
+        el.removeEventListener('mouseleave', () => isHovering = false);
+      }
+    };
+  }, []);
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!cardRef.current) return;
@@ -18,28 +63,29 @@ function SpotlightCard({ children, className = '' }: { children: React.ReactNode
   };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      whileHover={{ y: -8, scale: 1.01 }}
       ref={cardRef}
       onMouseMove={handleMouseMove}
       className={`spotlight-card rounded-[24px] border-t border-l border-white/10 border-b border-r border-black/20 shadow-[0_8px_32px_rgba(0,0,0,0.4)] ${className}`}
       style={{
-        // Apple-style dark frosted glass. The tint is kept semi-transparent so the
-        // animated megamendung backdrop shows through; `brightness` lifts the very dim
-        // clouds just enough that the blur reads as frost rather than a flat dark panel.
-        // NOTE: for this backdrop-filter to actually sample the page background, no
-        // ancestor of this card may carry a transform/will-change (that would turn the
-        // ancestor into a "backdrop root"). See revealGrids() in useGsapScrollReveal.ts.
-        // Driven by CSS custom properties so the mobile override (globals.css) can
-        // switch the blur off via a single var — robust against the CSS minifier, which
-        // otherwise drops the unprefixed `backdrop-filter` from a plain media-query rule
-        // and leaves Chrome-Android still blurring. The var fallbacks are the desktop look.
-        backgroundColor: 'var(--card-bg, rgba(28, 28, 34, 0.45))',
-        backdropFilter: 'var(--card-frost, blur(2.5px))',
-        WebkitBackdropFilter: 'var(--card-frost, blur(2.5px))'
+        // One CONSTANT card look, no backdrop-filter. The old frosted glass needed
+        // an `html.is-scrolling` override that swapped frost/bg during scroll, which
+        // made every card visibly flash ("glitch") on scroll start/stop. A steady
+        // semi-transparent tint keeps the animated backdrop faintly visible with
+        // zero per-frame blur cost and zero state flips. Still var-driven so the
+        // mobile media rule in globals.css can go near-opaque for cheap rendering.
+        backgroundColor: 'var(--card-bg, rgba(20, 20, 26, 0.78))',
+        backdropFilter: 'var(--card-frost, none)',
+        WebkitBackdropFilter: 'var(--card-frost, none)'
       }}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -288,9 +334,21 @@ function AppIntegrationsAnimation() {
   ];
 
   const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
 
-  // Randomly change active index every 1.5 seconds
   useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(entry.isIntersecting);
+    }, { threshold: 0.1 });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Randomly change active index every 1.5 seconds — only while scrolled
+  // into view, so this doesn't keep re-rendering all 28 icon tiles forever.
+  useEffect(() => {
+    if (!inView) return;
     const interval = setInterval(() => {
       // Pick a new random index that is different from the current one
       setActiveIndex((prev) => {
@@ -300,10 +358,10 @@ function AppIntegrationsAnimation() {
       });
     }, 1500);
     return () => clearInterval(interval);
-  }, [apps.length]);
+  }, [apps.length, inView]);
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center py-2 z-0">
+    <div ref={containerRef} className="w-full h-full relative flex items-center justify-center py-2 z-0">
       {/* Moving Background Glow */}
       <div 
         className="absolute w-40 h-40 blur-[45px] rounded-full transition-all duration-[1500ms] ease-in-out opacity-40 -z-10"
@@ -318,7 +376,7 @@ function AppIntegrationsAnimation() {
       <div className="w-full h-full grid grid-cols-7 gap-1.5 relative z-10">
         {apps.map((app, i) => {
           const isActive = i === activeIndex;
-          const isInvert = app.name === 'GitHub' || app.name === 'Notion';
+          const isInvert = app.name === 'GitHub';
           
           return (
             <div
@@ -364,70 +422,115 @@ export function InteractiveGrid() {
 
       <div className="max-w-6xl mx-auto relative">
         <div className="text-center mb-16">
-          <h2 className="text-[#c4c9b8] uppercase tracking-widest text-xs font-manrope font-light mb-3">
+          <SpotlightButton 
+            className="mb-6 pointer-events-auto hover:-translate-y-0 inline-flex" 
+            style={{ 
+              borderWidth: '0.5px', 
+              borderStyle: 'solid', 
+              borderColor: 'rgba(255,255,255,0.1)', 
+              cursor: 'default' 
+            }}
+            icon={false}
+          >
             THE PLATFORM
-          </h2>
-          <h3 className="text-4xl md:text-5xl font-light tracking-tight mb-4">
-            Your AI Operations Stack.
+          </SpotlightButton>
+          <h3 className="text-4xl md:text-5xl font-light tracking-normal mb-4" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 300 }}>
+            Your AI Operations <span className="italic" style={{ color: '#e4effd' }}>Stack.</span>
           </h3>
-          <p className="text-white/60 max-w-xl mx-auto font-light leading-relaxed">
-            Agents that act, integrations that connect, and templates that ship fast.
+          <p className="text-white max-w-xl mx-auto font-light leading-relaxed">
+            Agents that act, easy to deploy, no code needed, integrations that connect, and templates that ship fast.
           </p>
         </div>
 
         {/* 3-Column Grid Layout matching Grok style */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <motion.div 
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.1 }}
+          variants={{
+            visible: { transition: { staggerChildren: 0.15 } }
+          }}
+        >
 
           {/* Card 1: Autonomous AI Agent */}
-          <SpotlightCard className="flex flex-col p-6">
-            <div className="relative z-10 mb-5">
-              <h4 className="text-lg font-medium text-white mb-2">Autonomous AI Agent</h4>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed">
-                Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.
-              </p>
-            </div>
-            {/* Animated chat interface */}
-            <div className="relative z-10 flex-1 min-h-[220px]">
-              <AutonomousAgentAnimation />
-            </div>
-          </SpotlightCard>
+          <motion.div variants={{
+            hidden: { opacity: 0, y: 30, scale: 0.95 },
+            visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 25, stiffness: 200 } }
+          }} className="flex flex-col h-full">
+            <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
+              <div className="relative z-10 mb-5">
+                <h4 className="text-lg font-medium text-white mb-2">Autonomous AI Agent</h4>
+                <p className="text-white/50 text-[13px] font-light leading-relaxed">
+                  Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.
+                </p>
+              </div>
+              {/* Animated chat interface */}
+              <div className="relative z-10 flex-1 min-h-[220px]">
+                <AutonomousAgentAnimation />
+              </div>
+            </SpotlightCard>
+          </motion.div>
 
           {/* Card 2: App Integrations */}
-          <SpotlightCard className="flex flex-col p-6">
-            <div className="relative z-10 mb-5">
-              <h4 className="text-lg font-medium text-white mb-2">App Integrations</h4>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed">
-                Connect your external applications and seamlessly search across conversations, documents and emails.
-              </p>
-            </div>
-            {/* Integration logos grid */}
-            <div className="relative z-10 flex-1 min-h-[220px]">
-              <AppIntegrationsAnimation />
-            </div>
-          </SpotlightCard>
+          <motion.div variants={{
+            hidden: { opacity: 0, y: 30, scale: 0.95 },
+            visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 25, stiffness: 200 } }
+          }} className="flex flex-col h-full">
+            <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
+              <div className="relative z-10 mb-5">
+                <h4 className="text-lg font-medium text-white mb-2">App Integrations</h4>
+                <p className="text-white/50 text-[13px] font-light leading-relaxed">
+                  Connect your external applications and seamlessly search across conversations, documents and emails.
+                </p>
+              </div>
+              {/* Integration logos grid */}
+              <div className="relative z-10 flex-1 min-h-[220px]">
+                <AppIntegrationsAnimation />
+              </div>
+            </SpotlightCard>
+          </motion.div>
 
           {/* Card 3: Template Library */}
-          <SpotlightCard className="flex flex-col p-6">
-            <div className="relative z-10 mb-5">
-              <h4 className="text-lg font-medium text-white mb-2">Template Library</h4>
-              <p className="text-white/50 text-[13px] font-light leading-relaxed">
-                Speed up deployment with pre-built template flows. Connect tools and route notifications instantly.
-              </p>
-            </div>
-            {/* Template thumbnails */}
-            <div className="relative z-10 flex-1 min-h-[220px]">
-              <TemplateLibraryAnimation />
-            </div>
-          </SpotlightCard>
+          <motion.div variants={{
+            hidden: { opacity: 0, y: 30, scale: 0.95 },
+            visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 25, stiffness: 200 } }
+          }} className="flex flex-col h-full">
+            <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
+              <div className="relative z-10 mb-5">
+                <h4 className="text-lg font-medium text-white mb-2">Template Library</h4>
+                <p className="text-white/50 text-[13px] font-light leading-relaxed">
+                  Speed up deployment with pre-built template flows. Connect tools and route notifications instantly.
+                </p>
+              </div>
+              {/* Template thumbnails */}
+              <div className="relative z-10 flex-1 min-h-[220px]">
+                <TemplateLibraryAnimation />
+              </div>
+            </SpotlightCard>
+          </motion.div>
 
-        </div>
+        </motion.div>
         
         {/* NEW AGENT CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <motion.div 
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6"
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.1 }}
+          variants={{
+            visible: { transition: { staggerChildren: 0.15, delayChildren: 0.3 } }
+          }}
+        >
           {NEW_AGENTS.map((agent, idx) => (
-            <AgentCard key={idx} agent={agent} />
+            <motion.div key={idx} className="h-full" variants={{
+              hidden: { opacity: 0, y: 30, scale: 0.95 },
+              visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 25, stiffness: 200 } }
+            }}>
+              <AgentCard agent={agent} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
         
         {/* Scrolling Logo Marquee */}
         <IntegrationsMarquee />
@@ -465,13 +568,17 @@ function IntegrationsMarquee() {
   }, []);
 
   const logos = [
-    { name: 'Zoom', icon: '/integrations/icons/discord.svg' }, // using placeholder icons if real ones missing
-    { name: 'Letta', icon: '/integrations/icons/stripe-v2-svgrepo-com.svg' },
-    { name: 'Glean', icon: '/integrations/icons/google-drive.svg' },
+    { name: 'Zoom', icon: '/integrations/icons/zoom.svg' },
+    { name: 'Letta', icon: '' }, // no clean transparent icon-only mark available — text label only
+    { name: 'Glean', icon: '/integrations/icons/glean.svg' },
     { name: 'HubSpot', icon: '/integrations/icons/hubspot-svgrepo-com.svg' },
     { name: 'Slack', icon: '/integrations/icons/slack.svg' },
     { name: 'Salesforce', icon: '/integrations/icons/salesforce.svg' },
+    { name: 'Claude', icon: '/integrations/icons/claude.svg' },
+    { name: 'Gemini', icon: '/integrations/icons/gemini.svg' },
     { name: 'OpenAI', icon: '/integrations/icons/openai.svg' },
+    { name: 'AWS', icon: '/integrations/icons/aws.svg' },
+    { name: 'Tencent Cloud', icon: '/integrations/icons/tencent-cloud.svg' },
     { name: 'Zendesk', icon: '/integrations/icons/zendesk.svg' },
     { name: 'GitHub', icon: '/integrations/icons/github.svg' },
   ];
@@ -480,33 +587,46 @@ function IntegrationsMarquee() {
   const marqueeItems = [...logos, ...logos];
 
   return (
-    <div className="w-full mt-20 md:mt-28 mb-0">
-      <div className="text-center mb-10 md:mb-12 px-6">
-        <h3 className="text-[22px] md:text-[32px] font-light text-[#c4c9b8] mb-3 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+    <div className="w-full mt-20 md:mt-28 mb-0 relative">
+      {/* Unified readability scrim: A single smooth gradient covering both the text and the logo marquee to avoid horizontal cutoffs. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[150%] z-[-1]"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 80%)',
+        }}
+      />
+      <div className="text-center mb-10 md:mb-12 px-6 relative">
+        <h3 className="relative text-[22px] md:text-[32px] font-light text-white mb-3 tracking-normal" style={{ fontFamily: "'Manrope', sans-serif", textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
           Every Aivory agent speaks your customer&apos;s language. Literally.
         </h3>
-        <p className={`text-[20px] md:text-[22px] text-[#8a8f8e] font-light transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`} style={{ fontFamily: MULTILINGUAL_TEXTS[langIndex].font }}>
+        <p className={`relative text-[20px] md:text-[22px] text-white font-light transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`} style={{ fontFamily: MULTILINGUAL_TEXTS[langIndex].font, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
           {MULTILINGUAL_TEXTS[langIndex].text}
         </p>
       </div>
 
-      <div className="w-full overflow-hidden relative opacity-40 hover:opacity-100 transition-opacity duration-700">
-        {/* gradient masks for smooth edges */}
-        <div className="absolute top-0 left-0 w-32 md:w-64 h-full bg-gradient-to-r from-black to-transparent z-10 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-32 md:w-64 h-full bg-gradient-to-l from-black to-transparent z-10 pointer-events-none" />
-      
+      <div className="w-full overflow-hidden relative">
+        <div 
+          className="relative z-10 opacity-60 hover:opacity-100 transition-opacity duration-700"
+          style={{ 
+            WebkitMaskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)', 
+            maskImage: 'linear-gradient(to right, transparent, black 15%, black 85%, transparent)' 
+          }}
+        >
+
       <div className="flex w-[200%] animate-marquee">
         {marqueeItems.map((item, idx) => (
-          <div key={idx} className="flex flex-1 items-center justify-center gap-3 grayscale transition-all duration-300 px-8">
-            {item.name === 'Zoom' || item.name === 'Glean' ? null : (
-              <div style={{ filter: 'brightness(0) invert(1)', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div key={idx} className="flex flex-none shrink-0 items-center justify-center gap-3 grayscale transition-all duration-300 px-8">
+            {!item.icon ? null : (
+              <div style={{ filter: 'brightness(0) invert(1) drop-shadow(0 2px 6px rgba(0,0,0,0.7))', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <img src={item.icon} alt={item.name} className="w-full h-full object-contain" />
               </div>
             )}
-            <span className="text-white/80 font-semibold text-xl tracking-tight" style={{ fontFamily: item.name === 'Zoom' ? 'sans-serif' : 'inherit' }}>{item.name}</span>
+            <span className="text-white/90 font-semibold text-xl tracking-tight whitespace-nowrap" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.75)' }}>{item.name}</span>
           </div>
         ))}
       </div>
+        </div>
       </div>
     </div>
   );
@@ -560,7 +680,7 @@ const NEW_AGENTS = [
 function getBadgeColor(status: string) {
   const s = status.toLowerCase();
   if (s.includes('resolved') || s.includes('qualified') || s.includes('synced')) {
-    return 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20';
+    return 'bg-[#bbe2ef]/10 text-[#bbe2ef] border-[#bbe2ef]/20';
   }
   if (s.includes('escalating') || s.includes('nurture') || s.includes('reviewing')) {
     return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
@@ -574,10 +694,14 @@ function getBadgeColor(status: string) {
   return 'bg-white/10 text-white/70 border-white/20';
 }
 
-function TypewriterText({ text, onComplete }: { text: string, onComplete?: () => void }) {
+function TypewriterText({ text, onComplete, active = true }: { text: string, onComplete?: () => void, active?: boolean }) {
   const [displayed, setDisplayed] = useState('');
-  
+
   useEffect(() => {
+    // Skip the 20ms tick loop entirely while the card is scrolled out of view —
+    // this ran unconditionally before, so 3 off-screen AgentCards could still
+    // burn ~150 state updates/sec on a main thread that's also busy scrolling.
+    if (!active) return;
     setDisplayed('');
     let i = 0;
     const interval = setInterval(() => {
@@ -590,9 +714,9 @@ function TypewriterText({ text, onComplete }: { text: string, onComplete?: () =>
       }
     }, 20); // Faster typewriter
     return () => clearInterval(interval);
-  }, [text, onComplete]);
+  }, [text, onComplete, active]);
 
-  return <span>{displayed}<span className="ml-[2px] w-[2px] h-2.5 bg-[#aec99d] animate-pulse inline-block align-middle" /></span>;
+  return <span>{displayed}<span className="ml-[2px] w-[2px] h-2.5 bg-[#bbe2ef] animate-pulse inline-block align-middle" /></span>;
 }
 
 function AgentFlowVisual({ title }: { title: string }) {
@@ -672,20 +796,20 @@ function AgentFlowVisual({ title }: { title: string }) {
             <img src="/integrations/icons/telegram.svg" alt="Telegram" className="w-4 h-4 opacity-80" />
           </div>
           <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <div className="w-4 h-4 opacity-80 grayscale flex items-center justify-center">
+            <div className="w-4 h-4 opacity-90 flex items-center justify-center">
               <img src="/integrations/icons/gmail.svg" alt="Email" className="w-full h-full" />
             </div>
           </div>
           <div className="ml-0.5">{arrowRight}</div>
           <div className="ml-0.5">
-            <div className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-colors duration-700 ${reducedMotion || csState.status === 'resolved' ? 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20' : 'bg-white/5 text-white/40 border-white/10'}`}>
+            <div className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-colors duration-700 ${reducedMotion || csState.status === 'resolved' ? 'bg-[#bbe2ef]/10 text-[#bbe2ef] border-[#bbe2ef]/20' : 'bg-white/5 text-white/40 border-white/10'}`}>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
           </div>
           <div className="ml-auto flex items-center shrink-0">
-            <div className={`px-2 py-0.5 text-[9px] font-mono rounded-sm border transition-colors duration-700 uppercase tracking-widest ${csState.status === 'processing' && !reducedMotion ? 'bg-blue-400/10 text-blue-400 border-blue-400/20' : 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20'}`}>
+            <div className={`px-2 py-0.5 text-[9px] font-mono rounded-sm border transition-colors duration-700 uppercase tracking-widest ${csState.status === 'processing' && !reducedMotion ? 'bg-blue-400/10 text-blue-400 border-blue-400/20' : 'bg-[#bbe2ef]/10 text-[#bbe2ef] border-[#bbe2ef]/20'}`}>
               {reducedMotion ? 'RESOLVED' : csState.status}
             </div>
           </div>
@@ -697,7 +821,7 @@ function AgentFlowVisual({ title }: { title: string }) {
           {['BUDGET', 'AUTHORITY', 'NEED', 'TIME'].map((tag, i) => {
             const isLit = reducedMotion || lqPhase >= i;
             return (
-              <div key={tag} className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors duration-300 ${isLit ? 'bg-[#aec99d]/10 text-[#aec99d] border-[#aec99d]/20' : 'bg-white/5 text-white/30 border-white/10'}`}>
+              <div key={tag} className={`px-2 py-1 text-[9px] font-mono rounded border transition-colors duration-300 ${isLit ? 'bg-[#bbe2ef]/10 text-[#bbe2ef] border-[#bbe2ef]/20' : 'bg-white/5 text-white/30 border-white/10'}`}>
                  {tag}
               </div>
             );
@@ -714,9 +838,9 @@ function AgentFlowVisual({ title }: { title: string }) {
            </div>
            <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
               {!reducedMotion && inView && (
-                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" />
+                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#bbe2ef] to-transparent animate-travel" />
               )}
-              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
+              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#bbe2ef]/50" />}
            </div>
            <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
               <svg className="w-4 h-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -725,9 +849,9 @@ function AgentFlowVisual({ title }: { title: string }) {
            </div>
            <div className="flex-1 h-[1px] bg-white/5 relative overflow-hidden shrink-0 mx-2">
               {!reducedMotion && inView && (
-                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#aec99d] to-transparent animate-travel" style={{ animationDelay: '1s' }} />
+                <div className="absolute top-0 left-0 h-full w-8 bg-gradient-to-r from-transparent via-[#bbe2ef] to-transparent animate-travel" style={{ animationDelay: '1s' }} />
               )}
-              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#aec99d]/50" />}
+              {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#bbe2ef]/50" />}
            </div>
            <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
               <img src="/integrations/icons/slack.svg" alt="Slack" className="w-4 h-4 opacity-80" />
@@ -742,19 +866,34 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
   const [visibleItems, setVisibleItems] = useState<any[]>([]);
   // Use a ref to track unique IDs for each added task to avoid key collisions and allow React to track identity
   const idCounter = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  // This ran forever regardless of scroll position — 3 AgentCards each cycling
+  // every 3.5s (plus each card's TypewriterText ticking every 20ms) kept the
+  // main thread busy even while scrolled far away, compounding with real
+  // scroll work when the user came back through this section.
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      setInView(entry.isIntersecting);
+    }, { threshold: 0.1 });
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
+    if (!inView) return;
     let timer: NodeJS.Timeout;
     const startCycle = () => {
       let currentIdx = 0;
-      
+
       // Add first task
       setVisibleItems([{ ...tasks[0], uid: idCounter.current++ }]);
-      
+
       timer = setInterval(() => {
         currentIdx = (currentIdx + 1) % tasks.length;
         const nextTask = { ...tasks[currentIdx], uid: idCounter.current++ };
-        
+
         setVisibleItems((current) => {
           const newItems = [...current, nextTask];
           if (newItems.length > 2) { return newItems.slice(newItems.length - 2); }
@@ -762,16 +901,16 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
         });
       }, 3500);
     };
-    
+
     const initTimer = setTimeout(startCycle, offset);
     return () => {
       clearTimeout(initTimer);
       clearInterval(timer); // FIX: was clearTimeout
     };
-  }, [offset, tasks]);
+  }, [offset, tasks, inView]);
 
   return (
-    <div className="flex flex-col gap-3 relative h-full overflow-hidden w-full px-5 pb-5">
+    <div ref={containerRef} className="flex flex-col gap-3 relative h-full overflow-hidden w-full px-5 pb-5">
       {visibleItems.map((task, i) => {
         const isProcessing = task.status.toLowerCase().includes('processing') || 
                              task.status.toLowerCase().includes('scoring') || 
@@ -800,7 +939,7 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
             
             {/* Body */}
             <div className="text-[11px] text-white/80 leading-relaxed mb-2 truncate">
-              {isNewest ? <TypewriterText text={task.message} /> : task.message}
+              {isNewest ? <TypewriterText text={task.message} active={inView} /> : task.message}
             </div>
             
             {/* Result / Typing */}
@@ -808,15 +947,15 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
               {isProcessing ? (
                 <div className="flex items-center gap-2">
                   <div className="flex space-x-1 mt-0.5">
-                    <div className="w-1.5 h-1.5 bg-[#aec99d] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 bg-[#aec99d] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 bg-[#aec99d] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-1.5 h-1.5 bg-[#bbe2ef] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 bg-[#bbe2ef] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 bg-[#bbe2ef] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-[10px] text-[#aec99d]/80 italic font-mono">{task.result}</span>
+                  <span className="text-[10px] text-[#bbe2ef]/80 italic font-mono">{task.result}</span>
                 </div>
               ) : (
-                <div className="text-[10px] text-[#aec99d] font-semibold truncate flex items-center gap-1.5">
-                  <span className="text-[#aec99d]/60">→</span> {task.result}
+                <div className="text-[10px] text-[#bbe2ef] font-semibold truncate flex items-center gap-1.5">
+                  <span className="text-[#bbe2ef]/60">→</span> {task.result}
                 </div>
               )}
             </div>
@@ -829,7 +968,7 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
 
 function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
   return (
-    <SpotlightCard className="group flex flex-col p-6 relative overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_0_30px_rgba(174,201,157,0.05)] cursor-default">
+    <SpotlightCard className="group flex flex-col p-6 relative overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_0_30px_rgba(174,201,157,0.05)] cursor-default auto-spotlight h-full">
       <div className="relative z-10 mb-5 flex-shrink-0">
         <h4 className="text-lg font-medium text-white mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
           {agent.title}
@@ -840,15 +979,15 @@ function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
       </div>
 
       {/* Animation Element */}
-      <div className="relative z-10 flex-1 min-h-[300px] bg-black/20 border border-white/5 rounded-xl mt-auto overflow-hidden flex flex-col pt-10">
+      <div className="relative z-10 w-full h-[330px] shrink-0 bg-black/20 border border-white/5 rounded-xl mt-auto overflow-hidden flex flex-col pt-10">
         
         {/* Status Header */}
         <div className="absolute top-4 left-4 flex items-center gap-2 z-20">
           <div className="relative flex items-center justify-center w-2 h-2">
-            <span className="absolute inline-flex w-full h-full rounded-full bg-[#aec99d] opacity-75 animate-ping" />
-            <span className="relative inline-flex w-2 h-2 rounded-full bg-[#aec99d]" />
+            <span className="absolute inline-flex w-full h-full rounded-full bg-[#bbe2ef] opacity-75 animate-ping" />
+            <span className="relative inline-flex w-2 h-2 rounded-full bg-[#bbe2ef]" />
           </div>
-          <span className="text-[9px] text-[#c4c9b8] uppercase tracking-widest font-mono">
+          <span className="text-[9px] text-[#bbe2ef] uppercase tracking-widest font-mono">
             {agent.status}
           </span>
         </div>

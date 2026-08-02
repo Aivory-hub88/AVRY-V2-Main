@@ -10,11 +10,11 @@ interface StatItem {
 }
 
 const stats: StatItem[] = [
-  { target: 30, suffix: '+', label: 'Seamless Integrations' },
-  { target: 50, suffix: '+', label: 'Intelligent Workflows' },
-  { target: 8, suffix: '', label: 'Core Enterprise Architectures' },
-  { target: 5, suffix: '', label: 'Deployable AI Agents' },
-  { target: 1, suffix: '', label: 'Mission to Make AI Make Sense®' },
+  { target: 30, suffix: '+', label: 'Enterprise Integrations' },
+  { target: 50, suffix: '+', label: 'Automated Workflows' },
+  { target: 8, suffix: '', label: 'Core Architectures' },
+  { target: 5, suffix: '', label: 'Autonomous Agents' },
+  { target: 1, suffix: '', label: 'Unified Platform' },
 ];
 
 function useCountUp(target: number, active: boolean, duration = 2000) {
@@ -57,13 +57,13 @@ function StatCounter({ stat, active, delay }: { stat: StatItem; active: boolean;
     >
       <div
         className="font-light text-white leading-none mb-3"
-        style={{ fontFamily: "'Manrope', sans-serif", fontSize: 'clamp(1.4rem, 4vw, 5rem)' }}
+        style={{ fontFamily: "'Manrope', sans-serif", fontSize: 'clamp(1.4rem, 4vw, 5rem)', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
       >
         {value}{stat.suffix}
       </div>
       <div
         className="font-light text-[8px] sm:text-[10px] md:text-[0.85rem] text-white/65 tracking-normal md:tracking-[0.08em] whitespace-nowrap"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        style={{ fontFamily: "'Manrope', sans-serif", textShadow: '0 1px 10px rgba(0,0,0,0.6)' }}
       >
         {stat.label}
       </div>
@@ -103,7 +103,9 @@ export default function StatsSection() {
   }, []);
 
   return (
-    <div ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full relative overflow-hidden`} style={{ padding: '110px 0 120px 0' }}>
+    <div id="stats" ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full relative overflow-hidden`} style={{ padding: '110px 0 120px 0' }}>
+
+
 
       <div className="relative z-[1] max-w-[1340px] mx-auto px-4 lg:px-6">
         {/* Stats Row */}

@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('PricingSection', () => {
   describe('Pricing fidelity — prices derived from pricing.ts (Req 2.2)', () => {
-    it('displays the Deep Diagnostic price equal to formatUsd(getProductPrice(ai_snapshot))', () => {
+    it('displays the Deep Assessment price equal to formatUsd(getProductPrice(ai_snapshot))', () => {
       render(<PricingSection />);
       expect(screen.getByText(expectedDeepDiagnosticPrice)).toBeInTheDocument();
     });
@@ -97,7 +97,7 @@ describe('PricingSection', () => {
     it('renders the Full Stack banner headline', () => {
       render(<PricingSection />);
       expect(
-        screen.getByText(/Full Stack > Deep Diagnostic \+ Blueprint \+ Roadmap/)
+        screen.getByText(/Full Stack > Deep Assessment \+ Blueprint \+ Roadmap/)
       ).toBeInTheDocument();
     });
 
@@ -138,9 +138,9 @@ describe('PricingSection', () => {
   });
 
   describe('CTA wiring (mocked next/navigation + @/lib/payment)', () => {
-    it('routes to the free diagnostic when Start Deep Diagnostic is clicked', () => {
+    it('routes to the free diagnostic when Start Deep Assessment is clicked', () => {
       render(<PricingSection />);
-      fireEvent.click(screen.getByRole('button', { name: /Start Deep Diagnostic/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Start Deep Assessment/i }));
       expect(pushMock).toHaveBeenCalledWith('/diagnostic?type=free');
     });
 

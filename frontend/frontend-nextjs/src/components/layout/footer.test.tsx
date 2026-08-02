@@ -32,7 +32,7 @@ describe('Footer', () => {
   it('renders the brand description', () => {
     render(<Footer />);
     
-    expect(screen.getByText(/AI Readiness Diagnostic Platform/i)).toBeInTheDocument();
+    expect(screen.getByText(/AI Readiness Assessment Platform/i)).toBeInTheDocument();
   });
 
   it('renders the Platform navigation section', () => {

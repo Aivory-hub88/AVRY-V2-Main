@@ -5,16 +5,18 @@ import Image from 'next/image';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 
 const productLinks = [
-  { label: 'Deep Diagnostic', href: '/product' },
+  { label: 'Deep Assessment', href: '/product' },
   { label: 'AI Blueprint', href: '/product' },
   { label: 'AI Roadmap', href: '/product' },
   { label: 'Workflow Builder', href: '/product' },
   { label: 'AI Agents', href: '/product' },
   { label: 'Template Library', href: '/product' },
+  { label: 'Bastion', href: '/bastion' },
 ];
 
 const companyLinks = [
-  { label: 'About', href: '/company' },
+  { label: 'About', href: '/about' },
+  { label: 'Company', href: '/company' },
   { label: 'Blog', href: '/blog' },
   { label: 'Careers', href: '/careers' },
   { label: 'Investor Relations', href: '/investor-relations' },
@@ -31,7 +33,7 @@ export default function Footer() {
   const { ref, isVisible } = useScrollAnimation();
 
   return (
-    <footer className="w-full bg-[#050505] text-white pt-24 pb-12 font-sans">
+    <footer className="w-full bg-transparent text-white pt-24 pb-12 font-sans">
       <div ref={ref} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''}`}>
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           {/* 5-column grid */}

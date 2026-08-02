@@ -75,7 +75,7 @@ export default function ScrollRevealProvider() {
         revealElements('h2, p');
         revealGrids('main .grid');
         // Standalone decorative dividers, not section borders.
-        revealDividers('.border-t:not(section)');
+        revealDividers('.border-t:not(section):not(.spotlight-card)');
         cleanup = () => mod.killAllScrollTriggers();
       },
       { timeout: 1200 }

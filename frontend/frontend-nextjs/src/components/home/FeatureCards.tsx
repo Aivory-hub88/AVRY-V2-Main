@@ -33,33 +33,78 @@ function useCountUp(target: number, active: boolean, duration = 2000) {
   return value;
 }
 
-function DiagnosticStatItem({ 
-  target, prefix, suffix, title, subtitle, active, delay 
-}: { 
-  target: number; prefix: string; suffix: string; title: string; subtitle: string; active: boolean; delay: number 
+function DiagnosticStatItem({
+  target, prefix, suffix, title, subtitle, active, delay
+}: {
+  target: number; prefix: string; suffix: string; title: string; subtitle: string; active: boolean; delay: number
 }) {
   const value = useCountUp(target, active);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let startTime = Math.random() * 10000;
+
+    const animate = (time: number) => {
+      if (cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        const radiusX = rect.width / 2;
+        const radiusY = rect.height / 2;
+        const speed = 0.004; 
+        const angle = (time + startTime) * speed;
+        
+        const x = centerX + radiusX * Math.cos(angle);
+        const y = centerY - radiusY * Math.sin(angle);
+        
+        cardRef.current.style.setProperty('--mouse-x', `${x}px`);
+        cardRef.current.style.setProperty('--mouse-y', `${y}px`);
+      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
 
   return (
     <div
-      className="flex-1 min-w-0 md:min-w-[200px] text-center py-4 px-2 lg:px-4 transition-all duration-[800ms] ease-out flex flex-col items-center justify-start"
+      ref={cardRef}
+      className="group relative spotlight-card auto-spotlight flex-1 min-w-0 md:min-w-[200px] text-center py-8 px-4 lg:px-6 rounded-2xl transition-all duration-[800ms] ease-out flex flex-col items-center justify-start border-transparent bg-transparent hover:bg-white/[0.03]"
       style={{
         opacity: active ? 1 : 0,
         transform: active ? 'translateY(0)' : 'translateY(30px)',
         transitionDelay: `${delay}ms`,
       }}
     >
+      {/* Small accent mark above the number, grows in with the count-up */}
       <div
-        className="font-light text-white leading-none mb-3 flex items-baseline justify-center"
-        style={{ fontFamily: "'Manrope', sans-serif", fontSize: 'clamp(3rem, 5vw, 4.5rem)' }}
+        className="h-px w-8 mb-5 rounded-full transition-all duration-[900ms] ease-out"
+        style={{
+          background: 'linear-gradient(90deg, transparent, #7c3aed, transparent)',
+          transform: active ? 'scaleX(1)' : 'scaleX(0)',
+          opacity: active ? 1 : 0,
+          transitionDelay: `${delay + 150}ms`,
+        }}
+      />
+      <div
+        className="font-light text-white leading-none mb-4 flex items-baseline justify-center [font-variant-numeric:tabular-nums]"
+        style={{
+          fontFamily: "'Manrope', sans-serif",
+          fontSize: 'clamp(3rem, 5vw, 4.5rem)',
+          textShadow: '0 0 40px rgba(124, 58, 237, 0.35)',
+        }}
       >
         {prefix}{value}
         {suffix && <span style={{ fontSize: 'clamp(1.5rem, 2.5vw, 2.5rem)', marginLeft: '2px' }}>{suffix}</span>}
       </div>
-      <div className="text-[#d0d0d4] text-[13px] md:text-[15px] font-medium tracking-wide mb-1">
+      <div className="text-[#e4e4e7] text-[13px] md:text-[15px] font-medium tracking-wide mb-1.5">
         {title}
       </div>
-      <div className="text-[#b6b6ba] text-[11px] md:text-[13px] font-normal">
+      <div className="text-[#8a8a92] text-[11px] md:text-[13px] font-normal">
         {subtitle}
       </div>
     </div>
@@ -109,28 +154,29 @@ export default function FeatureCards() {
       <div ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full pt-24 pb-12 relative overflow-hidden`} id="features" style={{ zIndex: 1 }}>
         <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-24 relative z-[1]">
           <div className="text-center flex flex-col justify-center items-center">
-            <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-6 leading-tight text-white max-w-3xl">
-              Turn your AI Confusion<br />Into AI Execution
+            <h2 className="text-4xl md:text-5xl font-light tracking-tight mb-16 leading-tight text-white max-w-3xl" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 300, zoom: 0.8 }}>
+              Operational clarity.<br />
+              Executive <span className="italic" style={{ color: '#e4effd' }}>control.</span>
             </h2>
-            <p className="text-white/75 max-w-2xl font-light leading-relaxed mb-16">
-              Aivory™ helps organizations discover where AI creates value,
-              design the right systems, and deploy AI with confidence
-            </p>
+            
 
             {/* Diagnostic Stats Section */}
-            <div className="w-full max-w-[1000px] mx-auto flex flex-col items-center">
-              <div className="uppercase tracking-[0.2em] text-[#d0d0d4] text-[10px] md:text-xs font-semibold mb-3">
-                From Diagnostic to Deployment
-              </div>
-              <h3 className="text-xl md:text-3xl font-light text-white mb-12">
-                Days of consulting, compressed into minutes
+            <div className="w-full max-w-[850px] mx-auto flex flex-col items-center">
+              <h3 className="text-base md:text-2xl font-light text-white mb-12" style={{ zoom: 0.95, fontFamily: "'Manrope', sans-serif", fontWeight: 300 }}>
+                Business transformation starts with <br className="hidden md:block" />understanding how the organisation operates.
               </h3>
 
-              <div ref={statsRef} className="flex flex-nowrap justify-center items-start relative flex-row w-full mt-4">
-                <DiagnosticStatItem target={10} prefix="" suffix="min" title="AI Readiness Diagnostic" subtitle="not days of sessions" active={statsActive} delay={0} />
-                <div className="w-px self-stretch relative min-h-[100px] hidden md:block border-l border-white/10" />
-                <DiagnosticStatItem target={5} prefix="<" suffix="min" title="AI System Blueprint" subtitle="not weeks of decks" active={statsActive} delay={100} />
-                <div className="w-px self-stretch relative min-h-[100px] hidden md:block border-l border-white/10" />
+              <div ref={statsRef} className="flex flex-nowrap justify-center items-stretch relative flex-row w-full mt-4" style={{ zoom: 0.76 }}>
+                <DiagnosticStatItem target={10} prefix="" suffix="min" title="Business Operations Assessment" subtitle="not days of sessions" active={statsActive} delay={0} />
+                <div
+                  className="w-px self-stretch relative min-h-[100px] hidden md:block"
+                  style={{ background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.14) 20%, rgba(255,255,255,0.14) 80%, transparent)' }}
+                />
+                <DiagnosticStatItem target={5} prefix="<" suffix="min" title="Transformation Blueprint" subtitle="not weeks of decks" active={statsActive} delay={100} />
+                <div
+                  className="w-px self-stretch relative min-h-[100px] hidden md:block"
+                  style={{ background: 'linear-gradient(180deg, transparent, rgba(255,255,255,0.14) 20%, rgba(255,255,255,0.14) 80%, transparent)' }}
+                />
                 <DiagnosticStatItem target={0} prefix="" suffix="" title="False Starts" subtitle="one clear starting point" active={statsActive} delay={200} />
               </div>
             </div>

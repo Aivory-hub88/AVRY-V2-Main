@@ -24,14 +24,14 @@ export function CompanyContent() {
             <div>
               <h3 className="text-2xl md:text-3xl font-light text-white mb-4">Our Mission</h3>
               <p className="text-[#777] text-lg font-light leading-relaxed">
-                To make AI adoption practical, structured, and accessible for every organization, regardless of size, industry, or technical background.
+                To make AI adoption practical, structured, and accessible for every organisation, regardless of size, industry, or technical background.
               </p>
             </div>
             
             <div>
               <h3 className="text-2xl md:text-3xl font-light text-white mb-4">Our Vision</h3>
               <p className="text-[#777] text-lg font-light leading-relaxed">
-                A world where any organization can confidently understand, plan, and operate AI. Not just those with the largest budgets or deepest technical teams, but every organization starting now.
+                A world where any organisation can confidently understand, plan, and operate AI. Not just those with the largest budgets or deepest technical teams, but every organisation starting now.
               </p>
             </div>
           </div>
@@ -76,7 +76,7 @@ export function CompanyContent() {
             <div>
               <h3 className="text-xl font-medium text-white mb-3">Accessible by design</h3>
               <p className="text-[#777] font-light leading-relaxed">
-                AI should not be limited to organizations with large budgets or specialized teams. We build for anyone with meaningful problems to solve.
+                AI should not be limited to organisations with large budgets or specialised teams. We build for anyone with meaningful problems to solve.
               </p>
             </div>
 

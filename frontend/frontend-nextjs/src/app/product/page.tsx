@@ -9,7 +9,7 @@ import { CTAFooter } from '@/components/product/CTAFooter';
 import { DarkSectionSpotlight } from '@/components/ui/DarkSectionSpotlight';
 
 export const metadata: Metadata = {
-  title: 'Products — Aivory',
+  title: 'Products',
   description:
     'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
 };
@@ -27,7 +27,7 @@ export default function ProductPage() {
         subtitle="From diagnostic to deployment — everything you need to integrate AI into your business operations."
       />
 
-      {/* Grid Showcase (Diagnostic, Blueprint, Roadmap, Console, Workflows) */}
+      {/* Sticky Operational Framework showcase */}
       <InteractiveGridShowcase />
 
       {/* Spotlight Hover Utility Grid (Agents, Templates, Connectors, Telemetry) */}

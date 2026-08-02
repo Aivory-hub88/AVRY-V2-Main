@@ -109,7 +109,7 @@ export const SHARE_CONFIGS: NetworkShareConfig[] = [
   {
     network: "email",
     template:
-      'Hi team,\n\nWe scored {score}/100 ("{category}") on Aivory\'s AI Readiness Diagnostic.\nLet\'s review next-step blueprints: {url}\n\nBest regards',
+      'Hi team,\n\nWe scored {score}/100 ("{category}") on Aivory\'s AI Readiness Assessment.\nLet\'s review next-step blueprints: {url}\n\nBest regards',
     mode: "mailto",
     supportsImageParam: false,
     copyBeforeOpen: false,
