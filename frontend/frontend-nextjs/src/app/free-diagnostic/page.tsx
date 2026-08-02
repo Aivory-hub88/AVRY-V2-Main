@@ -230,6 +230,8 @@ function computeScore(answers: Record<string, number>): number {
 const DEFINED_BAND_FLOOR = 65;
 /** Start of the Developing band. Below this, a dimension is not a strength. */
 const DEVELOPING_BAND_FLOOR = 50;
+/** Midpoint of the 0-100 dimension scale, used to count what is running weak. */
+const MIDPOINT = 50;
 
 // Thresholds mirror the paid `maturityFromScore` exactly (80 / 65 / 50 / 35).
 function getMaturityLevel(score: number): string {
@@ -337,6 +339,40 @@ function getQuickNote(score: number, maturity: string, strengths: DimensionScore
   };
 }
 
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
+
+/**
+ * The closing hook — the free tier's only mention of AI, and the only place it
+ * says out loud what it has not answered.
+ *
+ * The free assessment answers two of the five executive questions: where are we
+ * today, and what is slowing us down. What to change first, what a fix is worth,
+ * and where AI helps most are deliberately left open — that is what the paid
+ * assessment sells. Naming the gap is more honest than implying the free score
+ * is the whole picture, and it is also the actual sales argument.
+ *
+ * The count is derived from the answers rather than asserted, so the line reads
+ * as a finding rather than a slogan.
+ */
+function getClosingHook(profile: DimensionScore[]): { finding: string; decline: string } {
+  const below = profile.filter(d => d.score < MIDPOINT).length;
+
+  if (below === 0) {
+    return {
+      finding: 'Every dimension of your operation is running at or above the level where automation holds up — an unusual result, and a strong base to build on.',
+      decline: 'What this assessment does not show is which of them repays attention first, what that is worth in recovered time and cost, or where AI can carry the load. That is the Business Operations Assessment.',
+    };
+  }
+
+  const subject = below === 1 ? 'One part of your operation is' : `${COUNT_WORDS[below]} parts of your operation are`;
+  const object = below === 1 ? 'it is' : 'they are';
+
+  return {
+    finding: `${subject} running below the level where automation holds up. This assessment shows where ${object}.`,
+    decline: `What it does not show is what fixing ${below === 1 ? 'it' : 'them'} is worth, which one to start with, or where AI can carry the load. That is the Business Operations Assessment.`,
+  };
+}
+
 function getNarrative(companyName: string, score: number, maturity: string): string {
   const templates: Record<string, string> = {
     Nascent: `For ${companyName}, a score of ${score}/100 points to an early stage of operational maturity. That is a valid starting point — many well-run organisations began here. The groundwork comes first: pick one core workflow, write down how it actually runs today, and make it consistent before changing anything else.`,
@@ -414,6 +450,10 @@ export default function FreeDiagnosticPage() {
   const [emailError, setEmailError] = useState('');
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [buildingPdf, setBuildingPdf] = useState(false);
+  // Generated once per visit so the reference on the PDF stays stable across
+  // repeated downloads. generateDiagnosticId() had been dead code until now.
+  const [diagnosticId] = useState(generateDiagnosticId);
 
   const slide1Ref = useRef<HTMLDivElement>(null);
   const slide2Ref = useRef<HTMLDivElement>(null);
@@ -550,6 +590,7 @@ export default function FreeDiagnosticPage() {
   const blockers = getBlockers(profile);
   const strengths = getStrengths(profile, new Set(blockers.map(b => b.key)));
   const quickNote = getQuickNote(score, maturity, strengths, blockers);
+  const closingHook = getClosingHook(profile);
   const indicatorPercent = getMaturityIndicatorPercent(maturity);
   const industryLabel = INDUSTRIES.find(i => i.value === industry)?.label || industry;
   const sizeLabel = SIZES.find(s => s.value === companySize)?.label || companySize;
@@ -609,31 +650,28 @@ export default function FreeDiagnosticPage() {
     setSubmittedEmail(trimmed);
     setUnlocked(true);
 
-    // The download runs first and the emailed copy reuses its output, so the
-    // visitor waits for exactly one capture rather than two.
-    void downloadDiagnosticCards().then(cards => emailReportCards(trimmed, cards));
+    // The PDF is the artefact that gets forwarded and printed, so it is what
+    // downloads on unlock and what gets emailed. jsPDF draws primitives rather
+    // than serialising the card DOM, so this is seconds rather than the PNG
+    // capture's half-minute — the visitor is not left waiting on a spinner.
+    // The PNG cards stay one button away for sharing.
+    void downloadPdf().then(pdfBase64 => emailReport(trimmed, pdfBase64));
   };
 
   /**
-   * Ships a copy of the cards to the n8n workflow that emails them.
+   * Ships a copy of the report to the n8n workflow that emails it.
    *
-   * The cards only exist in this browser tab, so delivery has to start here.
-   * Never blocks the download — the visitor already has the files either way,
+   * The report only exists in this browser tab, so delivery has to start here.
+   * Never blocks the download — the visitor already has the file either way,
    * so a delivery failure is a background problem, not theirs.
    */
-  const emailReportCards = async (recipient: string, cards: CapturedCard[]) => {
-    if (cards.length === 0) {
+  const emailReport = async (recipient: string, pdfBase64: string | null) => {
+    if (!pdfBase64) {
       setDeliveryStatus('failed');
       return;
     }
     setDeliveryStatus('sending');
     try {
-      const emailCards = await Promise.all(
-        cards.map(async card => ({
-          fileName: card.fileName,
-          dataUrl: await downscalePng(card.dataUrl, 1080),
-        })),
-      );
       const res = await fetch('/api/assessment-report-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -645,7 +683,7 @@ export default function FreeDiagnosticPage() {
           strengths: strengths.map(s => s.label),
           blockers: blockers.map(b => b.label),
           questionSetVersion: QUESTION_SET_VERSION,
-          cards: emailCards,
+          pdf: { fileName: pdfFileName, dataBase64: pdfBase64 },
         }),
         signal: AbortSignal.timeout(45000),
       });
@@ -693,6 +731,55 @@ export default function FreeDiagnosticPage() {
       });
     }
   }
+
+  /**
+   * Builds the A4 report. Cheap next to the PNG path — jsPDF draws primitives
+   * directly instead of asking the browser to serialise the card DOM — so this
+   * runs on unlock and the PNG capture stays behind its own button.
+   */
+  const buildPdf = useCallback(async () => {
+    const { buildAssessmentPdf } = await import('@/lib/assessmentPdf');
+    return buildAssessmentPdf({
+      companyName: companyName.trim() || 'Your company',
+      industryLabel,
+      sizeLabel,
+      score,
+      maturity,
+      quickNote,
+      profile: profile.map(d => ({
+        label: d.label,
+        score: d.score,
+        driverLabel: (d.score >= 67 ? d.strongest : d.weakest).label,
+        driverScore: (d.score >= 67 ? d.strongest : d.weakest).score,
+      })),
+      strengths: strengths.map(s => `${s.label} — ${s.score}/100`),
+      blockers: blockers.map(b => `${b.label} — ${b.score}/100`),
+      insights: insightItems,
+      narrative: getNarrative(companyName.trim() || 'your company', score, maturity),
+      closingHook,
+      diagnosticId,
+      generatedAt: new Date(),
+      upgradeUrl: `${window.location.origin}/#pricing-section`,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyName, industryLabel, sizeLabel, score, maturity, quickNote, profile, strengths, blockers, insightItems, closingHook, diagnosticId]);
+
+  const pdfFileName = `${companyName.trim() || 'Company'}_Business_Operations_Assessment.pdf`;
+
+  const downloadPdf = useCallback(async (): Promise<string | null> => {
+    setBuildingPdf(true);
+    trackEvent('assessment_download_pdf');
+    try {
+      const pdf = await buildPdf();
+      pdf.save(pdfFileName);
+      return (pdf.output('datauristring') as string).split(',')[1] ?? null;
+    } catch (err) {
+      console.error('Failed to generate the PDF report:', err);
+      return null;
+    } finally {
+      setBuildingPdf(false);
+    }
+  }, [buildPdf, pdfFileName]);
 
   const PREVIEW_SCALE = 0.6;
   const previewWidth = 1080 * PREVIEW_SCALE;
@@ -807,15 +894,23 @@ export default function FreeDiagnosticPage() {
 
               {unlocked ? (
                 <>
-                  <button
-                    className="btn-primary"
-                    onClick={downloadDiagnosticCards}
-                    disabled={downloading}
-                    style={{ maxWidth: 400, margin: '0 auto' }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                    {downloading ? 'Generating PNGs...' : 'Download report cards again (PNG)'}
-                  </button>
+                  <div className="download-actions">
+                    <button
+                      className="btn-primary"
+                      onClick={downloadPdf}
+                      disabled={buildingPdf}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                      {buildingPdf ? 'Building PDF…' : 'Download the report (PDF)'}
+                    </button>
+                    <button
+                      className="btn-secondary-download"
+                      onClick={downloadDiagnosticCards}
+                      disabled={downloading}
+                    >
+                      {downloading ? 'Rendering images…' : 'Share as image (PNG)'}
+                    </button>
+                  </div>
                   {deliveryStatus !== 'idle' && (
                     <div className={`delivery-status delivery-${deliveryStatus}`} role="status">
                       {deliveryStatus === 'sending' && `Emailing a copy to ${submittedEmail}…`}
@@ -1028,6 +1123,14 @@ export default function FreeDiagnosticPage() {
               </div>
             </div>
 
+            {/* Closing hook — the one place AI is named, and the only place the
+                free tier says out loud what it has NOT answered. The count is
+                derived from the answers so it reads as a finding, not a slogan. */}
+            <div className="closing-hook">
+              <p className="closing-hook-lead">{closingHook.finding}</p>
+              <p className="closing-hook-decline">{closingHook.decline}</p>
+            </div>
+
             {/* Conversion CTA */}
             <div className="upgrade-section">
               <div className="upgrade-grid">
@@ -1035,13 +1138,13 @@ export default function FreeDiagnosticPage() {
                   <div className="upgrade-eyebrow">Upgrade path 01</div>
                   <h3>Business Operations Assessment</h3>
                   <div className="upgrade-price">$79 <span>one time</span></div>
-                  <p className="upgrade-summary">Move from a quick score to a complete operational analysis built around your specific use case and not generic.</p>
-                  <div className="comparison-note"><strong>Why it beats the free diagnostic:</strong> the free report gives a snapshot. The Business Operations Assessment maps 30 data points across workflow maturity, data infrastructure, automation exposure, and organisational readiness.</div>
+                  <p className="upgrade-summary">Puts a number on the gaps this score only located — hours lost, cost carried, and what closing each one is worth.</p>
+                  <div className="comparison-note"><strong>What this adds:</strong> twelve questions place you on the scale. Forty questions across six dimensions, read against your industry, turn that position into a costed, ordered plan.</div>
                   <ul className="cta-features">
-                    <li>Detailed gap and constraint analysis</li>
-                    <li>Business objective and AI opportunity mapping</li>
-                    <li>Data and process readiness breakdown</li>
-                    <li>Prioritised use-case recommendations</li>
+                    <li>Each constraint quantified in hours and cost</li>
+                    <li>Your position against an industry benchmark</li>
+                    <li>What to change first, and why that order</li>
+                    <li>Where AI creates the biggest operational impact</li>
                   </ul>
                   <a
                     href="/#pricing-section"
@@ -1057,8 +1160,8 @@ export default function FreeDiagnosticPage() {
                   <div className="upgrade-eyebrow">Best next step</div>
                   <h3>Complete Transformation Package</h3>
                   <div className="upgrade-price">$299 <span>one time</span></div>
-                  <p className="upgrade-summary">Get the complete planning stack: Business Operations Assessment + Transformation Blueprint + Transformation Roadmap in one bundled path.</p>
-                  <div className="comparison-note"><strong>Why bundle:</strong> it connects diagnosis to execution, so you do not stop at insights. You get the system design and a phased plan to act on it.</div>
+                  <p className="upgrade-summary">The assessment, plus the system design and the phased plan that act on it: Business Operations Assessment + Transformation Blueprint + Transformation Roadmap.</p>
+                  <div className="comparison-note"><strong>Why bundle:</strong> a costed list of constraints still leaves you deciding how to fix them. This carries the diagnosis through to what gets built, in what order, against which targets.</div>
                   <ul className="cta-features">
                     <li>Everything in Business Operations Assessment</li>
                     <li>AI system blueprint and workflow architecture</li>
@@ -1452,6 +1555,68 @@ body {
 }
 
 /* Conversion CTA */
+.download-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.download-actions .btn-primary {
+  flex: 0 1 340px;
+  margin: 0;
+}
+
+.btn-secondary-download {
+  flex: 0 1 220px;
+  padding: 0.9rem 1.25rem;
+  background: transparent;
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111111;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.btn-secondary-download:hover:not(:disabled) {
+  border-color: #000000;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.btn-secondary-download:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.closing-hook {
+  max-width: 1100px;
+  margin: 0 auto 2.5rem;
+  padding: 1.75rem 0 0;
+  border-top: 1px solid #dcdcd7;
+}
+
+.closing-hook-lead {
+  font-size: 1.35rem;
+  line-height: 1.35;
+  font-weight: 700;
+  color: #111111;
+  margin: 0 0 0.65rem;
+  letter-spacing: -0.01em;
+}
+
+.closing-hook-decline {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--text-secondary, #555);
+  margin: 0;
+  max-width: 62ch;
+}
+
 .upgrade-section {
   max-width: 1100px;
   margin: 0 auto;
