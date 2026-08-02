@@ -4,7 +4,7 @@ import Navbar from '@/components/home/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Terms of Service — Aivory',
+  title: 'Terms of Service',
   description: 'Terms of Service and usage guidelines for Aivory platform.',
 };
 
@@ -54,7 +54,7 @@ export default function TermsPage() {
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">1. Who we are</h3>
             <p>
-              Aivory is an AI adoption platform built to help organizations assess, plan, and deploy AI. When you use Aivory, you&apos;re agreeing to these terms. If you&apos;re using Aivory on behalf of an organization, you&apos;re agreeing on their behalf too.
+              Aivory is an AI adoption platform built to help organisations assess, plan, and deploy AI. When you use Aivory, you&apos;re agreeing to these terms. If you&apos;re using Aivory on behalf of an organisation, you&apos;re agreeing on their behalf too.
             </p>
           </section>
 
@@ -98,7 +98,7 @@ export default function TermsPage() {
           <section className="space-y-6">
             <h3 className="text-2xl font-medium text-white">6. Payments and refunds</h3>
             <p>
-              Subscription plans are billed monthly or annually. One-time products like the Deep Diagnostic and Blueprint are charged at purchase.
+              Subscription plans are billed monthly or annually. One-time products like the Deep Assessment and Blueprint are charged at purchase.
             </p>
             <p>
               If something doesn&apos;t work the way we said it would, contact us within 7 days at hello@aivory.uk and we&apos;ll make it right — either with a fix or a refund. We don&apos;t offer refunds for change of mind on one-time purchases, but we&apos;re reasonable people. Talk to us.

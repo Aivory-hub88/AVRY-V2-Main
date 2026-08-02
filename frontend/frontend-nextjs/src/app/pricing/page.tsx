@@ -6,7 +6,7 @@ import PricingStepTwo from '@/components/home/PricingStepTwo';
 import PricingClientWrapper from './PricingClientWrapper';
 
 export const metadata: Metadata = {
-  title: 'Pricing — Aivory',
+  title: 'Pricing',
   description: 'Simple, transparent pricing. Buy once, own the output.',
 };
 

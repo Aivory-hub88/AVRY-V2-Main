@@ -25,7 +25,7 @@ const defaultUseCases: UseCase[] = [
   {
     id: "ai-blueprint",
     title: "AI Blueprint Generator",
-    description: "Create comprehensive AI blueprints for your organization with our advanced diagnostic tools.",
+    description: "Create comprehensive AI blueprints for your organisation with our advanced diagnostic tools.",
     tags: ["AI Strategy", "Architecture", "Roadmap"],
     quote: "Transform your AI strategy with data-driven insights",
   },
@@ -41,7 +41,7 @@ const defaultUseCases: UseCase[] = [
     title: "Performance Analytics",
     description: "Track and measure your AI model performance with detailed metrics.",
     tags: ["Metrics", "Reporting", "Optimization"],
-    quote: "Data-driven decisions for AI optimization",
+    quote: "Data-driven decisions for AI optimisation",
   },
 ];
 

@@ -9,6 +9,7 @@
 *.pem
 *.key
 acme.json
+.mcp.json
 
 # ─── Docker volumes / runtime data ───────────────────────────────────────────
 vps-local/

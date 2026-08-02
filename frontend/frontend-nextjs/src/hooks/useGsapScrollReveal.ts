@@ -25,6 +25,11 @@ export function useGsapScrollReveal() {
       if (el.closest('.hero')) return;
       if (el.closest('.gsap-card-container')) return;
       if (el.closest('.gsap-card')) return;
+      // Skip elements that opt out of the per-word split: the reveal masks
+      // each line with `overflow: hidden` sized to the line's own box, which
+      // clips descenders (g/y/p) on large display headings. These still get
+      // the section-level fade/slide-up from `.animate-on-scroll`.
+      if (el.closest('.no-word-split')) return;
       if ((el as any)._isSplit) return;
       (el as any)._isSplit = true;
 
@@ -58,8 +63,11 @@ export function useGsapScrollReveal() {
           trigger: el,
           start: 'top 88%',
           end: 'top 60%',
-          toggleActions: 'play none none none',
-          once: true,
+          // Bidirectional: reveal scrolling down into view (onEnter), stay
+          // revealed on onLeave/onEnterBack, hide again once scrolled back up
+          // past the start point (onLeaveBack) so it replays next time the
+          // user scrolls back down over it.
+          toggleActions: 'play none none reverse',
         },
       });
     });

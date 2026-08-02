@@ -9,6 +9,16 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Manrope Light's natural letterforms are already tight at display
+      // sizes (round glyphs like s/e/n/m visibly crowd each other in words
+      // like "sense"/"Assessment"). Tailwind's default tracking-tight
+      // (-0.025em) compounds that and reads as cramped/overlapping across
+      // every large font-light headline sitewide. Neutralizing it here
+      // fixes every current tracking-tight usage in one place instead of
+      // hand-patching dozens of components.
+      letterSpacing: {
+        tight: '0em',
+      },
       colors: {
         background: '#050505',
         surface: '#0a0a0a',

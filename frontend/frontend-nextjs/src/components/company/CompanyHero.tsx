@@ -33,7 +33,7 @@ export function CompanyHero() {
         {/* Subtitle Paragraphs */}
         <div className="flex flex-col gap-6 text-base sm:text-lg text-white/75 max-w-3xl mx-auto mb-10 font-light leading-relaxed" style={{ fontFamily: "'Manrope', sans-serif" }}>
           <p>
-            We help organizations identify where AI creates real value, design the right systems, and bring them into production without guesswork, wasted budget, or drawn-out consulting cycles.
+            We help organisations identify where AI creates real value, design the right systems, and bring them into production without guesswork, wasted budget, or drawn-out consulting cycles.
           </p>
           <p>
             Everything happens in one place. From AI readiness assessment to implementation blueprint to deployment tools. From the moment you begin to the moment AI is actively running in your business, Aivory guides the entire journey.

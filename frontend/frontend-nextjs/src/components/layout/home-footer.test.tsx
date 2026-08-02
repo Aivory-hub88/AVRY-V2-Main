@@ -19,7 +19,7 @@ import { HomeFooter } from './home-footer';
 
 /** Exact legacy link sets per column (Requirements 3.4 / 3.5 / 3.6). */
 const PRODUCT_LINKS = [
-  'Deep Diagnostic',
+  'Deep Assessment',
   'AI Blueprint',
   'AI Roadmap',
   'Workflow Builder',

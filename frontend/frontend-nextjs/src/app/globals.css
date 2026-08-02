@@ -22,14 +22,11 @@ body,
   }
 }
 
-/* ─── Desktop scroll perf: same trick, gated on active scrolling ───
-   Toggled by ScrollRevealProvider (adds/removes html.is-scrolling). Using CSS
-   vars (not a raw backdrop-filter decl) so the Next/lightningcss minifier
-   can't drop the unprefixed property the way it does with plain media rules. */
-html.is-scrolling .spotlight-card {
-  --card-frost: none;
-  --card-bg: rgba(18, 18, 22, 0.92);
-}
+/* NOTE: the old `html.is-scrolling .spotlight-card` override (frost off + darker
+   bg while scrolling) was REMOVED — swapping the card look mid-scroll made every
+   card visibly flash ("glitch") on each scroll start/stop. The cards now use one
+   constant look with NO backdrop-filter at all (see the SpotlightCard inline
+   styles), which is both glitch-free and cheaper than the blur it replaced. */
 
 /* ─── Scroll Animation Utility ─── */
 .animate-on-scroll {
@@ -667,7 +664,7 @@ html.is-scrolling .spotlight-card {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.5px; /* Thicker border glow */
+  padding: 1px; /* Normal border glow */
   background: radial-gradient(
     400px circle at var(--mouse-x, 0) var(--mouse-y, 0),
     rgba(255, 255, 255, 0.5),
@@ -683,7 +680,9 @@ html.is-scrolling .spotlight-card {
 }
 
 .spotlight-card:hover::before,
-.spotlight-card:hover::after {
+.spotlight-card:hover::after,
+.spotlight-card.auto-spotlight::before,
+.spotlight-card.auto-spotlight::after {
   opacity: 1;
 }
 
@@ -862,6 +861,27 @@ html.is-scrolling .spotlight-card {
   animation: loader-wave 1.2s infinite ease-in-out;
 }
 
+/* Octagon thinking dots, v2: single-hue glow-pulse instead of the old
+   loader-wave's dark-olive <-> sage color swap (the dip into #556B2F read
+   muddy against the dark card background). Dots stay one hue (sage) and
+   only pulse scale + opacity, so the "low" state is a dim glow rather than
+   a murky color change. */
+@keyframes octagon-dot-pulse {
+  0%, 100% { transform: scale(0.55); opacity: 0.25; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.animate-octagon-dot {
+  animation: octagon-dot-pulse 1.2s infinite ease-in-out;
+  box-shadow: 0 0 6px 0 rgba(174, 201, 157, 0.55);
+}
+
+/* Softer stand-in for Tailwind's default animate-ping, whose blunt scale(2)
+   fade reads as a stock UI kit "notification dot". Reuses the eased curve
+   already proven in the roadmap connector. */
+.premium-ping {
+  animation: roadmap-ping-soft 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
 /* roadmap-comet / roadmap-ping / roadmap-glow */
 /* Used by InteractiveShowcase.tsx + InteractiveGridShowcase.tsx (roadmap step
    connectors) — previously referenced with no CSS definition anywhere, so the
@@ -905,4 +925,31 @@ html.is-scrolling .spotlight-card {
 }
 .roadmap-glow {
   animation: roadmap-glow-breathe 4s ease-in-out infinite;
+}
+
+
+@keyframes silver-swipe {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+.silver-swipe-text {
+  background: linear-gradient(
+    105deg,
+    rgba(255,255,255,1) 35%,
+    rgba(180,180,180,1) 48%,
+    rgba(255,255,255,1) 52%,
+    rgba(180,180,180,1) 56%,
+    rgba(255,255,255,1) 65%
+  );
+  background-size: 200% auto;
+  color: #ffffff;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: silver-swipe 5s linear infinite;
 }

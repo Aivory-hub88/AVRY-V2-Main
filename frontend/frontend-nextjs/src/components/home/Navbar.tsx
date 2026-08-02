@@ -47,25 +47,13 @@ export default function Navbar() {
     };
   }, []);
 
-  // Set the shared cookies the dashboards expect, then navigate. Robust even if
-  // the session predates cookie-setting on login.
+  // Navigate only — auth cookies are written exclusively at login time
+  // (setAuthCookies in lib/auth.ts). Re-stamping them here from localStorage
+  // resurrected stale tokens as domain-wide duplicates and poisoned the
+  // dashboards' sessions; if the cookie is missing/expired the dashboard
+  // redirects to login, which is the correct behavior.
   const handleDashboard = (target: 'user' | 'admin' = 'user') => {
     if (!authed) { setIsSignInModalOpen(true); return; }
-    try {
-      const raw = localStorage.getItem('aivory_auth');
-      if (raw) {
-        const s = JSON.parse(raw);
-        const at = s?.access_token || '';
-        const acct = s?.user?.user_metadata?.account_type || 'free';
-        const u = { id: s?.user?.id || '', email: s?.user?.email || '', account_type: acct, role: acct };
-        const attrs = 'path=/; max-age=604800; SameSite=Lax';
-        if (at) {
-          document.cookie = `aivory_access_token=${at}; ${attrs}`;
-          document.cookie = `aivory_session_token=${encodeURIComponent(JSON.stringify(at))}; ${attrs}`;
-          document.cookie = `aivory_user=${encodeURIComponent(JSON.stringify(u))}; ${attrs}`;
-        }
-      }
-    } catch {}
     const dashUrl = target === 'admin'
       ? (process.env.NEXT_PUBLIC_ADMIN_DASHBOARD_URL || '/admin')
       : (process.env.NEXT_PUBLIC_DASHBOARD_URL || '/dashboard');

@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { login, signup, getPostLoginRedirectUrl } from "@/lib/auth";
+import { SpotlightButton } from '@/components/ui/SpotlightButton';
 
 export interface LoginModalProps {
   isOpen: boolean;
@@ -315,35 +316,19 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
             )}
 
             {/* Submit button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              style={{
-                width: "100%",
-                padding: "14px 24px",
-                fontSize: "16px",
-                fontWeight: 600,
-                color: "#fff",
-                backgroundColor: "#c4c9b8",
-                border: "none",
-                borderRadius: "8px",
-                cursor: isLoading ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                opacity: isLoading ? 0.6 : 1
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#b2b8a6";
+            <div className="mt-4 w-full">
+              <SpotlightButton
+                type="submit"
+                disabled={isLoading}
+                roundedClass="rounded-[8px]"
+                className="w-full"
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-white/50"><path d="M7 7l10 10M17 7v10H7" /></svg>
                 }
-              }}
-              onMouseLeave={(e) => {
-                if (!isLoading) {
-                  e.currentTarget.style.backgroundColor = "#c4c9b8";
-                }
-              }}
-            >
-              {isLoading ? (mode === "login" ? "Logging in..." : "Creating account...") : (mode === "login" ? "Log In" : "Sign Up")}
-            </button>
+              >
+                {isLoading ? (mode === "login" ? "Logging in..." : "Creating account...") : (mode === "login" ? "Log In" : "Sign Up")}
+              </SpotlightButton>
+            </div>
           </form>
 
           {/* Footer text with mode toggle */}

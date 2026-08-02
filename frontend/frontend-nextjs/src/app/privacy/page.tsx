@@ -4,7 +4,7 @@ import Navbar from '@/components/home/Navbar';
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Aivory',
+  title: 'Privacy Policy',
   description: 'Privacy Policy and data usage guidelines for Aivory platform.',
 };
 

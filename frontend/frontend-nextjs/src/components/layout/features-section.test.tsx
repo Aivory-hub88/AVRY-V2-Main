@@ -51,7 +51,7 @@ beforeEach(() => {
 
 const EXPECTED_CARDS = [
   {
-    title: 'AI Readiness Deep Diagnostic',
+    title: 'AI Readiness Deep Assessment',
     description:
       'Not a generic quiz. A structured multi-phase analysis across your business objective, data readiness, and constraints — so you know exactly where you stand before building anything.',
   },

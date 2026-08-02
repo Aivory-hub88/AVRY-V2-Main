@@ -66,6 +66,7 @@ services:
         NEXT_PUBLIC_CAREERS_URL: https://aivory.id/api/careers
         NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.aivory.id/diagnostics
         NEXT_PUBLIC_BLUEPRINT_URL: https://api.aivory.id/blueprint
+        NEXT_PUBLIC_ADMIN_DASHBOARD_URL: https://admin.aivory.id/admin
         NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
         NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
         NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
@@ -73,6 +74,9 @@ services:
     restart: unless-stopped
     networks:
       - aivory-network
+    environment:
+      - HONEYPOT_INGEST_TOKEN=${HONEYPOT_INGEST_TOKEN}
+      - BACKEND_SERVICE_URL=http://avry-backend:8081
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
@@ -84,6 +88,11 @@ services:
       - "traefik.http.routers.main-app-api.entrypoints=websecure,web"
       - "traefik.http.routers.main-app-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.main-app-api.priority=20"
+      - "traefik.http.routers.main-app-trap.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && (PathPrefix(`/api/internal`) || PathPrefix(`/api/v2/config`) || PathPrefix(`/api/admin/settings`))"
+      - "traefik.http.routers.main-app-trap.entrypoints=websecure,web"
+      - "traefik.http.routers.main-app-trap.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.main-app-trap.priority=20"
+      - "traefik.http.routers.main-app-trap.service=main-app"
       - "traefik.http.services.main-app.loadbalancer.server.port=3000"
 
   # ── User Dashboard (port 9001) ─────────────────────────────────────────────
@@ -96,6 +105,7 @@ services:
         NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
         NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.aivory.id/diagnostics
         NEXT_PUBLIC_BLUEPRINT_URL: https://api.aivory.id/blueprint
+        NEXT_PUBLIC_ADMIN_DASHBOARD_URL: https://admin.aivory.id/admin
         NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
         NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
         NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
@@ -117,9 +127,15 @@ services:
       - ZEROCLAW_WEBHOOK_URL=http://host.docker.internal:3003/webhook
       - N8N_AS_CODE_URL=http://host.docker.internal:3500
       - N8N_BASE_URL=http://n8n:5678
+      - N8N_PUBLIC_URL=https://n8n.aivory.id
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - N8N_CREDENTIALS_ENCRYPTION_KEY=${N8N_CREDENTIALS_ENCRYPTION_KEY}
       - N8N_API_KEY=${N8N_API_KEY}
       - N8N_MCP_URL=http://n8n-mcp:3020
       - N8N_MCP_AUTH_TOKEN=${N8N_MCP_AUTH_TOKEN}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - COMPOSIO_REDIRECT_URL=${COMPOSIO_REDIRECT_URL}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
@@ -176,6 +192,7 @@ services:
       - "traefik.http.routers.admin-app.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`admin.aivory.id`)) && PathPrefix(`/admin`)"
       - "traefik.http.routers.admin-app.entrypoints=web,websecure"
       - "traefik.http.routers.admin-app.tls=true"
+      - "traefik.http.routers.admin-app.tls.certresolver=letsencrypt"
       - "traefik.http.routers.admin-app.priority=10"
       - "traefik.http.services.admin-app.loadbalancer.server.port=9002"
 
@@ -196,6 +213,27 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ENVIRONMENT=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
+      - TELEGRAM_AGENT_GATEWAY_URL=${TELEGRAM_AGENT_GATEWAY_URL:-}
+      - TELEGRAM_GATEWAY_TOKEN=${TELEGRAM_GATEWAY_TOKEN:-}
+      - TELEGRAM_BOT_TOKEN_CUSTOMER_SERVICE=${TELEGRAM_BOT_TOKEN_CUSTOMER_SERVICE:-}
+      - TELEGRAM_BOT_USERNAME_CUSTOMER_SERVICE=${TELEGRAM_BOT_USERNAME_CUSTOMER_SERVICE:-}
+      - TELEGRAM_BOT_TOKEN_LEADS_QUALIFIER=${TELEGRAM_BOT_TOKEN_LEADS_QUALIFIER:-}
+      - TELEGRAM_BOT_USERNAME_LEADS_QUALIFIER=${TELEGRAM_BOT_USERNAME_LEADS_QUALIFIER:-}
+      - TELEGRAM_BOT_TOKEN_FINANCE_INVOICE_OPS=${TELEGRAM_BOT_TOKEN_FINANCE_INVOICE_OPS:-}
+      - TELEGRAM_BOT_USERNAME_FINANCE_INVOICE_OPS=${TELEGRAM_BOT_USERNAME_FINANCE_INVOICE_OPS:-}
+      - TELEGRAM_BOT_TOKEN_OFFICE_ASSISTANT=${TELEGRAM_BOT_TOKEN_OFFICE_ASSISTANT:-}
+      - TELEGRAM_BOT_USERNAME_OFFICE_ASSISTANT=${TELEGRAM_BOT_USERNAME_OFFICE_ASSISTANT:-}
+      - SLACK_CLIENT_ID=${SLACK_CLIENT_ID:-}
+      - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET:-}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
+      - HONEYPOT_INGEST_TOKEN=${HONEYPOT_INGEST_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - avry-backend-data:/app/data
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
@@ -460,4 +498,5 @@ networks:
     external: true
 
 volumes:
+  avry-backend-data:
   postgres_data:
