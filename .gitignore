@@ -8,6 +8,8 @@
 .env.production
 *.pem
 *.key
+/vps_key
+/ed25519
 acme.json
 .mcp.json
 
