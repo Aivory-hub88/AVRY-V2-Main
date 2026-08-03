@@ -67,6 +67,7 @@ export interface AssessmentStrings {
     buildingPdf: string;
     sharePng: string;
     renderingPng: string;
+    pdfDownloaded: string;
     deliverySending: (email: string) => string;
     deliverySent: (email: string) => string;
     deliveryFailed: string;
@@ -237,6 +238,7 @@ const EN: AssessmentStrings = {
     emailInvalid: 'Enter a valid email address.',
     downloadPdf: 'Download the report (PDF)', buildingPdf: 'Building PDF…',
     sharePng: 'Share as image (PNG)', renderingPng: 'Rendering images…',
+    pdfDownloaded: 'Your PDF report has downloaded — check your downloads folder.',
     deliverySending: e => `Emailing a copy to ${e}…`,
     deliverySent: e => `A copy is on its way to ${e}.`,
     deliveryFailed: 'We could not email a copy just now — your download above has the full report.',
@@ -391,6 +393,7 @@ const ID: AssessmentStrings = {
     emailInvalid: 'Masukkan alamat email yang valid.',
     downloadPdf: 'Unduh laporan (PDF)', buildingPdf: 'Menyiapkan PDF…',
     sharePng: 'Bagikan sebagai gambar (PNG)', renderingPng: 'Menyiapkan gambar…',
+    pdfDownloaded: 'Laporan PDF Anda sudah terunduh — cek folder unduhan Anda.',
     deliverySending: e => `Mengirim salinan ke ${e}…`,
     deliverySent: e => `Salinan sedang dalam perjalanan ke ${e}.`,
     deliveryFailed: 'Kami belum berhasil mengirim salinannya — unduhan di atas sudah berisi laporan lengkap.',
