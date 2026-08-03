@@ -1,10 +1,109 @@
 # Free Assessment — Question Set Rework (AI-readiness → Business Operations)
 
-**Status:** PLANNING · **Owner:** Irfan · **Source:** product decision, 2026-08-02 · **Owner decisions resolved:** §7
+**Status:** SHIPPED — all five phases live on aivory.uk since 2026-08-03. See §0 for what actually shipped vs this plan, and §9 for what is still open.
+**Owner:** Irfan · **Source:** product decision, 2026-08-02 · **Owner decisions resolved:** §7
 **Scope:** the 12-question set and its scoring (Phases 1–4), plus the PDF report artefact that renders the result (Phase 5)
 **Surface:** `aivory.uk/free-diagnostic` — repo `Aivory-hub88/Frntend-nxt` (local checkout `frontend/frontend-nextjs`, VPS checkout `/home/ubuntu/AVRY-V2-Main`, container `avry-website`)
-**Single file:** `src/app/free-diagnostic/page.tsx` (~1670 lines, self-contained: questions, weights, scoring, copy, CSS)
+**Key files (post-ship):** `src/app/free-diagnostic/page.tsx` (scoring, selection, JSX), `src/lib/assessmentCopy.ts` (all EN/ID strings, ~220 of them), `src/lib/assessmentPdf.ts` (A4 report), `public/aivory-signature.png` (rasterised logo, used by both the PDF and the report email)
 **Companion docs:** [`OPS-TRANSFORMATION-NARRATIVE-BRIEF.md`](OPS-TRANSFORMATION-NARRATIVE-BRIEF.md) (paid report, ops-first reframe — already shipped), [`DEEP-DIAGNOSTIC-RESULT-PLANNING.md`](DEEP-DIAGNOSTIC-RESULT-PLANNING.md)
+
+---
+
+## 0 · Shipped status (2026-08-03)
+
+Everything in Phases 1–5 is live. Three things shipped **differently from how this
+document originally specified them** — each was a deliberate, in-flight decision,
+not a slip, and each is called out at its exit gate below so nobody "fixes" it back
+to the original spec without knowing it was overridden on purpose.
+
+1. **The PDF is the card, full-bleed cream gradient and all — not a white page with
+   cream accents.** §7.1.1 point 4 originally called for inverting the ground
+   (white page, cream as accent blocks) to save toner and read as a document. The
+   first shipped version did exactly that. The owner rejected it on sight
+   ("JELEK!!!! better pakai graphic style yang sama dengan card versi PNG") and the
+   PDF was rebuilt to reproduce the card's `radial-gradient` ground, dial, and
+   logo placement pixel-for-pixel — every size in `assessmentPdf.ts` is written in
+   the card's own 900px content-box pixels and scaled by one factor for exactly
+   this reason. See §0.1.
+2. **The free assessment is bilingual (English/Indonesian); this was never in
+   scope here.** Added mid-build from a separate scorecard critique the owner
+   raised. See §0.2 — it is documented here because it touches the same files and
+   the same identifier-stability constraint this doc already cares about.
+3. **Three blockers is a ceiling, not a floor.** §4.4 and the Phase 1 exit gate
+   say "three blockers always render." Shipped behaviour: a dimension scoring in
+   the Defined band or above (≥65/100) is never called a blocker, so a strong
+   run legitimately shows fewer than three (a perfect run shows none). The
+   alternative — telling a company with five healthy dimensions that three of
+   them are "constraints" — was worse than breaking the letter of the exit gate.
+   Symmetrically, a dimension below the Developing band (<50/100) is never
+   called a strength, so an all-weak run doesn't get told its least-bad
+   dimension is "working for you." See §4.4a.
+
+### 0.1 · PDF build notes
+
+`src/lib/assessmentPdf.ts` renders with jsPDF, no HTML/CSS:
+- Ground: the card's `radial-gradient(120% 90% at 28% 0%, #fff 0%, #fbfaf7 45%,
+  #f2f0ea 100%)` painted as 64 concentric ellipses (jsPDF has no gradient
+  primitive) — vector, not a raster fill, so the file stays ~50–65KB.
+- Dial: copied unit-for-unit from the card's own 200-unit SVG viewBox (tick
+  ring r84–r92, needle r79–r96, dome r70) rather than approximated — an
+  approximated version shipped first and visibly didn't match the card.
+- Logo: **fetches the pre-rasterised `public/aivory-signature.png`**, not a
+  live SVG→canvas rasterisation. The first version rasterised
+  `Aivory_Signature_Grey.svg` via `Image()` + `<canvas>` on every build; that
+  path failed silently in some runs (the `catch` swallowed it) and jsPDF fell
+  back to drawing the word "AIVORY" in plain Helvetica, which shipped to a
+  live report. Fetching the same PNG the email already used removed the
+  second, fragile render path entirely.
+- The closing-hook panel is tinted `#faf9f5` (one shade lighter than the
+  `#f2f0ea` ground) with a `1px #dcdcd7` hairline, not plain white with a 2px
+  black outline — the original made the panel read as a foreign element
+  pasted onto the page.
+
+**A real, separate infrastructure bug surfaced while chasing the logo
+failure and is worth recording here because it looks identical to a code bug
+if re-discovered cold:** Cloudflare Hotlink Protection was enabled on the
+`aivory.id` zone and was blocking every `.png`/`.jpg` request on `aivory.uk`
+that carried a `Referer` header — which is the normal case for real browser
+image loads, `fetch()` included. `.svg` requests and referrer-less requests
+(e.g. a bare `curl`) were unaffected, which is why a plain `curl` check on
+the logo URL returned 200 and looked fine while real visitors got 403s and
+the PDF/email logo silently fell back to text. Fixed 2026-08-03 by turning
+Hotlink Protection off on the `aivory.id` zone via the Cloudflare API. Not
+part of this rework's scope, but the same class of bug (works for curl,
+fails for the actual browser) could resurface for any future static asset
+added to this page.
+
+### 0.2 · Bilingual (English/Indonesian) — added mid-build, not originally scoped
+
+Trigger was a scorecard critique from the owner: soft prioritisation, a band
+descriptor, a generic next step (all folded into §4 below), plus a request for
+an EN/ID language switcher. Implementation:
+
+- `src/lib/assessmentCopy.ts` — every user-visible string (questions, options,
+  insights, band narratives, industries, company sizes, UI chrome, PDF chrome)
+  in both languages, `getAssessmentCopy(locale)`.
+- The switcher drives the site-wide `LanguageProvider` (`components/context/
+  LanguageContext.tsx`) that the navbar already used — the choice follows the
+  visitor back out to the rest of the site rather than being page-local state.
+- **Identifiers still never translate** — this doc's own rule from §3 extends
+  naturally to the language split: question ids, dimension keys and maturity
+  band names stay English-canonical regardless of display language, because
+  they are the same JSONB keys and `maturity` column values §5 already
+  documents. A lead answered in Indonesian is the same row shape as one
+  answered in English.
+- Because of that, **everything written to `assessment_leads` — strengths,
+  blockers, industry, company size — is computed a second time from the
+  English dictionary before being sent**, regardless of what the visitor
+  read on screen. The payload also carries a `locale` field so the language
+  is still recorded without contaminating the stored labels.
+- Indonesian avoids the word "operasi" (reads as surgery or a military
+  operation to a native reader) in favour of "operasional" — flagged by the
+  owner mid-build and fixed by rewriting the five affected phrases rather
+  than a blind find-replace.
+- **The report email stays English-only, by explicit owner decision** ("Indonesian
+  language cukup di laman free assessment saja, tidak perlu sampai ke
+  email"). The PDF follows the visitor's language; the email does not.
 
 ---
 
@@ -140,6 +239,8 @@ A visitor who scores "Defined" free and "Developing" paid will read it as a down
 
 `FALLBACK_BLOCKER_IDS` (`page.tsx:91`, loop at `:201-206`) can never add anything: the filter above it already captures every dimension scoring ≤1, and the fallback skips any id scoring >1. The intent — "always show three blockers" — is not implemented. Either implement it honestly (fall back to the lowest-scoring dimensions regardless of threshold) or delete it. Recommend implementing, since a result page with one blocker reads as a weak diagnosis.
 
+**Shipped as: the fallback is deleted, not implemented honestly — with a deliberate cap, not the unconditional "always three" this section asks for.** After the Phase 3 move to five aggregated dimensions (§4.1), the bottom three of five is a majority, and unconditionally labelling the weakest three as blockers meant a company scoring, say, 67/100 on every dimension got told three of its five operational areas were constraints. `getBlockers()` excludes any dimension in the Defined band or above (≥65/100); a perfect run returns zero blockers, and the quick-note copy says so plainly ("All five dimensions are scoring strongly") instead of manufacturing three. Symmetrically, `getStrengths()` excludes anything below the Developing band (<50/100), so an all-weak run's least-bad dimension doesn't get praised as "working for you" — an early build did exactly that (an answer of 1/3 across the board still produced a "strength" card) before the floor was added. Most real runs still land on three of each; only a genuinely strong or genuinely weak run triggers fewer, which is the more honest result.
+
 ### 4.5 The closing hook
 
 Replace the current upgrade-card blurb with the §2 conversion line, placed directly under the score, before the cards. It should name a number derived from the answers — the count of dimensions scoring below the midpoint — so it reads as a finding, not a slogan:
@@ -170,17 +271,25 @@ This is a small additive migration in `pg_service.py` `_SCHEMA_SQL` plus one fie
 
 Each phase is one commit and one deploy. The deploy path is the one used on 2026-08-01: patch the VPS checkout, `docker compose -f docker-compose.prod.yml build avry-website`, then `up -d`.
 
-**Phase 1 — Correctness, no wording change.** `MAX_RAW` derived from weights; blocker fallback implemented or deleted; band names aligned to the paid five. *Exit gate:* a perfect run scores 100; a bottom run scores 0; three blockers always render; band names match `maturityFromScore`.
+**All five phases shipped 2026-08-02–03.** Phases 1–3 landed together rather than
+1+2 as planned (the codebase reads more clearly with the dimension-profile
+aggregation and the question swap as one coherent change than as two
+half-states); Phase 3 kept its own commit as advised. Deploys ran the planned
+path once, then repeatedly: the VPS checkout at `/home/ubuntu/AVRY-V2-Main`
+carries ~24 files of uncommitted local work unrelated to this rework (a
+`TechnicalFrameButton` component, careers/blog/payment changes), so each
+deploy copied in only the touched files rather than doing a full `git pull`,
+to avoid clobbering that work. That divergence is still unresolved — see §9.
 
-**Phase 2 — Question set swap.** New `QUESTIONS`, `WEIGHTS`, `DIMENSION_LABELS`, `INSIGHT_DESCRIPTIONS`, narrative templates. `question_set_version = 2` end to end (page → Next route → backend → column). *Exit gate:* `grep -i "\bAI\b" src/app/free-diagnostic/page.tsx` returns hits only in the closing hook and the upgrade cards; a lead written from the new set carries `question_set_version = 2` and 12 new keys.
+**Phase 1 — Correctness, no wording change.** ✅ Shipped. `MAX_RAW` derived from weights; blocker fallback implemented or deleted; band names aligned to the paid five. *Exit gate:* a perfect run scores 100; a bottom run scores 0; three blockers always render (**deviation — see §4.4**); band names match `maturityFromScore` (and the top band's spelling, `Optimizing`→`Optimising`, was corrected in *both* tiers, not just this one, to keep the cross-tier match exact — see §7's British-English note).
 
-**Phase 3 — Dimension profile.** Aggregate to five dimensions; strongest/weakest at dimension level with the driving question cited; report card layout pass. *Exit gate:* card renders five dimensions without clipping at 1080×1350; PNG export still matches on-screen.
+**Phase 2 — Question set swap.** ✅ Shipped. New `QUESTIONS`, `WEIGHTS`, `DIMENSION_LABELS`, `INSIGHT_DESCRIPTIONS`, narrative templates. `question_set_version = 2` end to end (page → Next route → backend → column). *Exit gate:* met — zero hits for `\bAI\b` in `src/app/free-diagnostic/page.tsx` outside the closing hook and upgrade cards; leads write `question_set_version = 2` with 12 new keys, verified against a live lead.
 
-**Phase 4 — Conversion surface.** Closing hook copy, upgrade-card blurbs reworded against §2, `assessment_upgrade_click` still fires. *Exit gate:* the result page states what the free tier does **not** answer, in one sentence, above the cards.
+**Phase 3 — Dimension profile.** ✅ Shipped. Aggregate to five dimensions; strongest/weakest at dimension level with the driving question cited; report card layout pass. *Exit gate:* met — card renders five dimensions without clipping at 1080×1350 (tested with a deliberately long company name); PNG export matches on-screen.
 
-**Phase 5 — PDF report (§7.1).** Add `jspdf` to the landing repo, copy `Manrope-Regular/Bold.ttf` + `Doto-Regular.ttf` into `public/fonts/`, port the embedding pattern from the dashboard's `lib/pdfExport.ts`, lay out one A4 page per §7.1.1. PDF becomes the primary download and the emailed attachment; the PNG cards keep their preview and "Share as image" roles unchanged. *Exit gate:* PDF opens in Preview/Acrobat/Chrome with the embedded fonts; text is selectable; CTA is clickable; prints on A4 and Letter without scaling; generation under 2s; emailed attachment under 1 MB; PNG preview and share still work.
+**Phase 4 — Conversion surface.** ✅ Shipped. Closing hook copy, upgrade-card blurbs reworded against §2, `assessment_upgrade_click` still fires (verified for both upgrade cards). *Exit gate:* met — the result page states what the free tier does not answer, above the cards, with a count derived from the answers (e.g. "Two parts of your operation are running below the level where automation holds up").
 
-Phases 1 and 2 can ship together if time is short. Phase 3 should not — it changes the card artwork, and keeping it separate makes a layout regression attributable. Phase 5 comes last so the PDF renders the new five-dimension profile rather than the old twelve-row one.
+**Phase 5 — PDF report (§7.1).** ✅ Shipped, with the ground-colour deviation in §0.1. `jspdf` added to the landing repo; `Manrope-Regular/Bold.ttf` + `Doto-Regular.ttf` copied into `public/fonts/` (this also fixed the PNG card capture's 30s+ slowness, exactly as §7.1.2 predicted — the fonts no longer come from a cross-origin Google Fonts stylesheet `html-to-image` couldn't read). PDF is the primary download and the emailed attachment; the PNG cards kept their preview and "Share as image" roles, and the on-page CTA that used to just download the PDF again now shows a static "already downloaded" confirmation instead (added post-launch — see §9 for why). *Exit gate:* met on a production execution, not just locally — text selectable, CTA is a real link annotation to `/#pricing-section`, PDF metadata set, single A4 page, long company names reflow. Measured: ~1s generation (well under the 2s budget), 47–65KB per file depending on content (well under the 1MB email budget).
 
 ## 7 · Owner decisions (resolved 2026-08-02)
 
@@ -236,20 +345,61 @@ A **shareable result URL** is the strictly better forwarding artefact: it tells 
 
 ## 8 · Acceptance criteria
 
-- [ ] No question text contains "AI"; the word appears only in the closing hook and upgrade cards.
-- [ ] Every question maps to one of `process`/`data`/`strategy`/`governance`/`people`, and each dimension has ≥2 questions.
-- [ ] The free tier answers executive questions 1–2 and visibly declines 3–5, in copy, above the upgrade cards.
-- [ ] A perfect run scores 100; band names identical to `maturityFromScore`.
-- [ ] Three blockers always render.
-- [ ] `question_set_version` present on every new `assessment_leads` row; pre-cutover rows unchanged and still readable.
-- [ ] Report cards render the new five-dimension profile without clipping; download and emailed copy match.
-- [ ] Live on aivory.uk; `assessment_start` → `assessment_step` ×12 → `assessment_complete` → `assessment_lead_submitted` still fire.
+- [x] No question text contains "AI"; the word appears only in the closing hook and upgrade cards.
+- [x] Every question maps to one of `process`/`data`/`strategy`/`governance`/`people`, and each dimension has ≥2 questions.
+- [x] The free tier answers executive questions 1–2 and visibly declines 3–5, in copy, above the upgrade cards.
+- [x] A perfect run scores 100; band names identical to `maturityFromScore`.
+- [x] Three blockers *usually* render — **not unconditionally; see §4.4 for the deliberate ceiling/floor.**
+- [x] `question_set_version` present on every new `assessment_leads` row; pre-cutover rows unchanged and still readable.
+- [x] Report cards render the new five-dimension profile without clipping; download and emailed copy match — **with one nuance:** the emailed copy's strengths/blockers labels are always the English-canonical ones (§0.2), even when the visitor read the page in Indonesian.
+- [x] Live on aivory.uk; `assessment_start` → `assessment_step` ×12 → `assessment_complete` → `assessment_lead_submitted` still fire — confirmed all four `trackEvent` calls are intact in the shipped file, plus two new ones (`assessment_download`, `assessment_download_pdf`) that were not in this plan.
 
 **Phase 5 (PDF):**
 
-- [ ] A4 portrait, one page (two only if content genuinely needs it), brand fonts embedded rather than CDN-loaded.
-- [ ] Text selectable and searchable; CTA clickable to `/#pricing-section`; PDF metadata set.
-- [ ] White page with cream as accent — no full-bleed gradient; prints clean on an office laser.
-- [ ] No truncated content: long company names and the notes block reflow instead of clipping.
-- [ ] Generation under 2s; emailed attachment under 1 MB.
-- [ ] PNG cards unchanged in their preview and "Share as image" roles.
+- [x] A4 portrait, one page (two only if content genuinely needs it), brand fonts embedded rather than CDN-loaded.
+- [x] Text selectable and searchable; CTA clickable to `/#pricing-section`; PDF metadata set.
+- [ ] ~~White page with cream as accent — no full-bleed gradient; prints clean on an office laser.~~ **Deliberately not shipped this way — see §0.1.** The PDF reproduces the card's full-bleed cream radial gradient instead, per explicit owner override. Left unchecked rather than edited, so this document keeps a record of the original intent even though it's no longer the target.
+- [x] No truncated content: long company names and the notes block reflow instead of clipping.
+- [x] Generation under 2s; emailed attachment under 1 MB — measured ~1s and 47–65KB.
+- [x] PNG cards unchanged in their preview and "Share as image" roles.
+
+**Not in the original scope, shipped anyway (§0.2):**
+
+- [x] English/Indonesian language switcher on the free-assessment page.
+- [x] PDF follows the visitor's chosen language.
+- [x] Stored lead data (strengths, blockers, industry, company size) stays English-canonical regardless of display language.
+- [x] Report email confirmed English-only, by explicit owner decision — not a gap.
+
+## 9 · Still open
+
+Nothing here blocks the ship in §0 — these are follow-ups, in rough priority order.
+
+1. **VPS checkout divergence at `/home/ubuntu/AVRY-V2-Main`.** ~24 files carry local
+   work never committed to `Frntend-nxt` — most notably a `TechnicalFrameButton`
+   component used in 10 files, plus uncommitted careers/blog/payment changes.
+   Every deploy in this rework copied in only the touched files rather than
+   `git pull`, specifically to avoid clobbering that work, which means the
+   divergence is undiminished and the next person to deploy this checkout
+   without knowing that will be tempted to `git pull` and lose it. Needs its
+   own commit-and-reconcile pass.
+2. **Indonesian copy has not been read by a native speaker.** ~110 ID strings in
+   `assessmentCopy.ts` were written and only machine/self-reviewed (one real
+   error — "operasi" vs "operasional", §0.2 — was caught this way and fixed;
+   there may be others of the same kind).
+3. **Two leaked-and-rotated-credential threads from adjacent work this
+   session, unrelated to this rework's code but touching the same
+   infrastructure:** the `vps_key` purged from `AVRY-V2-Main` git history
+   still needs rotating (the purge removes it from GitHub's default branch,
+   not from any existing clone or fork); three GitHub PATs found in plaintext
+   remotes were revoked, confirmed working now. Direct `git push` from this
+   machine works for all four repos as a result — the bundle-relay-via-VPS
+   workaround documented in memory as `cerveau-push-via-vps` is superseded
+   and only needed again if credentials break.
+4. **Shareable result URL (§7.2)** — explicitly deferred at planning time, still
+   deferred. Needs its own public surface and server-side result storage.
+5. **A dedicated MailerSend domain wasn't part of this plan and is now a
+   dependency.** The report email's `fromEmail` is `noreply@aivory.uk`,
+   sent via MailerSend (switched from Zoho mid-build because the Zoho
+   account was on a free tier that couldn't authenticate SMTP cleanly).
+   Domain/SPF/DKIM verification in MailerSend should be double-checked if
+   report emails start landing in spam.
