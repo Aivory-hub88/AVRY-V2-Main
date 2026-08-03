@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 
 import { trackEvent } from '@/lib/analytics';
+import { useLanguage } from '@/components/context/LanguageContext';
+import { getAssessmentCopy, type AssessmentStrings, type Locale } from '@/lib/assessmentCopy';
 
 // ============================================================================
 // TYPES
@@ -18,13 +20,6 @@ type Step = 'profile' | 'question' | 'results';
  * the honest "what you are not seeing yet" lines.
  */
 type Dimension = 'process' | 'data' | 'strategy' | 'governance' | 'people';
-
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  dim: Dimension;
-}
 
 interface DimensionInfo {
   id: string;
@@ -73,20 +68,32 @@ interface CapturedCard {
  * Grouped as: baseline (1-4), friction (5-8), capacity to change (9-12). The
  * grouping is internal — the UI still shows one question per screen.
  */
-const QUESTIONS: Question[] = [
-  { id: 'process_documentation', dim: 'process', question: 'How are your core processes captured today?', options: ['Nothing written down', "In people's heads, informally", 'Some SOPs, partly current', 'Documented and kept current'] },
-  { id: 'workflow_standardization', dim: 'process', question: 'If two people do the same task, how similar is the result?', options: ['Completely different', 'Broadly similar', 'Mostly consistent', 'Identical, by design'] },
-  { id: 'data_availability', dim: 'data', question: 'Where does the data you run the business on live?', options: ['Nowhere central', 'Scattered across tools and spreadsheets', 'Partly consolidated', 'One system of record'] },
-  { id: 'systems_integration', dim: 'data', question: 'Do your core systems pass information to each other?', options: ['No real systems yet', 'People move data by hand', 'Some connected, some manual', 'Connected end to end'] },
-  { id: 'manual_workload', dim: 'process', question: "How much of your team's week goes to repetitive manual work?", options: ['Most of it', 'About half', 'Some, but contained', 'Very little'] },
-  { id: 'rework_rate', dim: 'governance', question: 'How often does completed work have to be corrected or redone?', options: ['Constantly', 'Weekly', 'Occasionally', 'Rarely'] },
-  { id: 'handoff_delay', dim: 'process', question: 'When work passes between teams or systems, what happens?', options: ['It stalls, often for days', 'It waits, then someone chases', 'Minor delays', 'It moves without waiting'] },
-  { id: 'decision_latency', dim: 'strategy', question: 'From "we need to decide this" to an actual decision, how long?', options: ['Months', 'Weeks', 'Days', 'Same day'] },
-  { id: 'ownership_clarity', dim: 'governance', question: 'Does each core workflow have a named owner?', options: ['No one owns them', 'Ownership is implied, not stated', 'Most have an owner', 'Every one, and they are accountable'] },
-  { id: 'improvement_mandate', dim: 'strategy', question: 'Is there budget and a mandate to change how work gets done?', options: ['Neither', 'Interest, but nothing committed', 'Budget being discussed', 'Funded, with an owner'] },
-  { id: 'change_readiness', dim: 'people', question: 'How does the organisation react to changing how work is done?', options: ['Resists it', 'Cautious', 'Open to it', 'Actively pushes for it'] },
-  { id: 'internal_capability', dim: 'people', question: 'Do you have people who can implement operational change?', options: ['No one', 'Limited digital skills', 'Some capable people', 'A dedicated team'] },
+/**
+ * Id and dimension only — the question text and its options live in
+ * assessmentCopy.ts, one set per language.
+ *
+ * The split is not cosmetic. These ids are JSONB keys in
+ * `assessment_leads.answers` and the dimension keys match the paid product's
+ * scoring, so they must be identical whichever language the visitor answered
+ * in. A lead from the Indonesian page has to be the same row shape as one from
+ * the English page, or any later analysis of the table is worthless.
+ */
+const QUESTION_SPEC: Array<{ id: string; dim: Dimension }> = [
+  { id: 'process_documentation', dim: 'process' },
+  { id: 'workflow_standardization', dim: 'process' },
+  { id: 'data_availability', dim: 'data' },
+  { id: 'systems_integration', dim: 'data' },
+  { id: 'manual_workload', dim: 'process' },
+  { id: 'rework_rate', dim: 'governance' },
+  { id: 'handoff_delay', dim: 'process' },
+  { id: 'decision_latency', dim: 'strategy' },
+  { id: 'ownership_clarity', dim: 'governance' },
+  { id: 'improvement_mandate', dim: 'strategy' },
+  { id: 'change_readiness', dim: 'people' },
+  { id: 'internal_capability', dim: 'people' },
 ];
+
+const TOTAL_QUESTIONS = QUESTION_SPEC.length;
 
 /**
  * Carried over verbatim wherever a question survived the rework, so scores
@@ -108,24 +115,11 @@ const QUESTION_SET_VERSION = 2;
 // Deriving it means the ceiling follows the weights whenever questions change.
 const MAX_RAW = Object.values(WEIGHTS).reduce((sum, w) => sum + w, 0) * 3;
 
-/** The five aggregated dimensions, named exactly as the paid radar names them. */
-const DIM_LABELS: Record<Dimension, string> = {
-  process: 'Process', data: 'Data', strategy: 'Strategy',
-  governance: 'Governance', people: 'People',
-};
-
-/** Per-question labels — the traceability line under each dimension. */
-const DIMENSION_LABELS: Record<string, string> = {
-  process_documentation: 'Process Documentation', workflow_standardization: 'Workflow Consistency',
-  data_availability: 'Data Availability', systems_integration: 'Systems Integration',
-  manual_workload: 'Manual Workload', rework_rate: 'Rework Rate',
-  handoff_delay: 'Handoff Flow', decision_latency: 'Decision Speed',
-  ownership_clarity: 'Ownership Clarity', improvement_mandate: 'Improvement Mandate',
-  change_readiness: 'Change Readiness', internal_capability: 'Internal Capability',
-};
+/** Dimension keys, in the order the profile renders them. */
+const DIMENSION_KEYS: Dimension[] = ['process', 'data', 'strategy', 'governance', 'people'];
 
 const INDUSTRIES = [
-  { value: '', label: 'Select industry...' },
+  { value: '', label: '' },
   { value: 'manufacturing', label: 'Manufacturing' },
   { value: 'retail', label: 'Retail & e-commerce' },
   { value: 'financial', label: 'Financial services' },
@@ -142,7 +136,7 @@ const INDUSTRIES = [
 ];
 
 const SIZES = [
-  { value: '', label: 'Select company size...' },
+  { value: '', label: '' },
   { value: 'micro', label: '1–10 (Micro)' },
   { value: 'small', label: '11–50 (Small)' },
   { value: 'medium', label: '51–200 (Medium)' },
@@ -157,63 +151,6 @@ const SIZES = [
 // downgrade. Both tiers spell the top band "Optimising"; leads captured before
 // 2026-08-02 carry the old "Optimizing" in assessment_leads.maturity.
 const MATURITY_STAGES = ['Nascent', 'Initiating', 'Developing', 'Defined', 'Optimising'];
-
-/**
- * Cause → effect, in operational terms. Same explanatory shape as the paid
- * product's DIM_CONSEQUENCE_CHAINS (readinessNarrative.ts), so a weak area is
- * explained the same way in both tiers. Nothing here names a remedy — naming
- * what to fix first is what the paid assessment sells.
- */
-const INSIGHT_DESCRIPTIONS: Record<string, { strength: string; blocker: string }> = {
-  process_documentation: {
-    strength: "Written, current processes make operations repeatable — new people get productive faster, and improvements stick instead of decaying back.",
-    blocker: "Undocumented processes live in individual heads, so operations stay person-dependent and every absence or departure becomes an outage."
-  },
-  workflow_standardization: {
-    strength: "The same task produces the same result whoever runs it, so quality is predictable and capacity can be added without diluting output.",
-    blocker: "The same task produces a different result depending on who does it, so quality stays unpredictable and no fix can be rolled out reliably."
-  },
-  data_availability: {
-    strength: "One system of record means everyone argues from the same numbers, and decisions stop waiting on someone to reconcile spreadsheets.",
-    blocker: "Data scattered across tools and spreadsheets means nobody sees the whole picture, and every decision starts by rebuilding the same view by hand."
-  },
-  systems_integration: {
-    strength: "Systems that pass information to each other remove an entire class of manual re-entry, along with the errors and delay it introduces.",
-    blocker: "Moving data between systems by hand costs hours nobody tracks, and introduces errors that surface downstream after they have already cost something."
-  },
-  manual_workload: {
-    strength: "Little of the week goes to repetitive work, so the team's hours are spent on judgement rather than keystrokes.",
-    blocker: "Repetitive work consumes most of the week, so capacity goes to maintaining the business rather than improving it."
-  },
-  rework_rate: {
-    strength: "Work is rarely redone, which means problems are caught where they start rather than after the cost is already sunk.",
-    blocker: "Frequent rework is the clearest sign quality is inspected in at the end rather than built in, and every correction is paid for twice."
-  },
-  handoff_delay: {
-    strength: "Work moves between teams without waiting, so elapsed time reflects the actual work rather than the queue between the steps.",
-    blocker: "Work stalls every time it changes hands, so most of the elapsed time on a task is spent waiting rather than being worked on."
-  },
-  decision_latency: {
-    strength: "Decisions land in days, so improvements start paying back while the reason for them is still current.",
-    blocker: "Decisions that take weeks or months mean improvements are stale by the time they are approved, and the cost of waiting never appears on any report."
-  },
-  ownership_clarity: {
-    strength: "Every core workflow has a named, accountable owner — which is what makes an improvement hold after the attention moves elsewhere.",
-    blocker: "Workflows with no named owner have nobody to notice when they drift, so problems only escalate once a customer feels them."
-  },
-  improvement_mandate: {
-    strength: "Funded change with a named owner means an identified improvement can actually be executed rather than added to a list.",
-    blocker: "Without committed budget and a clear mandate, identified improvements stay identified — the diagnosis costs nothing, the delay does."
-  },
-  change_readiness: {
-    strength: "An organisation that pushes for better ways of working adopts change under its own momentum instead of having to be driven through it.",
-    blocker: "Resistance to changing how work is done means even well-designed improvements are quietly abandoned once the rollout attention ends."
-  },
-  internal_capability: {
-    strength: "Having people who can implement operational change means improvements get built and maintained in-house rather than rented indefinitely.",
-    blocker: "With nobody able to implement change, every improvement depends on an outside vendor, which caps both the pace and the depth of what is possible."
-  }
-};
 
 // ============================================================================
 // SCORING ENGINE
@@ -259,11 +196,11 @@ function getMaturityIndicatorPercent(level: string): number {
  * (its weakest answer for a low dimension, its strongest for a high one), a
  * light version of the paid product's score traceability.
  */
-function getDimensionProfile(answers: Record<string, number>): DimensionScore[] {
-  return (Object.keys(DIM_LABELS) as Dimension[]).map(key => {
-    const members: DimensionInfo[] = QUESTIONS
+function getDimensionProfile(answers: Record<string, number>, copy: AssessmentStrings): DimensionScore[] {
+  return DIMENSION_KEYS.map(key => {
+    const members: DimensionInfo[] = QUESTION_SPEC
       .filter(q => q.dim === key)
-      .map(q => ({ id: q.id, label: DIMENSION_LABELS[q.id] || q.id, score: answers[q.id] ?? 0, weight: WEIGHTS[q.id] || 1 }));
+      .map(q => ({ id: q.id, label: copy.questionLabels[q.id] || q.id, score: answers[q.id] ?? 0, weight: WEIGHTS[q.id] || 1 }));
 
     const mean = members.reduce((sum, m) => sum + m.score, 0) / members.length;
     // Heavier weight breaks ties, so the driver cited is the one that matters most.
@@ -271,7 +208,7 @@ function getDimensionProfile(answers: Record<string, number>): DimensionScore[] 
 
     return {
       key,
-      label: DIM_LABELS[key],
+      label: copy.dimensions[key],
       score: Math.round((mean / 3) * 100),
       mean,
       weakest: byWeakest[0],
@@ -280,6 +217,7 @@ function getDimensionProfile(answers: Record<string, number>): DimensionScore[] 
     };
   });
 }
+
 
 /**
  * The three weakest dimensions, weakest first.
@@ -322,24 +260,34 @@ function getStrengths(profile: DimensionScore[], exclude: Set<string>): Dimensio
     .slice(0, 3);
 }
 
-function getQuickNote(score: number, maturity: string, strengths: DimensionScore[], blockers: DimensionScore[]): { title: string; body: string } {
-  const strongest = strengths[0];
-  const improvementText = blockers.map(d => `${d.label} (${d.score}/100)`).join(', ');
+/**
+ * The quick note now names an order and a direction, not just a list.
+ *
+ * Soft prioritisation ("your biggest constraint appears to be X, followed by
+ * Y") and a generic next step are safe to give away: they say *where* to look,
+ * never *how* to fix it. What to change first with a costed case, and the plan
+ * behind it, remain the paid assessment.
+ */
+function getQuickNote(
+  score: number, maturity: string, strengths: DimensionScore[],
+  blockers: DimensionScore[], copy: AssessmentStrings,
+): { title: string; body: string } {
+  const c = copy.card;
+  const title = c.quickNoteTitle(score, maturity);
 
   if (!blockers.length) {
-    return {
-      title: `Quick note: ${score}/100 — ${maturity}`,
-      body: `All five dimensions are scoring strongly. ${strongest ? `${strongest.label} is the clearest current strength.` : 'The current answers show a balanced operational base.'}`
-    };
+    return { title, body: `${c.allStrong}${strengths[0] ? ' ' + c.strongestDimension(strengths[0].label, strengths[0].score) : ''}` };
   }
 
-  return {
-    title: `Quick note: ${score}/100 — ${maturity}`,
-    body: `${strongest ? `Strongest dimension: ${strongest.label} (${strongest.score}/100). ` : ''}Needs improvement: ${improvementText}.`
-  };
+  const [worst, ...rest] = blockers;
+  const parts = [
+    c.biggestConstraint(worst.label, worst.score, rest.map(d => d.label)),
+    c.nextStep(worst.label),
+  ];
+  if (strengths[0]) parts.unshift(c.strongestDimension(strengths[0].label, strengths[0].score));
+  return { title, body: parts.join(' ') };
 }
 
-const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
 
 /**
  * The closing hook — the free tier's only mention of AI, and the only place it
@@ -354,35 +302,20 @@ const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five'];
  * The count is derived from the answers rather than asserted, so the line reads
  * as a finding rather than a slogan.
  */
-function getClosingHook(profile: DimensionScore[]): { finding: string; decline: string } {
+function getClosingHook(profile: DimensionScore[], copy: AssessmentStrings): { finding: string; decline: string } {
   const below = profile.filter(d => d.score < MIDPOINT).length;
+  const h = copy.hook;
 
-  if (below === 0) {
-    return {
-      finding: 'Every dimension of your operation is running at or above the level where automation holds up — an unusual result, and a strong base to build on.',
-      decline: 'What this assessment does not show is which of them repays attention first, what that is worth in recovered time and cost, or where AI can carry the load. That is the Business Operations Assessment.',
-    };
-  }
-
-  const subject = below === 1 ? 'One part of your operation is' : `${COUNT_WORDS[below]} parts of your operation are`;
-  const object = below === 1 ? 'it is' : 'they are';
-
-  return {
-    finding: `${subject} running below the level where automation holds up. This assessment shows where ${object}.`,
-    decline: `What it does not show is what fixing ${below === 1 ? 'it' : 'them'} is worth, which one to start with, or where AI can carry the load. That is the Business Operations Assessment.`,
-  };
+  if (below === 0) return { finding: h.findingNone, decline: h.declineNone };
+  if (below === 1) return { finding: h.findingOne, decline: h.declineOne };
+  return { finding: h.findingMany(h.countWords[below] ?? String(below)), decline: h.declineMany };
 }
 
-function getNarrative(companyName: string, score: number, maturity: string): string {
-  const templates: Record<string, string> = {
-    Nascent: `For ${companyName}, a score of ${score}/100 points to an early stage of operational maturity. That is a valid starting point — many well-run organisations began here. The groundwork comes first: pick one core workflow, write down how it actually runs today, and make it consistent before changing anything else.`,
-    Initiating: `For ${companyName}, a score of ${score}/100 shows the foundation beginning to take shape while critical gaps remain. Organisations at this stage gain most from one narrow, visible win — a single handoff or a single source of rework, fixed where the result can be measured within 30–90 days.`,
-    Developing: `For ${companyName}, a score of ${score}/100 indicates solid ground — core processes are defined and several foundations are in place. This is the moment to move from isolated fixes to a structured improvement plan with targets attached to it.`,
-    Defined: `For ${companyName}, a score of ${score}/100 reflects advanced operational maturity — work is standardised, owned, and measured. The next step is scaling what already works into the areas it has not reached yet, and tightening how outcomes are tracked.`,
-    Optimising: `For ${companyName}, a score of ${score}/100 places you among organisations whose operations are genuinely well-run. At this level the remaining gains compound: shortening the distance between deciding and acting, and removing the last places where work still waits on a person.`
-  };
-  return templates[maturity] || '';
+
+function getNarrative(companyName: string, score: number, maturity: string, copy: AssessmentStrings): string {
+  return copy.narrative[maturity]?.(companyName, score) ?? '';
 }
+
 
 // Bolds the score fraction and day-range callouts inside the narrative
 // (e.g. "42/100", "30–90 days"), matching the reference design's emphasis.
@@ -451,6 +384,11 @@ export default function FreeDiagnosticPage() {
   const [submittedEmail, setSubmittedEmail] = useState('');
   const [deliveryStatus, setDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   const [buildingPdf, setBuildingPdf] = useState(false);
+  const { language, setLanguage } = useLanguage();
+  const copy = getAssessmentCopy(language as Locale);
+  // Stored labels stay English whatever the visitor read, so a lead answered
+  // in Indonesian is still comparable in the admin dashboard and the email.
+  const canonical = getAssessmentCopy('en');
   // Generated once per visit so the reference on the PDF stays stable across
   // repeated downloads. generateDiagnosticId() had been dead code until now.
   const [diagnosticId] = useState(generateDiagnosticId);
@@ -468,7 +406,7 @@ export default function FreeDiagnosticPage() {
   };
 
   const handleOptionSelect = (idx: number) => {
-    const q = QUESTIONS[questionIndex];
+    const q = QUESTION_SPEC[questionIndex];
     setAnswers(prev => ({ ...prev, [q.id]: idx }));
   };
 
@@ -481,9 +419,9 @@ export default function FreeDiagnosticPage() {
   };
 
   const handleNext = () => {
-    const q = QUESTIONS[questionIndex];
+    const q = QUESTION_SPEC[questionIndex];
     if (answers[q.id] === undefined) return;
-    if (questionIndex < 11) {
+    if (questionIndex < TOTAL_QUESTIONS - 1) {
       setQuestionIndex(i => i + 1);
     } else {
       setStep('results');
@@ -496,7 +434,7 @@ export default function FreeDiagnosticPage() {
     if (step !== 'question') return;
     trackEvent('assessment_step', {
       step_number: questionIndex + 1,
-      question_id: QUESTIONS[questionIndex].id,
+      question_id: QUESTION_SPEC[questionIndex].id,
     });
   }, [step, questionIndex]);
 
@@ -586,14 +524,21 @@ export default function FreeDiagnosticPage() {
   // Compute results
   const score = computeScore(answers);
   const maturity = getMaturityLevel(score);
-  const profile = getDimensionProfile(answers);
+  const profile = getDimensionProfile(answers, copy);
   const blockers = getBlockers(profile);
   const strengths = getStrengths(profile, new Set(blockers.map(b => b.key)));
-  const quickNote = getQuickNote(score, maturity, strengths, blockers);
-  const closingHook = getClosingHook(profile);
+  const quickNote = getQuickNote(score, maturity, strengths, blockers, copy);
+  const closingHook = getClosingHook(profile, copy);
+  const canonicalProfile = getDimensionProfile(answers, canonical);
+  const canonicalBlockers = getBlockers(canonicalProfile);
+  const canonicalStrengths = getStrengths(canonicalProfile, new Set(canonicalBlockers.map(b => b.key)));
+  
   const indicatorPercent = getMaturityIndicatorPercent(maturity);
-  const industryLabel = INDUSTRIES.find(i => i.value === industry)?.label || industry;
-  const sizeLabel = SIZES.find(s => s.value === companySize)?.label || companySize;
+  const industryLabel = copy.industries[industry] || INDUSTRIES.find(i => i.value === industry)?.label || industry;
+  const sizeLabel = copy.sizes[companySize] || SIZES.find(s => s.value === companySize)?.label || companySize;
+  // What the visitor reads is localised; what the database stores is not.
+  const industryLabelEn = canonical.industries[industry] || industry;
+  const sizeLabelEn = canonical.sizes[companySize] || companySize;
 
   useEffect(() => {
     if (step !== 'results') return;
@@ -613,7 +558,7 @@ export default function FreeDiagnosticPage() {
   const handleUnlock = async () => {
     const trimmed = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) {
-      setEmailError('Enter a valid email address.');
+      setEmailError(copy.ui.emailInvalid);
       return;
     }
     setEmailError('');
@@ -626,14 +571,15 @@ export default function FreeDiagnosticPage() {
         body: JSON.stringify({
           email: trimmed,
           companyName: companyName.trim(),
-          industry: industryLabel,
-          companySize: sizeLabel,
+          industry: industryLabelEn,
+          companySize: sizeLabelEn,
           score,
           maturity,
           answers,
-          strengths: strengths.map(s => s.label),
-          blockers: blockers.map(b => b.label),
+          strengths: canonicalStrengths.map(s => s.label),
+          blockers: canonicalBlockers.map(b => b.label),
           source: 'free-assessment',
+          locale: language,
           questionSetVersion: QUESTION_SET_VERSION,
         }),
         signal: AbortSignal.timeout(10000),
@@ -680,8 +626,8 @@ export default function FreeDiagnosticPage() {
           companyName: companyName.trim(),
           score,
           maturity,
-          strengths: strengths.map(s => s.label),
-          blockers: blockers.map(b => b.label),
+          strengths: canonicalStrengths.map(s => s.label),
+          blockers: canonicalBlockers.map(b => b.label),
           questionSetVersion: QUESTION_SET_VERSION,
           pdf: { fileName: pdfFileName, dataBase64: pdfBase64 },
         }),
@@ -705,7 +651,7 @@ export default function FreeDiagnosticPage() {
     insightItems.push({
       title: primaryStrength.label,
       driver: `${primaryStrength.strongest.label} — ${primaryStrength.strongest.score}/3`,
-      desc: INSIGHT_DESCRIPTIONS[primaryStrength.strongest.id]?.strength || "Strength here is a foundation the rest of the operation can be built on rather than worked around.",
+      desc: copy.insights[primaryStrength.strongest.id]?.strength || '',
       type: 'strength'
     });
   }
@@ -714,9 +660,9 @@ export default function FreeDiagnosticPage() {
     insightItems.push({
       title: blocker.label,
       driver: `${blocker.weakest.label} — ${blocker.weakest.score}/3`,
-      desc: INSIGHT_DESCRIPTIONS[blocker.weakest.id]?.blocker || (index === 0
+      desc: copy.insights[blocker.weakest.id]?.blocker || (index === 0
         ? "A gap here creates friction that everything downstream has to absorb, usually as time nobody is measuring."
-        : "This constraint quietly caps how much any other improvement can deliver."),
+        : ''),
       type: 'blocker'
     });
   });
@@ -726,7 +672,7 @@ export default function FreeDiagnosticPage() {
       insightItems.push({
         title: secondaryStrength.label,
         driver: `${secondaryStrength.strongest.label} — ${secondaryStrength.strongest.score}/3`,
-        desc: INSIGHT_DESCRIPTIONS[secondaryStrength.strongest.id]?.strength || "Solid performance here removes one of the constraints that usually slows operational change down.",
+        desc: copy.insights[secondaryStrength.strongest.id]?.strength || "Solid performance here removes one of the constraints that usually slows operational change down.",
         type: 'strength'
       });
     }
@@ -755,11 +701,14 @@ export default function FreeDiagnosticPage() {
       strengths: strengths.map(s => `${s.label} — ${s.score}/100`),
       blockers: blockers.map(b => `${b.label} — ${b.score}/100`),
       insights: insightItems,
-      narrative: getNarrative(companyName.trim() || 'your company', score, maturity),
+      narrative: getNarrative(companyName.trim() || 'your company', score, maturity, copy),
       closingHook,
       diagnosticId,
       generatedAt: new Date(),
       upgradeUrl: `${window.location.origin}/#pricing-section`,
+      strings: copy.pdf,
+      labels: copy.card,
+      locale: language as Locale,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyName, industryLabel, sizeLabel, score, maturity, quickNote, profile, strengths, blockers, insightItems, closingHook, diagnosticId]);
@@ -791,6 +740,22 @@ export default function FreeDiagnosticPage() {
       
       {/* Close button */}
       <a href="/" className="close-diagnostic-btn" title="Close Diagnostic" aria-label="Close Diagnostic">✕</a>
+
+      {/* The diagnostic hides the site navbar, so it needs its own language
+          control. It drives the same provider the navbar does, so the choice
+          follows the visitor back out to the rest of the site. */}
+      <div className="lang-switch">
+        <label htmlFor="assessment-lang" className="sr-only">{copy.ui.languageLabel}</label>
+        <select
+          id="assessment-lang"
+          value={language}
+          onChange={e => setLanguage(e.target.value as Locale)}
+          aria-label={copy.ui.languageLabel}
+        >
+          <option value="en">English</option>
+          <option value="id">Bahasa Indonesia</option>
+        </select>
+      </div>
         {/* ===== PROFILE STEP ===== */}
         {step === 'profile' && (
           <>
@@ -799,38 +764,38 @@ export default function FreeDiagnosticPage() {
             </div>
             <div className="step-container" key="profile">
               <div className="profile-header">
-                <h1>Let&apos;s start with your company</h1>
-                <p>This helps us tailor the diagnostic to your context.</p>
+                <h1>{copy.ui.profileTitle}</h1>
+                <p>{copy.ui.profileSubtitle}</p>
               </div>
               <div className="form-group">
-                <label htmlFor="company-name">Company name</label>
+                <label htmlFor="company-name">{copy.ui.companyName}</label>
                 <input
                   type="text"
                   id="company-name"
-                  placeholder="e.g. PT Maju Bersama"
+                  placeholder={copy.ui.companyPlaceholder}
                   value={companyName}
                   onChange={e => setCompanyName(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="company-size">Company size</label>
+                <label htmlFor="company-size">{copy.ui.companySize}</label>
                 <select id="company-size" value={companySize} onChange={e => setCompanySize(e.target.value)}>
                   {SIZES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>{s.value ? (copy.sizes[s.value] || s.label) : copy.ui.selectSize}</option>
                   ))}
                 </select>
               </div>
               <div className="form-group">
-                <label htmlFor="industry">Industry</label>
+                <label htmlFor="industry">{copy.ui.industry}</label>
                 <select id="industry" value={industry} onChange={e => setIndustry(e.target.value)}>
                   {INDUSTRIES.map(i => (
-                    <option key={i.value} value={i.value}>{i.label}</option>
+                    <option key={i.value} value={i.value}>{i.value ? (copy.industries[i.value] || i.label) : copy.ui.selectIndustry}</option>
                   ))}
                 </select>
               </div>
               <button className="btn-primary" disabled={!isProfileValid} onClick={handleProfileContinue}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: 4 }}><path d="M7 7l10 10M17 7v10H7" /></svg>
-                Continue
+                {copy.ui.continue}
               </button>
             </div>
           </>
@@ -838,10 +803,11 @@ export default function FreeDiagnosticPage() {
 
         {/* ===== QUESTION STEP ===== */}
         {step === 'question' && (() => {
-          const q = QUESTIONS[questionIndex];
-          const totalSteps = QUESTIONS.length + 1;
+          const spec = QUESTION_SPEC[questionIndex];
+          const q = copy.questions[spec.id];
+          const totalSteps = TOTAL_QUESTIONS + 1;
           const progress = ((questionIndex + 1) / totalSteps) * 100;
-          const selectedAnswer = answers[q.id];
+          const selectedAnswer = answers[spec.id];
 
           return (
             <>
@@ -850,7 +816,7 @@ export default function FreeDiagnosticPage() {
               </div>
               <div className="step-container" key={`q${questionIndex}`}>
                 <div className="question-header">
-                  <div className="question-number">Question {questionIndex + 1} of 12</div>
+                  <div className="question-number">{copy.ui.questionOf(questionIndex + 1, TOTAL_QUESTIONS)}</div>
                   <div className="question-text">{q.question}</div>
                 </div>
                 <div className="options-list">
@@ -866,7 +832,7 @@ export default function FreeDiagnosticPage() {
                 </div>
                 <div className="nav-row">
                   <button className="btn-back" onClick={handleBack}>
-                    {questionIndex === 0 ? '← Back to profile' : '← Previous'}
+                    {questionIndex === 0 ? copy.ui.back : '←'}
                   </button>
                   <button
                     className="btn-next"
@@ -874,7 +840,7 @@ export default function FreeDiagnosticPage() {
                     onClick={handleNext}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', marginRight: 4 }}><path d="M7 7l10 10M17 7v10H7" /></svg>
-                    {questionIndex === 11 ? 'See results' : 'Next'}
+                    {questionIndex === TOTAL_QUESTIONS - 1 ? copy.ui.seeResults : copy.ui.next}
                   </button>
                 </div>
               </div>
@@ -887,9 +853,14 @@ export default function FreeDiagnosticPage() {
           <>
             {/* Action Header */}
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.75rem' }}>Your Business Operations Assessment Report</h1>
+              <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.75rem' }}>{copy.ui.resultsTitle}</h1>
               <p className="results-subhead">
-                Score <strong>{score}/100</strong> · <strong>{maturity}</strong> maturity — your full breakdown is below.
+                {copy.ui.resultsSubhead(score, maturity)}
+              </p>
+              {/* The band name alone only ranks you. The descriptor says what
+                  being in it actually means, which is what makes it land. */}
+              <p className="results-band-descriptor">
+                <strong>{maturity}</strong> — {copy.bands[maturity]?.descriptor}
               </p>
 
               {unlocked ? (
@@ -901,33 +872,33 @@ export default function FreeDiagnosticPage() {
                       disabled={buildingPdf}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                      {buildingPdf ? 'Building PDF…' : 'Download the report (PDF)'}
+                      {buildingPdf ? copy.ui.buildingPdf : copy.ui.downloadPdf}
                     </button>
                     <button
                       className="btn-secondary-download"
                       onClick={downloadDiagnosticCards}
                       disabled={downloading}
                     >
-                      {downloading ? 'Rendering images…' : 'Share as image (PNG)'}
+                      {downloading ? copy.ui.renderingPng : copy.ui.sharePng}
                     </button>
                   </div>
                   {deliveryStatus !== 'idle' && (
                     <div className={`delivery-status delivery-${deliveryStatus}`} role="status">
-                      {deliveryStatus === 'sending' && `Emailing a copy to ${submittedEmail}…`}
-                      {deliveryStatus === 'sent' && `A copy is on its way to ${submittedEmail}.`}
-                      {deliveryStatus === 'failed' && 'We could not email a copy just now — your download above has the full report.'}
+                      {deliveryStatus === 'sending' && copy.ui.deliverySending(submittedEmail)}
+                      {deliveryStatus === 'sent' && copy.ui.deliverySent(submittedEmail)}
+                      {deliveryStatus === 'failed' && copy.ui.deliveryFailed}
                     </div>
                   )}
                 </>
               ) : (
                 <div className="email-gate">
-                  <div className="email-gate-label">Where should we send a copy of this report?</div>
+                  <div className="email-gate-label">{copy.ui.emailGateLabel}</div>
                   <div className="email-gate-row">
                     <input
                       type="email"
                       inputMode="email"
                       autoComplete="email"
-                      placeholder="you@company.com"
+                      placeholder={copy.ui.emailPlaceholder}
                       aria-label="Work email"
                       aria-invalid={emailError ? true : undefined}
                       value={email}
@@ -941,12 +912,12 @@ export default function FreeDiagnosticPage() {
                       disabled={submittingLead || downloading}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                      {submittingLead || downloading ? 'Preparing…' : 'Get my report cards'}
+                      {submittingLead || buildingPdf ? '…' : copy.ui.emailCta}
                     </button>
                   </div>
                   {emailError && <div className="email-gate-error" role="alert">{emailError}</div>}
                   <div className="email-gate-note">
-                    Unlocks the downloadable report cards below. No spam — we use this to send your report and nothing else.
+                    {copy.ui.emailNote}
                   </div>
                 </div>
               )}
@@ -964,15 +935,15 @@ export default function FreeDiagnosticPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '46px', width: 'auto', display: 'block', flexShrink: 0 }} />
-                        <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>Quick Assessment<br />of Business Operations</div>
+                        <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>{copy.card.quickAssessment}<br />{copy.card.ofBusinessOperations}</div>
                       </div>
                       <div style={{ borderBottom: '1px solid #111', marginBottom: 32 }} />
 
                       {/* Company info grid */}
                       <div style={{ paddingBottom: 22, marginBottom: 40, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Company Name<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Industry Category<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLabel}</div></div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Industry Size<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sizeLabel}</div></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copy.card.companyName}<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{companyName.trim() || 'Acme Industry LLC'}</div></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copy.card.industryCategory}<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLabel}</div></div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{copy.card.industrySize}<div style={{ fontSize: 18, fontWeight: 400, color: '#333', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sizeLabel}</div></div>
                       </div>
 
                       {/* Score section — no box, soft tactile dial */}
@@ -1108,7 +1079,7 @@ export default function FreeDiagnosticPage() {
                       <div style={{ marginBottom: 40 }}>
                         <div style={{ fontSize: 22, fontWeight: 700, color: '#111', textTransform: 'uppercase', letterSpacing: '0.01em', marginBottom: 12 }}>Notes</div>
                         <div style={{ fontSize: 20, color: '#111', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' }}>
-                          {renderNotesWithBold(getNarrative(companyName.trim() || 'your company', score, maturity))}
+                          {renderNotesWithBold(getNarrative(companyName.trim() || 'your company', score, maturity, copy))}
                         </div>
                       </div>
                     </div>
@@ -1591,6 +1562,55 @@ body {
 .btn-secondary-download:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.results-band-descriptor {
+  max-width: 46rem;
+  margin: 0.5rem auto 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #555);
+}
+
+.lang-switch {
+  position: fixed;
+  top: 2rem;
+  left: 2rem;
+  z-index: 60;
+}
+
+.lang-switch select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.45rem 2rem 0.45rem 0.8rem;
+  border: 1px solid #cccccc;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'%3e%3cpath d='M6 9l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 14px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #111111;
+  cursor: pointer;
+}
+
+.lang-switch select:hover { border-color: #000000; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .lang-switch { top: 1rem; left: 1rem; }
 }
 
 .closing-hook {
