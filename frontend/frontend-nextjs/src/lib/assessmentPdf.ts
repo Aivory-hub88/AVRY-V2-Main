@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import type { AssessmentStrings } from '@/lib/assessmentCopy';
 
 /**
  * A4 report for the free Business Operations Assessment.
@@ -85,6 +86,11 @@ export interface AssessmentPdfInput {
   generatedAt: Date;
   /** Absolute, because a forwarded PDF has no origin to resolve against. */
   upgradeUrl: string;
+  /** Chrome strings follow the language the visitor read the results in. */
+  strings: AssessmentStrings['pdf'];
+  /** Card headings, also localised. */
+  labels: AssessmentStrings['card'];
+  locale: 'en' | 'id';
 }
 
 // ── Asset loading ────────────────────────────────────────────────────────────
@@ -250,7 +256,7 @@ function paragraph(
  * the r84-r92 tick ring rather than floating inside or outside it, and the
  * figure has to sit where the card's absolutely-positioned overlay puts it.
  */
-function drawDial(pdf: jsPDF, cx: number, cy: number, box: number, score: number): void {
+function drawDial(pdf: jsPDF, cx: number, cy: number, box: number, score: number, scoreLabelText: string): void {
   const U = box / 200;              // one unit of the card's viewBox, in points
   const TO_UNITS = 200 / 176;       // the overlay is positioned in the 176px box
 
@@ -284,7 +290,7 @@ function drawDial(pdf: jsPDF, cx: number, cy: number, box: number, score: number
   pdf.setFont(F(), 'normal');
   pdf.setFontSize(scoreLabelSize);
   pdf.setTextColor('#999999');
-  pdf.text('SCORE', cx, cy + (67.6 * TO_UNITS - 100) * U,
+  pdf.text(scoreLabelText, cx, cy + (67.6 * TO_UNITS - 100) * U,
     { align: 'center', charSpace: scoreLabelSize * 0.18 });
 
   // The figure — 46px Doto at 78px from the top, line-height 1
@@ -315,8 +321,8 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   // Document furniture — this is what the file looks like in a file list and in
   // an email client's attachment preview.
   pdf.setProperties({
-    title: `Business Operations Assessment — ${input.companyName}`,
-    subject: `Operational maturity ${input.score}/100 (${input.maturity})`,
+    title: input.strings.docTitle(input.companyName),
+    subject: input.strings.docSubject(input.score, input.maturity),
     author: 'Aivory',
     creator: 'Aivory Free Assessment',
     keywords: 'business operations, operational maturity, assessment, Aivory',
@@ -340,8 +346,8 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   pdf.setFont(F(), 'normal');
   pdf.setFontSize(px(22));
   pdf.setTextColor(INK);
-  pdf.text('QUICK ASSESSMENT', MARGIN + CONTENT_W, y + px(14), { align: 'right' });
-  pdf.text('OF BUSINESS OPERATIONS', MARGIN + CONTENT_W, y + px(14) + px(22) * 1.35, { align: 'right' });
+  pdf.text(input.labels.quickAssessment.toUpperCase(), MARGIN + CONTENT_W, y + px(14), { align: 'right' });
+  pdf.text(input.labels.ofBusinessOperations.toUpperCase(), MARGIN + CONTENT_W, y + px(14) + px(22) * 1.35, { align: 'right' });
 
   y += logoH + px(14);
   rule(pdf, y, INK, 0.8);
@@ -349,9 +355,9 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   // ── Company info grid ───────────────────────────────────────────────────────
   y += px(24);
   const cols = [
-    { label: 'Company name', value: input.companyName || '—' },
-    { label: 'Industry category', value: input.industryLabel || '—' },
-    { label: 'Company size', value: input.sizeLabel || '—' },
+    { label: input.labels.companyName, value: input.companyName || '—' },
+    { label: input.labels.industryCategory, value: input.industryLabel || '—' },
+    { label: input.labels.industrySize, value: input.sizeLabel || '—' },
   ];
   const colW = CONTENT_W / 3;
   let metaBottom = y;
@@ -380,7 +386,7 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
 
   y += chipH + px(16);
   const dialBox = px(150);
-  drawDial(pdf, MARGIN + dialBox / 2, y + dialBox / 2, dialBox, input.score);
+  drawDial(pdf, MARGIN + dialBox / 2, y + dialBox / 2, dialBox, input.score, input.labels.score.toUpperCase());
 
   const noteX = MARGIN + dialBox + px(28);
   const noteW = MARGIN + CONTENT_W - noteX;
@@ -390,7 +396,7 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   y = Math.max(y + dialBox, noteY) + px(18);
 
   // ── Five-dimension profile ──────────────────────────────────────────────────
-  microLabel(pdf, 'Operational profile', MARGIN, y, px(12));
+  microLabel(pdf, input.labels.operationalProfile, MARGIN, y, px(12));
   y += px(20);
 
   input.profile.forEach(d => {
@@ -429,8 +435,8 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   rule(pdf, y);
   y += px(18);
   const halfW = CONTENT_W / 2 - px(20);
-  microLabel(pdf, 'Working for you', MARGIN, y, px(12));
-  microLabel(pdf, 'Holding you back', MARGIN + CONTENT_W / 2 + px(20), y, px(12));
+  microLabel(pdf, input.labels.workingForYou, MARGIN, y, px(12));
+  microLabel(pdf, input.labels.holdingYouBack, MARGIN + CONTENT_W / 2 + px(20), y, px(12));
   const listTop = y + px(18);
   const renderList = (items: string[], x: number) => {
     let ly = listTop;
@@ -467,11 +473,11 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   });
 
   // ── Notes ───────────────────────────────────────────────────────────────────
-  microLabel(pdf, 'Notes', MARGIN, y, px(12));
+  microLabel(pdf, input.labels.notes, MARGIN, y, px(12));
   y = paragraph(pdf, input.narrative, MARGIN, y + px(18), CONTENT_W, { size: px(16) }) + px(18);
 
   // ── Closing hook + clickable CTA ────────────────────────────────────────────
-  const btnLabel = 'See the Business Operations Assessment';
+  const btnLabel = input.strings.ctaButton;
   pdf.setFont(F(), 'bold');
   pdf.setFontSize(px(16));
   const btnW = pdf.getTextWidth(btnLabel) + px(48);
@@ -486,10 +492,13 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   const btnY = declineEnd + px(12);
   const boxH = btnY + btnH + px(20) - hookTop;
 
-  pdf.setFillColor(255, 255, 255);
+  // A white panel on the cream ground reads as a foreign element pasted onto the
+  // page. Tinting it a shade lighter than the ground lifts it without breaking
+  // the card's material, and the rule is a hairline rather than a heavy outline.
+  pdf.setFillColor(250, 249, 245);
   pdf.roundedRect(MARGIN, hookTop, CONTENT_W, boxH, px(10), px(10), 'F');
-  pdf.setDrawColor(INK);
-  pdf.setLineWidth(1);
+  pdf.setDrawColor(RULE);
+  pdf.setLineWidth(0.6);
   pdf.roundedRect(MARGIN, hookTop, CONTENT_W, boxH, px(10), px(10), 'S');
 
   paragraph(pdf, input.closingHook.finding, MARGIN + padX, hookTop + px(26), CONTENT_W - padX * 2,
@@ -515,10 +524,10 @@ export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsP
   pdf.setFont(F(), 'normal');
   pdf.setFontSize(px(13));
   pdf.setTextColor(MUTED);
-  const stamp = input.generatedAt.toLocaleDateString('en-GB', {
+  const stamp = input.generatedAt.toLocaleDateString(input.locale === 'id' ? 'id-ID' : 'en-GB', {
     day: 'numeric', month: 'long', year: 'numeric',
   });
-  pdf.text(`© 2026 Aivory. All rights reserved. · ${stamp} · Ref ${input.diagnosticId}`, MARGIN, footY);
+  pdf.text(`${input.labels.rights} · ${input.strings.generated} ${stamp} · ${input.strings.ref} ${input.diagnosticId}`, MARGIN, footY);
   if (logo) {
     const fh = px(24);
     pdf.addImage(logo.dataUrl, 'PNG', MARGIN + CONTENT_W - fh * logo.ratio, footY - fh * 0.78, fh * logo.ratio, fh);
