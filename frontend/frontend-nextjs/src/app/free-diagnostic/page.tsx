@@ -865,15 +865,17 @@ export default function FreeDiagnosticPage() {
 
               {unlocked ? (
                 <>
+                  {/* The PDF already downloaded once automatically, as part of
+                      handleUnlock — a live "Download the report (PDF)" button
+                      here would just invite a confused second download of the
+                      same file. It becomes a static confirmation instead.
+                      Share-as-image stays a real button: unlocking never
+                      triggers that action on its own. */}
                   <div className="download-actions">
-                    <button
-                      className="btn-primary"
-                      onClick={downloadPdf}
-                      disabled={buildingPdf}
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8 }}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                      {buildingPdf ? copy.ui.buildingPdf : copy.ui.downloadPdf}
-                    </button>
+                    <div className="pdf-downloaded-note">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                      {copy.ui.pdfDownloaded}
+                    </div>
                     <button
                       className="btn-secondary-download"
                       onClick={downloadDiagnosticCards}
@@ -1538,6 +1540,24 @@ body {
 .download-actions .btn-primary {
   flex: 0 1 340px;
   margin: 0;
+}
+
+/* Reads as "already done", not as a call to action — no border weight or
+   hover state, so it never competes with the still-live share button. */
+.pdf-downloaded-note {
+  flex: 0 1 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #4a7a3f;
+}
+
+.pdf-downloaded-note svg {
+  flex-shrink: 0;
 }
 
 .btn-secondary-download {

@@ -146,34 +146,31 @@ async function loadFonts(pdf: jsPDF): Promise<void> {
 }
 
 /**
- * Rasterises the Aivory signature SVG so jsPDF can place it — jsPDF has no SVG
- * support, and this is the same mark the cards use rather than a text
- * substitute. Rendered at 4x the placed size so it stays crisp in print.
+ * The Aivory signature mark, as the same pre-rasterised PNG the report email
+ * uses (public/aivory-signature.png) — not a live SVG-to-canvas rasterisation.
+ *
+ * That was the previous approach and it was the bug: rasterising the SVG via
+ * Image()+canvas on every PDF build is a second, fragile render path that can
+ * fail independently of the on-screen report cards (which the browser renders
+ * natively via a plain <img> tag and never touches canvas for). When it failed
+ * here, the catch swallowed it silently and jsPDF fell back to drawing the
+ * word "AIVORY" in plain Helvetica — which is what shipped to a live report.
+ * Fetching the already-rasterised PNG removes that whole failure path: it is
+ * the exact asset already proven to render, decoded once, embedded as-is.
  */
-async function loadLogo(heightPt: number): Promise<{ dataUrl: string; ratio: number } | null> {
+async function loadLogo(): Promise<{ dataUrl: string; ratio: number } | null> {
   try {
-    const res = await fetch('/Aivory_Signature_Grey.svg');
-    if (!res.ok) return null;
-    const svg = await res.text();
-    const blobUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-    try {
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('logo failed to decode'));
-        img.src = blobUrl;
-      });
-      const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
-      const canvas = document.createElement('canvas');
-      canvas.height = Math.round(heightPt * 4);
-      canvas.width = Math.round(heightPt * 4 * ratio);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      return { dataUrl: canvas.toDataURL('image/png'), ratio };
-    } finally {
-      URL.revokeObjectURL(blobUrl);
-    }
+    const base64 = await fetchAsBase64('/aivory-signature.png');
+    if (!base64) return null;
+    const dataUrl = `data:image/png;base64,${base64}`;
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('logo failed to decode'));
+      img.src = dataUrl;
+    });
+    const ratio = (img.naturalWidth || 1) / (img.naturalHeight || 1);
+    return { dataUrl, ratio };
   } catch {
     return null;
   }
@@ -316,7 +313,7 @@ export const PDF_SAFE_BOTTOM = SAFE_BOTTOM;
 
 export async function buildAssessmentPdf(input: AssessmentPdfInput): Promise<jsPDF> {
   const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
-  const [, logo] = await Promise.all([loadFonts(pdf), loadLogo(px(38))]);
+  const [, logo] = await Promise.all([loadFonts(pdf), loadLogo()]);
 
   // Document furniture — this is what the file looks like in a file list and in
   // an email client's attachment preview.
