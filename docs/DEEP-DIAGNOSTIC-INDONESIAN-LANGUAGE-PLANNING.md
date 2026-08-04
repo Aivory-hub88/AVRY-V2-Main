@@ -1,10 +1,13 @@
 # Deep Diagnostic — Bahasa Indonesia Language Support
 
 **Status:** Phase 1 (Intake flow) and Phase 2 (Results page + PDF report) —
-✅ **BOTH SHIPPED** 2026-08-04. Phase 1 pushed as `84dfd62`, Phase 2 pushed
-as `bfd94f4`, both in `avry-user-dashboard` on `Aivory-hub88` (canonical
-remote). The full assessment — intake, review, results page, and the
-downloadable PDF — now renders end to end in Bahasa Indonesia.
+✅ **BOTH SHIPPED to the repo** 2026-08-04. Phase 1 pushed as `84dfd62`,
+Phase 2 pushed as `bfd94f4`, both in `avry-user-dashboard` on `Aivory-hub88`
+(canonical remote). The full assessment — intake, review, results page, and
+the downloadable PDF — now renders end to end in Bahasa Indonesia **in the
+codebase**. 🔴 **Not deployed yet** — the live user dashboard on the VPS is
+still running the pre-Indonesian build; deploying this is the **next
+priority task**, see §6.
 **Owner:** Irfan · **Source:** product request, 2026-08-04 — parity with the
 free assessment landing page, which already ships a bilingual EN/ID
 experience.
@@ -222,3 +225,56 @@ rather than scraping DOM) — left untranslated, same call as skipping
   pagination budgets actually prevent overflow) would be worth doing before
   a wide rollout, per the plan's original "handled empirically, not
   predicted" pagination approach.
+
+## 6 · Next priority — deploy to the live VPS
+
+**Both phases exist only in the git repo right now.** Confirmed
+(2026-08-04) that no VPS step has been taken this round — commits `84dfd62`
+and `bfd94f4` are pushed to `Aivory-hub88/avry-user-dashboard`, but the live
+container has not been pulled, rebuilt, or restarted, so
+`https://www.aivory.id/dashboard` (and `stag.aivory.id`) are still serving
+the pre-Indonesian build.
+
+**Why this isn't a trivial `git pull`** — per `[[dashboard-local-vps-divergence]]`
+and `[[aivory-dashboards-vps-deploy]]`: the VPS checkout the live container
+actually builds from has, in the past, diverged from the fork (different
+branch, or ahead/behind on unrelated changes), and uncommitted VPS-local
+edits have been silently reverted by redeploys before. So this is not a
+blind overwrite — it needs a state check first.
+
+**To-do**
+
+- [ ] **6.1 SSH to the VPS and confirm which checkout is live** — locate the
+      active `avry-user-dashboard` directory (`/home/ubuntu/AVRY-V2-Main/frontend/avry-user-dashboard`
+      per the last-known layout, but re-verify with `ls -la` /
+      `git remote -v` since this has moved before), and check its current
+      branch + `git status` + how far behind `Aivory-hub88/avry-user-dashboard`'s
+      `main` it is.
+- [ ] **6.2 Reconcile any VPS-local-only changes before overwriting.** If
+      `git status` on the VPS shows uncommitted changes or the branch isn't
+      `main`, diff them against what Phase 1/2 touched before merging — do
+      not blanket `git reset --hard` per the standing "never overwrite VPS
+      state blindly" rule.
+- [ ] **6.3 Fetch + fast-forward merge** the VPS checkout onto
+      `Aivory-hub88/avry-user-dashboard main` (which now includes `84dfd62`
+      + `bfd94f4`).
+- [ ] **6.4 Rebuild + restart only the user-dashboard container** —
+      `docker compose -f docker-compose.prod.yml up -d --build --no-deps avry-user-dashboard`
+      (exact compose file path/name to confirm on arrival; do not touch
+      other services).
+- [ ] **6.5 Verify live**, in the actual browser against the public URL (not
+      just a local curl — Traefik routes by Host header, so bare-IP/curl
+      checks 404 by design per `[[dashboard-local-vps-divergence]]`):
+      dropdown appears on both the intake page and the results page, a full
+      Indonesian run through intake → summary → results renders correctly,
+      and the downloadable PDF is Indonesian when generated in that locale.
+      Also spot-check English mode still works (no regression).
+- [ ] **6.6 Confirm the container that's now running was actually built from
+      the new commit** (image build timestamp / `docker inspect` labels, or
+      by checking a landmark string only present in the new code) — a
+      cached Docker layer silently serving the old bundle has bitten this
+      project before.
+
+**Exit gate:** the public URL renders the Indonesian dropdown and a full
+Indonesian assessment + PDF end to end, with no regression to the English
+path, and the deployed commit is confirmed to match `bfd94f4`.
