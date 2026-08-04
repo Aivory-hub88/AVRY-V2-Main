@@ -1,16 +1,17 @@
 # Deep Diagnostic — Bahasa Indonesia Language Support
 
-**Status:** Phase 1 (Intake flow — dropdown + translated questions) —
-✅ **SHIPPED** 2026-08-04, committed locally as `84dfd62` in
-`avry-user-dashboard` (not pushed yet). Phase 2 (Results page + PDF report)
-**not started — next priority**.
+**Status:** Phase 1 (Intake flow) and Phase 2 (Results page + PDF report) —
+✅ **BOTH SHIPPED** 2026-08-04. Phase 1 pushed as `84dfd62`, Phase 2 pushed
+as `bfd94f4`, both in `avry-user-dashboard` on `Aivory-hub88` (canonical
+remote). The full assessment — intake, review, results page, and the
+downloadable PDF — now renders end to end in Bahasa Indonesia.
 **Owner:** Irfan · **Source:** product request, 2026-08-04 — parity with the
 free assessment landing page, which already ships a bilingual EN/ID
 experience.
-**Scope:** the Deep Diagnostic ("Business Operation" assessment) intake flow
-in `avry-user-dashboard` — question phases, options, and the review/summary
-page. Explicitly **not** the results page (`final-result/page.tsx`) or the
-generated PDF report narrative — those are Phase 2.
+**Scope:** the entire Deep Diagnostic ("Business Operation" assessment) user
+journey in `avry-user-dashboard` — intake question phases, the review/summary
+page, the on-screen results page (`final-result/page.tsx`), and the
+generated PDF report (`lib/pdfExport.ts`).
 **Repo:** `Aivory-hub88/avry-user-dashboard`
 
 ---
@@ -99,57 +100,125 @@ just the intake flow for this first phase given the size of the full task
 
 ---
 
-## 4 · Next priority — Phase 2: Results page + PDF report in Indonesian
+## 4 · What shipped (Phase 2) — Results page + PDF report in Indonesian
 
-**Objective:** when a user completes the assessment in Indonesian, the
+**Objective met:** when a user completes the assessment in Indonesian, the
 results page (`app/diagnostics/deep/final-result/page.tsx`) and the
-exported PDF (`lib/pdfExport.ts`) should also render in Indonesian, closing
-the gap the user originally asked for ("dokumen dalam bahasa Indonesia").
+exported PDF (`lib/pdfExport.ts`) now render in Indonesian too — closing the
+gap the user originally asked for ("dokumen dalam bahasa Indonesia").
 
-**Why this is materially harder than Phase 1** (confirmed by direct code
-read, not estimated): `lib/readinessNarrative.ts` (~611 lines) *composes*
-narrative sentences from template literals with interpolated computed
-values and lookup tables (`DIM_LABELS`, `MATURITY_BANDS`,
-`RISK_SOURCE_LABELS`, `buildVerdictNarrative`, `buildExecutiveSummary`,
-`buildExecutiveInsight`, `buildFirstMoves`, `buildWhyThisRecommendation`,
-`buildEvidenceUsed`, `buildConfidenceReasoning`, `DIM_CONSEQUENCE_CHAINS`,
-etc.) — this is not a flat string dictionary like
-`deepDiagnosticQuestionsId.ts`, so each function needs a genuine Indonesian
-rewrite of its prose, not a find-and-replace. `lib/pdfExport.ts`
-(~2793 lines) has ~113 hardcoded English label/copy strings with no locale
-parameter at all today. `final-result/page.tsx` has ~55 inline JSX text
-strings.
+Research ahead of implementation confirmed the doc's original size estimate
+held (`lib/readinessNarrative.ts` composes prose from template literals, not
+a flat dictionary) but found the true scope was larger than first estimated:
+roughly **half of `lib/pdfExport.ts`'s narrative text is its own separate
+hardcoded copy**, not sourced from `readinessNarrative.ts` at all (financial-
+case narrative, opportunities intro, methodology walkthrough, editorial
+cover letter, CTA steps, closing note) — each needed independent Indonesian
+prose, not just a translated lookup table.
 
-**To-do**
+**Architecture decisions actually taken (differ from the original to-do
+list below in one respect — see 4.2):**
 
-- [ ] **4.1 Locale-parameterize `lib/readinessNarrative.ts`.** Every
-      builder function needs an Indonesian counterpart for its template
-      literal(s) and lookup tables, selected by a `locale` parameter — same
-      pattern the free assessment's `assessmentCopy.ts` already proved out
-      with its `narrative: Record<id, (args) => string>` function-table
-      shape (`frontend-nextjs/src/lib/assessmentCopy.ts:33-116`), just
-      applied to a larger, more numerous set of builders.
-- [ ] **4.2 Thread `locale` through `lib/pdfExport.ts`.** Follows the
-      precedent already shipping in `frontend-nextjs/src/lib/assessmentPdf.ts`
-      (`buildAssessmentPdf(input: { strings, labels, locale, ... })` — all
-      copy pre-resolved by the caller, no locale branching inside the PDF
-      builder itself). The ~113 hardcoded label strings need to move into a
-      similar per-locale copy object.
-- [ ] **4.3 Translate `final-result/page.tsx`'s ~55 inline JSX strings**,
-      reusing `useLocaleContext()` the same way Phase 1's pages do.
-- [ ] **4.4 Decide the emailed-report question explicitly** (if Deep
-      Diagnostic reports are ever emailed/stored server-side, unlike the
-      free assessment which explicitly keeps the emailed copy English-only
-      per `FREE-ASSESSMENT-QUESTION-REWORK-PLANNING.md:104-106` — confirm
-      whether the same non-goal applies here before building).
-- [ ] **4.5 Verify old stored `DiagnosticContext` rows** (pre-Phase-2,
-      Postgres-stored) still render correctly when a user views them with
-      the dropdown set to Indonesian — the underlying computed data has no
-      locale field, so the narrative layer must not assume one exists.
+- **4.1 (as planned) — `lib/readinessNarrative.ts` locale-parameterized.**
+  All 20 exported builders + 13 lookup tables now take a `locale` param and
+  branch into independent English/Indonesian template literals (not a
+  translated interpolation into the English sentence skeleton — e.g. the
+  English-only "a/an" article logic in `buildExecutiveSummary` has no
+  Indonesian equivalent and is skipped entirely on that branch).
+- **4.2 (deviates from plan) — `lib/pdfExport.ts` threads `locale` as a
+  parameter, not a pre-resolved `strings`/`labels` object.** The plan called
+  for following `assessmentPdf.ts`'s pattern (caller pre-resolves all copy
+  into one object). In practice `pdfExport.ts`'s ~20 helpers each own their
+  English literals inline already, so adopting that pattern would have meant
+  rewriting every helper's internals rather than adding a parameter — for a
+  file this size, threading `locale: 'en' | 'id'` through `exportReportToPdf`
+  and each helper it calls was the lower-risk mechanical change. Also
+  re-specified the `boldSubstrings()` bold-highlight phrase lists for
+  Indonesian wording (they must match verbatim substrings in the *localized*
+  sentence, not a translation of the English phrase), fixed the hardcoded
+  `en-GB` date locale, and bumped ~10 flat `ensureSpace()` pagination budgets
+  for Indonesian's longer text.
+- **4.3 (as planned, larger than estimated) — `final-result/page.tsx` +
+  12 child components under `components/result/`.** ~90 strings translated
+  (vs. the ~55 first estimated), reusing the same dropdown pattern as
+  Phase 1's intake pages.
+- **Not in the original to-do list, but required:** the upstream prose
+  `readinessNarrative.ts` composes *around* — `services/deepDiagnostic.ts`'s
+  `buildRoomForImprovement`, `rankOpportunities`, `classifyRisks`, and
+  `computeScoreDrivers` — also needed Indonesian versions. These now compute
+  **both locales at submission time** and store the Indonesian output as new
+  optional fields on `DiagnosticContext` (`roomForImprovementId?`,
+  `opportunitiesId?`, `risksId?`, `scoreDriversId?`), following the exact
+  same absence-safe convention as the existing `scoreDrivers?` field — the
+  results page and PDF prefer the `Id` field when present and the current
+  locale is `id`, and fall back to the English field otherwise. This means
+  switching the dropdown after submission is instant (no recomputation), and
+  a pre-Phase-2 stored report (missing the `Id` fields) degrades gracefully
+  to English for just those fields rather than breaking.
+- **4.4 resolved implicitly:** Deep Diagnostic reports are not emailed
+  today (confirmed — no email-report code path exists in this flow, unlike
+  the free assessment), so the non-goal question didn't apply.
+- **4.5 verified** — see below.
 
-**Exit gate:** a full run — intake → summary → results page → PDF export —
-completed entirely in Bahasa Indonesia reads as a coherent Indonesian
-report, with zero numbers or scoring outcomes changed by the language
-selection (same Architecture Principle as
-`DEEP-DIAGNOSTIC-EXPERIENCE-V2-PLANNING.md`: the LLM/narrative layer
-composes, it never computes).
+**3 real bugs found and fixed during live verification** (not caught by
+`tsc`, only visible in actual rendered Indonesian output):
+1. `services/deepDiagnostic.ts`'s Data-dimension improvement item produced
+   "kualitasnya kualitas sedang, perlu dibersihkan" (doubled "kualitas") —
+   the template prepended a word already present in the translated label.
+2. `lib/readinessNarrative.ts`'s `buildEvidenceUsed` interpolated raw
+   percentage numbers directly (`${quantitative.currentAutomationPct}%`),
+   which skipped the Indonesian comma-decimal formatting other call sites
+   got automatically — fixed by routing through `fmtGap()`.
+3. `lib/bottleneckQuantification.ts`'s `formatPainPointHours` had no locale
+   param at all — pain-point hour figures stayed in English ("~15 hrs/week")
+   even with the rest of the report in Indonesian.
+
+**Verified live**, not just typechecked: seeded a full synthetic intake
+answer set directly into `localStorage` and submitted it through the real
+`buildDiagnosticContext` code path (not a hand-authored context, so every
+computed field — scores, ROI, opportunities, risks, improvements — is
+genuine engine output). Confirmed: the entire results page renders correctly
+in Indonesian; switching back to English has zero regressions; the "Download
+Full Report" button produces a complete ~1.04MB Indonesian PDF blob with
+zero thrown errors; and stripping the `Id` fields from a stored context and
+reloading in Indonesian correctly falls back to English for exactly the
+affected fields (opportunity titles, first-move text, risk descriptions)
+while everything else stays Indonesian — no crash, no blank sections.
+`tsc --noEmit` clean throughout (only the 2 pre-existing unrelated errors
+noted in Phase 1 remain in the full project).
+
+**Files touched (Phase 2):** `lib/readinessNarrative.ts`,
+`lib/resultFormatters.ts`, `lib/bottleneckQuantification.ts`,
+`lib/industryBenchmarks.ts`, `lib/diagnosticHistory.ts`, `lib/pdfExport.ts`,
+`services/deepDiagnostic.ts`, `types/diagnostic.ts`,
+`app/diagnostics/deep/final-result/page.tsx`,
+`app/diagnostics/deep/final-result/final-result.module.css`, and 12 files
+under `components/result/` (`HeaderBar`, `DeltaChip`, `ScoreRing`,
+`RadarChart`, `DimensionBenchmarkBars`, `DimensionDrivers`,
+`HistorySparkline`, `ROIMetricTile`, `ROISensitivityTornado`,
+`EfficiencyWhatIfSlider`, `OpportunityMatrix`, `OpportunityCard`,
+`RiskCard`, `ErrorCard`, `SectionNavRail`, `AdvisoryContactModal`).
+`components/result/PrintableReport.tsx` confirmed dead code (unused by the
+PDF export path, which builds the document programmatically via jsPDF calls
+rather than scraping DOM) — left untranslated, same call as skipping
+`DiagnosticSummary.tsx` in Phase 1.
+
+## 5 · Open items / possible follow-ups (not blocking)
+
+- The model-generated "Business Operations Analysis" section (`aiAnalysis` /
+  `llmResult`) is not translated — that content comes from an upstream LLM
+  call outside this flow's control; only the static chrome around it
+  (headings, the "generated by..." disclaimer) is localized. Giving the LLM
+  a locale hint so it generates Indonesian narrative directly is a separate,
+  larger effort (would need the actual LLM prompt/gateway, likely in the
+  zeroclaw/vps-bridge stack per `[[zeroclaw-llm-models]]`) and was out of
+  scope here.
+- Free-text answers (pain points, manual processes, primary objective) are
+  never translated by design (Phase 1's rule) — they display exactly as the
+  user typed them, in whatever language that was.
+- No visual/PDF-layout QA pass was done beyond confirming the PDF generates
+  a complete, non-empty blob with no thrown exceptions — a page-by-page
+  visual read of a real generated Indonesian PDF (checking the bumped
+  pagination budgets actually prevent overflow) would be worth doing before
+  a wide rollout, per the plan's original "handled empirically, not
+  predicted" pagination approach.
