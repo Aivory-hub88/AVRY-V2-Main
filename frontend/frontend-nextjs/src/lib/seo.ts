@@ -114,7 +114,11 @@ export function createOrganization(siteUrl: PublicSiteUrl) {
       'Autonomous Infrastructure Defence',
       'Governed AI Systems',
     ],
-    sameAs: ['https://www.linkedin.com/company/aivory/'],
+    sameAs: [
+      'https://www.linkedin.com/company/aivory/',
+      'https://github.com/Aivory-hub88',
+    ],
+    award: ['NVIDIA Inception Program (2026)'],
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'sales',
@@ -124,6 +128,7 @@ export function createOrganization(siteUrl: PublicSiteUrl) {
     subjectOf: [
       { '@id': `${siteUrl}/#faq` },
       { '@id': `${siteUrl}/#howto-assessment` },
+      { '@id': `${siteUrl}/nvidia-inception#webpage` },
     ],
   };
 }

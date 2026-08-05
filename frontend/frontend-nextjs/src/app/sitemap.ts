@@ -25,6 +25,7 @@ const STATIC_ROUTES: Array<{
   { path: "/company", changeFrequency: "monthly", priority: 0.6 },
   { path: "/contact", changeFrequency: "monthly", priority: 0.5 },
   { path: "/free-diagnostic", changeFrequency: "monthly", priority: 0.7 },
+  { path: "/nvidia-inception", changeFrequency: "yearly", priority: 0.6 },
   { path: "/cookie-policy", changeFrequency: "yearly", priority: 0.2 },
 ];
 
