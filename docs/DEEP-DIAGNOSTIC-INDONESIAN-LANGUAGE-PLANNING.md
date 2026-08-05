@@ -1,13 +1,20 @@
 # Deep Diagnostic — Bahasa Indonesia Language Support
 
-**Status:** Phase 1 (Intake flow) and Phase 2 (Results page + PDF report) —
-✅ **BOTH SHIPPED to the repo** 2026-08-04. Phase 1 pushed as `84dfd62`,
-Phase 2 pushed as `bfd94f4`, both in `avry-user-dashboard` on `Aivory-hub88`
+**Status:** Phase 1 (Intake flow), Phase 2 (Results page + PDF report), and
+Phase 3 (PDF QA pass + bug fixes) — ✅ **ALL SHIPPED to the repo**, Phase 1+2
+✅ **DEPLOYED to the live VPS** 2026-08-05. Phase 1 pushed as `84dfd62`,
+Phase 2 pushed as `bfd94f4`, Phase 3 pushed as `9c0c1b2` (not yet deployed to
+the VPS — see note in §8), all in `avry-user-dashboard` on `Aivory-hub88`
 (canonical remote). The full assessment — intake, review, results page, and
 the downloadable PDF — now renders end to end in Bahasa Indonesia **in the
-codebase**. 🔴 **Not deployed yet** — the live user dashboard on the VPS is
-still running the pre-Indonesian build; deploying this is the **next
-priority task**, see §6.
+codebase**, and Phase 1+2 are live in production at
+`https://aivory.id/dashboard`. 🟡 **One item still needs a human pass**: the
+logged-in, end-to-end Indonesian flow check (dropdown → intake → summary →
+results → PDF download) against the **live production site** has still not
+been done by either the agent or Irfan — see §6.5 and §8 for why, and do
+this before calling the rollout fully closed. Phase 3's QA (§8) was done
+against a real downloaded report and a locally-regenerated PDF, which is
+strong evidence but is not the same as a live-site check.
 **Owner:** Irfan · **Source:** product request, 2026-08-04 — parity with the
 free assessment landing page, which already ships a bilingual EN/ID
 experience.
@@ -226,55 +233,214 @@ rather than scraping DOM) — left untranslated, same call as skipping
   a wide rollout, per the plan's original "handled empirically, not
   predicted" pagination approach.
 
-## 6 · Next priority — deploy to the live VPS
+## 6 · Deploy to the live VPS — ✅ DONE 2026-08-05
 
-**Both phases exist only in the git repo right now.** Confirmed
-(2026-08-04) that no VPS step has been taken this round — commits `84dfd62`
-and `bfd94f4` are pushed to `Aivory-hub88/avry-user-dashboard`, but the live
-container has not been pulled, rebuilt, or restarted, so
-`https://www.aivory.id/dashboard` (and `stag.aivory.id`) are still serving
-the pre-Indonesian build.
+**Executed on `tencent-vps` (129.226.155.216), live checkout
+`/home/ubuntu/avry-user-dashboard` symlinked from
+`/home/ubuntu/AVRY-V2-Main/frontend/avry-user-dashboard`, compose project
+`/home/ubuntu/AVRY-V2-Main/docker-compose.prod.yml`.**
 
-**Why this isn't a trivial `git pull`** — per `[[dashboard-local-vps-divergence]]`
-and `[[aivory-dashboards-vps-deploy]]`: the VPS checkout the live container
-actually builds from has, in the past, diverged from the fork (different
-branch, or ahead/behind on unrelated changes), and uncommitted VPS-local
-edits have been silently reverted by redeploys before. So this is not a
-blind overwrite — it needs a state check first.
+- [x] **6.1 Located the live checkout and checked its state.** It was
+      **not** on `main` — branch was `feat/diagnostic-report-upgrades`, and
+      it turned out to be **106 commits behind** `Aivory-hub88/avry-user-dashboard`'s
+      `main` (not the handful expected), including `84dfd62` + `bfd94f4`.
+      This is the same drift pattern `[[dashboard-local-vps-divergence]]`
+      warned about, worse than any prior known instance.
+- [x] **6.2 Found and preserved real uncommitted VPS-local work before
+      touching anything** — this is the part worth remembering. 14 modified
+      + 3 untracked files (~3,865 lines), all with the *same* mtime
+      (31 Jul 23:47:39–42, a ~3s window — a bulk file-copy signature, not
+      organic edits), turned out to be an **entire uncommitted
+      payment/invoicing feature** (`CreditPackGrid.tsx`, `InvoiceModal.tsx`,
+      `lib/invoicePdf.ts`, plus edits across `usePayment.ts`,
+      `paymentHandler.ts`, `subscriptionPlans.ts`, the wallet/quota/
+      subscriptions pages, `WalletSettings.tsx`, `SettingsModal.tsx`) that
+      existed **only** on that VPS disk — no branch, no stash, no other
+      copy anywhere. One of those files, `app/diagnostics/deep/final-result/page.tsx`,
+      directly overlapped with the incoming Phase 2 commit (2,179 local
+      diff lines vs. 511 incoming diff lines on the same file) — a real
+      merge conflict, not a theoretical one.
+      - Ran `git stash push -u -m 'pre-indonesian-deploy WIP payment/invoicing
+        2026-08-05'` — **this WIP is now safely preserved as `stash@{0}`** on
+        the `feat/diagnostic-report-upgrades` branch in that checkout. It has
+        not been reconciled, rebased onto `main`, or committed anywhere —
+        that's a separate, unscoped task if/when someone picks the
+        payment/invoicing feature back up. See §7 for the follow-up doc.
+      - Hit a second, unrelated blocker while stashing: the entire `hooks/`
+        directory and a handful of root config files (`.env.example`,
+        `next.config.ts`, `package.json`, `package-lock.json`,
+        `vitest.config.ts`) were **owned by a foreign UID (`197612:197121`,
+        not `ubuntu`, not resolvable to a real user)** — git couldn't
+        unlink/rewrite them. Root cause unconfirmed (likely an old
+        rsync/tar-extract that preserved a non-local UID) but fixed with
+        `sudo chown -R ubuntu:ubuntu /home/ubuntu/avry-user-dashboard`. Worth
+        a spot-check if other VPS checkouts hit mysterious "permission
+        denied" on git operations.
+- [x] **6.3 Fetch + fast-forward merge**, after the working tree was clean:
+      `git checkout main && git reset --hard HEAD && git pull --ff-only
+      origin main` → clean fast-forward to `bfd94f4`, 276 files changed. This
+      brought in far more than Phase 1/2 — the other 103 commits were
+      unrelated, previously-unshipped work (agent feature, workflow
+      versioning/fixtures, exchange-rate live rates, etc. — now documented
+      separately, see §7). Confirmed before rebuilding:
+      - New required env vars (`DATABASE_URL`, `JWT_SECRET`,
+        `N8N_CREDENTIALS_ENCRYPTION_KEY`, added to `.env.example` in this
+        range) were **already present** in `/home/ubuntu/AVRY-V2-Main/.env`
+        and already wired into the `avry-user-dashboard` service block in
+        `docker-compose.prod.yml` — this gap was closed in an earlier session
+        per `[[workflow-copilot-three-followups]]` and held this time (no
+        regression).
+      - The 4 new SQL files under `migrations/` (`dashboard-storage.sql`,
+        `dashboard-n8n-credentials.sql`, `dashboard-workflow-fixtures.sql`,
+        `dashboard-workflow-versions.sql`) collectively define 8 tables —
+        all 8 **already existed** in `avry-postgres`'s `dashboard` schema
+        (confirmed via `\dt dashboard.*`). No migration needed to be run.
+- [x] **6.4 Rebuilt + restarted only the user-dashboard container** —
+      `docker compose -f docker-compose.prod.yml up -d --build --no-deps
+      avry-user-dashboard`. Build succeeded, container recreated and
+      started; `avry-admin-dashboards` was untouched.
+- [x] **6.6 Confirmed the running container is the new build** — `docker
+      inspect` shows `State.StartedAt` matching the rebuild time; `docker
+      logs --since 2m` after restart shows zero errors/exceptions.
+      `https://aivory.id/dashboard` serves the login page correctly
+      (title, form, no console/server errors beyond pre-existing CSP
+      warnings for third-party analytics scripts, unrelated to this
+      change).
+- [ ] **6.5 NOT completed — needs Irfan, not the agent.** The full
+      logged-in Indonesian flow (dropdown on intake + results, a real
+      intake → summary → results run in Bahasa Indonesia, PDF download)
+      was **not** verified against the live production site. The agent has
+      no production login credentials and, per its own operating rules,
+      will not enter a password or fabricate/bypass a production auth
+      session to get one — that's a hard line, not a missing tool. **This
+      is the one remaining step before the rollout can be called done.**
+      While doing it, also do the visual PDF QA pass flagged as open in §5
+      (page-by-page read of a real Indonesian PDF, checking the bumped
+      `ensureSpace()` pagination budgets actually prevent overflow) — it
+      was never done and is the highest-risk untested part of this whole
+      feature.
 
-**To-do**
+**Exit gate — partially met:** the deployed commit is confirmed to be
+`bfd94f4` and running cleanly with no regressions detected at the
+infrastructure level. The functional exit gate (Indonesian dropdown +
+full assessment + PDF verified live, no English-path regression) is
+**still open**, pending §6.5.
 
-- [ ] **6.1 SSH to the VPS and confirm which checkout is live** — locate the
-      active `avry-user-dashboard` directory (`/home/ubuntu/AVRY-V2-Main/frontend/avry-user-dashboard`
-      per the last-known layout, but re-verify with `ls -la` /
-      `git remote -v` since this has moved before), and check its current
-      branch + `git status` + how far behind `Aivory-hub88/avry-user-dashboard`'s
-      `main` it is.
-- [ ] **6.2 Reconcile any VPS-local-only changes before overwriting.** If
-      `git status` on the VPS shows uncommitted changes or the branch isn't
-      `main`, diff them against what Phase 1/2 touched before merging — do
-      not blanket `git reset --hard` per the standing "never overwrite VPS
-      state blindly" rule.
-- [ ] **6.3 Fetch + fast-forward merge** the VPS checkout onto
-      `Aivory-hub88/avry-user-dashboard main` (which now includes `84dfd62`
-      + `bfd94f4`).
-- [ ] **6.4 Rebuild + restart only the user-dashboard container** —
-      `docker compose -f docker-compose.prod.yml up -d --build --no-deps avry-user-dashboard`
-      (exact compose file path/name to confirm on arrival; do not touch
-      other services).
-- [ ] **6.5 Verify live**, in the actual browser against the public URL (not
-      just a local curl — Traefik routes by Host header, so bare-IP/curl
-      checks 404 by design per `[[dashboard-local-vps-divergence]]`):
-      dropdown appears on both the intake page and the results page, a full
-      Indonesian run through intake → summary → results renders correctly,
-      and the downloadable PDF is Indonesian when generated in that locale.
-      Also spot-check English mode still works (no regression).
-- [ ] **6.6 Confirm the container that's now running was actually built from
-      the new commit** (image build timestamp / `docker inspect` labels, or
-      by checking a landmark string only present in the new code) — a
-      cached Docker layer silently serving the old bundle has bitten this
-      project before.
+## 7 · Unrelated features that rode along in this deploy
 
-**Exit gate:** the public URL renders the Indonesian dropdown and a full
-Indonesian assessment + PDF end to end, with no regression to the English
-path, and the deployed commit is confirmed to match `bfd94f4`.
+The 106-commit gap between the VPS's stale branch and `main` meant this
+deploy shipped **~103 commits of previously-unreleased work** that has
+nothing to do with Indonesian language support — most notably a new agent
+feature and workflow version/fixture history. Those are documented
+separately so they don't get lost inside a language-support planning doc:
+
+- [`AGENT-FEATURE-OVERVIEW.md`](AGENT-FEATURE-OVERVIEW.md)
+- [`WORKFLOW-VERSIONING-AND-FIXTURES-OVERVIEW.md`](WORKFLOW-VERSIONING-AND-FIXTURES-OVERVIEW.md)
+
+Also now live but out of scope for any doc yet: `lib/liveRates.ts` +
+`app/api/exchange-rates/route.ts` (live FX rates — may already be covered by
+`[[deep-diagnostic-fx-and-report-fixes]]`, worth cross-checking) and the
+uncommitted payment/invoicing WIP stashed in §6.2 above (not deployed, not
+documented — still needs its owner to reconcile it).
+
+## 8 · Phase 3 — PDF QA pass and bug fixes (2026-08-05, `9c0c1b2`)
+
+**Trigger:** Irfan uploaded a real Indonesian Deep Diagnostic PDF (company
+"Acme", downloaded from the live/local flow) and asked for it to be checked
+before an unrelated commit (the Blueprint/Roadmap language dropdown, see
+`[[blueprint-roadmap-language-dropdown]]`) went out. This is the visual
+PDF QA pass flagged as an open item in §5 and never completed — reading a
+real generated document (not just `tsc`) is what surfaced these; none were
+visible from the code alone.
+
+**4 issues found, all fixed:**
+
+1. **Mislabeled ROI headline.** The "ROI 3 Tahun" tile showed the *gross*
+   `threeYearROIPercent` (37.2% in the reviewed report) but was captioned
+   "bersih setelah investasi" / "net of investment". The "Kisaran ROI 3
+   Tahun" scenario range just below it correctly uses the *net*
+   `netThreeYearROIPercent` (which nets out the annual ongoing-cost
+   assumption `ONGOING_COST_RATE = 0.20`) — so its "Dasar" cell showed a
+   wildly different, often negative number with no explanation, reading as
+   a broken/contradictory financial case. **Fix:** relabelled the headline
+   caption to `'sebelum biaya operasional berjalan'` / `'before ongoing
+   operating costs'` (accurate — it *is* net of the initial investment,
+   just not of ongoing run costs) and added an explanatory sentence under
+   the scenario range clarifying the two figures differ on purpose. The
+   actual headline number was **not** changed — it already matched the
+   narrative sentence and the Methodology formula row, so changing it
+   would have introduced a *new* inconsistency rather than fixing one.
+   This bug is present in the English PDF too (same code path, `locale ===
+   'en'` branch had the equivalent "net of investment" caption) — fixed in
+   both locales. Files: `lib/pdfExport.ts`.
+2. **Overlapping text in the Methodology table.** Row 1's description,
+   `"Kapasitas tim yang dipulihkan per tahun"` (40 chars — longer than any
+   English equivalent), was drawn with a bare `pdf.text()` call with no
+   width constraint, unlike the adjacent result column which already used
+   `splitTextToSize`. It ran straight into the result column instead of
+   wrapping, visibly garbling that row in the reviewed PDF. **Fix:** apply
+   `splitTextToSize` to the description column too (48mm budget), and take
+   `Math.max()` of both columns' wrapped line counts when advancing `y`.
+   Files: `lib/pdfExport.ts`.
+3. **FX-rate date in the wrong locale.** `getFxAsOfLabel()`
+   (`lib/liveRates.ts`) hardcoded `toLocaleDateString('en-GB', ...)` for
+   the "live" FX branch regardless of report locale — the reviewed PDF
+   showed "Kurs per 05 Aug 2026 (live)" (English month) right next to a
+   cover page correctly showing "05 Agustus 2026". Fixed by adding a
+   `locale` param to `getFxAsOfLabel()` and a parallel `fxAsOfId` field on
+   `ROIProjection` (`types/diagnostic.ts`), computed once at calculation
+   time alongside the existing `fxAsOf` — same absence-safe,
+   compute-both-locales-once convention as `opportunitiesId?` /
+   `scoreDriversId?` from Phase 2. Both the PDF and the on-screen
+   `final-result/page.tsx` now read `fxAsOfId` when `locale === 'id'`.
+   **Caveat:** only exercised via code inspection + the regeneration test
+   below, which had no live FX cache locally (fell back to the static
+   `FX_AS_OF` snapshot string, a different code path) — the `id-ID` branch
+   itself wasn't rendered and screenshotted. Same date-locale pattern is
+   already proven correct elsewhere in the same file (the cover date), so
+   confidence is high, but this is the one fix in this batch that wasn't
+   directly eyeballed.
+4. **Mixed-language "Analisis Operasional Bisnis" section.** By design
+   (§5), the model-generated narrative (`aiAnalysis`/`llmResult`) is not
+   translated — but seeing it in a real document made clear that
+   translated sub-headings (KEKUATAN, KENDALA UTAMA, ...) sitting directly
+   above untranslated English paragraphs reads as broken, not as a known
+   limitation. **Fix:** added one line to the existing disclaimer note (in
+   both the PDF and `final-result/page.tsx`, shown only when
+   `locale === 'id'`) stating this section is still English-only. Does not
+   change what content renders, just sets expectations. Files:
+   `lib/pdfExport.ts`, `app/diagnostics/deep/final-result/page.tsx` (+
+   `final-result.module.css` for the new `.aiLanguageNote` class).
+
+**Verification:** `tsc --noEmit` clean (same 2 pre-existing unrelated
+errors as before). Regenerated a full PDF from the real code path — not a
+mock — via a throwaway `vitest` test that called `calculateROI()` +
+`exportReportToPdf()` directly with a synthetic `DiagnosticContext` close
+to the reviewed report's numbers, monkey-patching `jsPDF`'s instance
+`.save()` (a subclass via `vi.mock('jspdf', ...)`, since it's assigned as
+an own-property in the constructor and shadows a prototype patch) to dump
+bytes to disk instead of attempting a browser download. Confirmed
+directly in the regenerated PDF: fixes 1, 2, and 4 all render correctly
+(no overlap, correct label, disclaimer present, no new pagination
+overflow). Fix 3 confirmed by code + pattern-matching only, per the caveat
+above. Font-loading and a couple of glyph artefacts in the regenerated PDF
+(missing → and − glyphs, one missing inter-word space) are Helvetica-
+fallback artefacts from running headless in Node without network access to
+fetch the embedded Manrope font — not present in the real
+browser-generated PDF that triggered this review, and not related to any
+of the 4 fixes.
+
+**Not done / still open:**
+- Phase 3 has **not** been deployed to the VPS (unlike Phase 1+2, which
+  are live). It is committed and pushed to `Aivory-hub88/avry-user-dashboard`
+  `main` (`9c0c1b2`) only.
+- §6.5's live-site logged-in verification is still open and unaffected by
+  this phase — Phase 3's QA used an already-downloaded PDF and a local
+  regeneration, not the production site.
+- The maturity-scale labels "Baru Mulai" and "Memulai" (Nascent/Initiating)
+  read as near-synonyms in Indonesian — noted during review, not fixed
+  (lower priority, not selected in scope for this pass).
+- Minor style notes not acted on: "pendarahan modal" (capital bleed) and
+  "waktu ke nilai" (time to value) read as stiff literal translations; the
+  cover letter body says "Business Operations Assessment" in English while
+  the cover page title is translated — a small naming inconsistency.

@@ -1,0 +1,126 @@
+# Blueprint & Roadmap — Language Dropdown
+
+**Status:** ✅ **SHIPPED to the repo** 2026-08-05, pushed as `9c0c1b2` to
+`avry-user-dashboard` on `Aivory-hub88` (canonical remote). **Not yet
+deployed to the live VPS.**
+**Owner:** Irfan · **Source:** product request, 2026-08-05 — extend the same
+EN/ID language switcher already shipped for Deep Diagnostic
+(`[[deep-diagnostic-indonesian-language-planning]]`) to the Blueprint and
+Roadmap pages.
+**Scope:** `app/blueprint/page.tsx` + its 6 child components under
+`components/blueprint/`, and `app/roadmap/page.tsx`, in `avry-user-dashboard`.
+**Repo:** `Aivory-hub88/avry-user-dashboard`
+
+---
+
+## 1 · Why this exists
+
+Deep Diagnostic already has a language dropdown (see the Indonesian language
+planning doc). The ask was to bring the same dropdown to the Blueprint and
+Roadmap pages — the two pages a user visits right after Deep Diagnostic in
+the product flow.
+
+## 2 · What was already there (discovered before building anything)
+
+Unlike Deep Diagnostic, Blueprint and Roadmap use the **root app layout**,
+which renders the sidebar — and the sidebar already includes `LanguagePill`
+(an EN/ID segmented toggle), wired to the same `useLocaleContext()` /
+`next-intl` system. Deep Diagnostic needed its own on-page dropdown because
+its layout (`app/diagnostics/deep/layout.tsx`) deliberately hides the app
+sidebar. So the underlying language-switching mechanism was **already
+reachable** on Blueprint/Roadmap before this change — confirmed by checking
+`app/layout.tsx` and `components/shared/Sidebar.tsx`.
+
+Both pages also already had **partial** next-intl wiring: `useTranslations
+("blueprint")` / `useTranslations("roadmap")` calls existed, backed by 42
+and 34 keys respectively in `messages/en.json` / `messages/id.json` (with
+real, already-translated Indonesian values, not English copies) — but only
+16 and 26 `t()` call-sites actually used them, out of ~1456 and ~1208 lines
+per page. Most UI chrome was still hardcoded English.
+
+Given this, the actual scope was two things: (1) add the literal `<select>`
+dropdown per explicit request, even though `LanguagePill` already worked
+here — for visual consistency with the Deep Diagnostic pattern; and (2)
+translate the UI chrome that wasn't wired yet.
+
+## 3 · What shipped
+
+- **`<select>` dropdown**, matching Deep Diagnostic's exact pattern
+  (`<option value="en">English</option>` / `<option value="id">Bahasa
+  Indonesia</option>`, wired to the same `setLocale()`), added to:
+  - `app/blueprint/page.tsx` — appears in **all three page states**: empty
+    (no blueprint generated yet), corrupted/parse-error, and the full
+    rendered blueprint. A shared `languageSwitcher` JSX variable avoids
+    repeating the markup three times.
+  - `app/roadmap/page.tsx` — appears above the page header, in all states.
+  - New CSS: `.languageSwitcherRow` / `.languageSwitcherLabel` /
+    `.languageSwitcher` in `blueprint.module.css` (Blueprint uses CSS
+    modules); inline `style={{}}` for Roadmap (matches that file's existing
+    all-inline-styles convention, no CSS module there).
+- **Bug found and fixed while wiring the empty state:** `.emptyContainer`
+  in `blueprint.module.css` was a single flex row that centered both axes
+  — adding the dropdown as a second child put it in the dead center next
+  to the empty-state message instead of the top-right corner. Restructured
+  to a flex column (`.emptyContainer` → `.emptyBody` wrapping the actual
+  centered content) so the dropdown sits in its own row above.
+- **UI chrome translation** (headings, buttons, empty/error states, table
+  headers, status badges, tooltips, toasts) via two sequential sweeps
+  (Blueprint tree first, then Roadmap — sequential, not parallel, because
+  both write to the same `messages/en.json` / `messages/id.json`):
+  - `app/blueprint/page.tsx` — ~48 strings, plus 6 child components
+    (`BlueprintHeader.tsx` ~19, `ExecutiveSummary.tsx` 5, `WorkflowCard.tsx`
+    7, `RiskCard.tsx` 3, `DeploymentCard.tsx` 4; `ArchitectureLayer.tsx`
+    needed no changes — purely prop-driven). One real pre-existing bug
+    fixed in passing: a workflow-creation success toast was hardcoded
+    Indonesian text regardless of the active locale.
+  - `app/roadmap/page.tsx` — ~16 strings across 4 in-file helper
+    components (`OverallProgressBar`, `RoadmapTimeline`, `MilestoneRow`,
+    `KpiCard`), each needing its own `useTranslations("roadmap")` binding
+    added.
+  - **64 new keys** added to the `blueprint` namespace (+2 to `common`)
+    and **18 new keys** to the `roadmap` namespace, in both
+    `messages/en.json` and `messages/id.json` — key sets verified
+    identical between locales after each sweep.
+- **Deliberately left untranslated**, matching the Deep Diagnostic
+  precedent (canonical rule: LLM-generated content never translates, only
+  chrome does):
+  - Blueprint/roadmap content fetched from the backend (`BlueprintV1`
+    fields, `AiryRoadmap` phases/milestones/KPIs) — generated by an
+    upstream LLM call (roadmap via VPS-bridge `/console/stream`, blueprint
+    via `/api/blueprints`), same as Deep Diagnostic's `aiAnalysis`.
+  - `BLUEPRINT_INSIGHTS` static sample data — rendered through the same
+    fields as live blueprint content, treated identically.
+  - `exportRoadmapPdf()`'s jsPDF `doc.text()` calls and the Aivory-assistant
+    prefill strings (natural-language LLM prompts, not UI labels).
+
+## 4 · Files touched
+
+`app/blueprint/blueprint.module.css`, `app/blueprint/page.tsx`,
+`app/roadmap/page.tsx`, `components/blueprint/BlueprintHeader.tsx`,
+`components/blueprint/DeploymentCard.tsx`,
+`components/blueprint/ExecutiveSummary.tsx`,
+`components/blueprint/RiskCard.tsx`, `components/blueprint/WorkflowCard.tsx`,
+`messages/en.json`, `messages/id.json`.
+
+## 5 · Verification
+
+`tsc --noEmit` clean throughout (same 2 pre-existing unrelated errors as the
+rest of the repo). Verified live via the local dev server (`user-dashboard`
+launch config, port 9000, `/dashboard` basePath, `aivory_auth` localStorage
+bypass): toggled EN→ID→EN on both pages in both their empty and non-empty
+states, confirmed every string switches correctly and stays in sync with the
+sidebar's `LanguagePill`, confirmed the empty-state layout fix visually
+(dropdown now top-right, not center), and confirmed no new console errors —
+the only errors present (`/api/storage/blueprint` and `/api/storage/roadmap`
+500s) are pre-existing local-dev artefacts from no local Postgres connection,
+unrelated to this change (falls back to localStorage correctly).
+
+## 6 · Open items
+
+- **Not deployed to the VPS.** Pushed to `main` on `Aivory-hub88` only.
+- No production/live-site check has been done (same caveat as Deep
+  Diagnostic's §6.5 — needs a real login, which the agent cannot do).
+- LLM-generated blueprint/roadmap content stays English-only regardless of
+  the dropdown, same open item as Deep Diagnostic's `aiAnalysis` section —
+  giving the upstream LLM a locale hint is a separate, larger, cross-repo
+  effort (vps-bridge).
