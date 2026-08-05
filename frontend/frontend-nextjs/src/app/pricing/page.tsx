@@ -15,6 +15,15 @@ import {
 export const metadata: Metadata = {
   title: 'Pricing',
   description: 'Simple, transparent pricing. Buy once, own the output.',
+  alternates: {
+    canonical: '/pricing',
+    languages: { en: '/pricing', id: '/pricing' },
+  },
+  openGraph: {
+    title: 'Pricing | Aivory',
+    description: 'Simple, transparent pricing for AI-powered business transformation.',
+    url: '/pricing',
+  },
 };
 
 export default function PricingPage() {
@@ -27,7 +36,13 @@ export default function PricingPage() {
           { name: 'Pricing', item: absoluteUrl('/pricing') },
         ])}
       />
-      <main className="relative bg-[#050505] min-h-screen pt-24 text-white font-manrope">
+      <main
+        className="relative min-h-screen font-manrope"
+        style={{
+          background:
+            'linear-gradient(to bottom, #050505 0, #050505 64px, #dfe4e5 64px, #dfe4e5 100%)',
+        }}
+      >
         <Navbar />
         <PricingClientWrapper />
         <Footer />
