@@ -107,7 +107,7 @@ export default function Footer() {
                   title="NVIDIA Inception Program — 2026 cohort"
                 >
                   <img
-                    src="/images/badges/nvidia-inception-badge.svg"
+                    src="/images/badges/nvidia-inception-badge-v2.svg"
                     alt="NVIDIA Inception Program — Aivory AI is a member (2026 cohort)"
                     className="h-[45px] w-auto shrink-0 md:h-[55px]"
                   />

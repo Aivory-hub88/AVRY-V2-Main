@@ -157,7 +157,7 @@ export default function NvidiaInceptionPage() {
             <figure className="lg:col-span-7">
               <div className="flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#11110f] p-12 md:p-16 lg:p-20">
                 <img
-                  src="/images/badges/nvidia-inception-badge.svg"
+                  src="/images/badges/nvidia-inception-badge-v2.svg"
                   alt="NVIDIA Inception Program 2026 badge — granted to Aivory AI"
                   width={620}
                   height={400}
