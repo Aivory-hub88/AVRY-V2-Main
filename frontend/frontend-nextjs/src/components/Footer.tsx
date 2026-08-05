@@ -94,16 +94,16 @@ export default function Footer() {
 
             {/* Logo */}
             <div className="col-span-2 md:col-span-1 flex md:justify-end mt-8 md:mt-0">
-              <div className="flex flex-col items-end gap-4">
+              <div className="flex flex-row items-center gap-6 md:gap-8">
                 <img
                   src="/Aivory_logo_2_2026.svg"
                   alt="Aivory Logo"
-                  className="h-[36px] md:h-[52px] w-auto opacity-90"
+                  className="h-[28px] md:h-[36px] w-auto opacity-90"
                 />
                 <img
                   src="/images/Nvidia Inception/nvidia-inception-program-badge-rgb-for-screen.svg"
                   alt="NVIDIA Inception Program"
-                  className="h-[40px] md:h-[56px] w-auto"
+                  className="h-[35px] md:h-[45px] w-auto"
                 />
               </div>
             </div>
