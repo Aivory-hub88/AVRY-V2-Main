@@ -16,7 +16,7 @@ export default function PricingClientWrapper() {
   const activeCurrency = currency || 'USD';
 
   return (
-    <div id="pricing-section" className="w-full bg-[#efeee8] pt-16">
+    <div id="pricing-section" className="w-full pt-16">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-12">
           <h2 className="text-[36px] md:text-[56px] font-normal tracking-tight text-[#1a1a1a]" style={{ fontFamily: "'Manrope', sans-serif" }}>
