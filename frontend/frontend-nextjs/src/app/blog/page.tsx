@@ -1,20 +1,29 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import Navbar from "@/components/home/Navbar";
-import Footer from "@/components/Footer";
-import { getBlogPosts, BlogPost, BlogPostsResponse } from "@/lib/blog-api"
-import { DEFAULT_OG_IMAGE } from "@/lib/seo"
+import Navbar from "@/components/home/Navbar"
+import Footer from "@/components/Footer"
+import { getBlogPosts, type BlogPost, type BlogPostsResponse } from "@/lib/blog-api"
+import {
+  DEFAULT_OG_IMAGE,
+  SITE_URL,
+  absoluteUrl,
+  JsonLd,
+  createBreadcrumbList,
+} from "@/lib/seo"
 
 export const metadata: Metadata = {
-  title: "Blog",
+  title: "News & Insights",
   description:
-    "Insights, guides, and updates on AI adoption, automation, and business transformation from the Aivory team.",
-  alternates: { canonical: "/blog" },
+    "Reporting and practical analysis on business operations, governed AI, and operational transformation from Aivory.",
+  alternates: {
+    canonical: "/blog",
+    languages: { en: "/blog", id: "/blog" },
+  },
   openGraph: {
     type: "website",
-    title: "Blog",
+    title: "News & Insights | Aivory",
     description:
-      "Insights, guides, and updates on AI adoption, automation, and business transformation.",
+      "Reporting and practical analysis on business operations, governed AI, and operational transformation.",
     url: "/blog",
     images: [DEFAULT_OG_IMAGE],
   },
@@ -22,246 +31,357 @@ export const metadata: Metadata = {
 }
 
 function formatDate(dateString: string): string {
-  const date = new Date(dateString)
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
+  return new Date(dateString).toLocaleDateString("en-GB", {
+    day: "2-digit",
     month: "long",
-    day: "numeric",
+    year: "numeric",
   })
 }
 
-function BlogPostCard({ post }: { post: BlogPost }) {
+function ArticleArrow() {
   return (
-    <Link
-      href={`/blog/${post.slug}`}
-      className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden hover:border-[#c4c9b8]/40 hover:bg-white/[0.04] transition-all duration-300"
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4" fill="none">
+      <path d="M3 13 13 3M6 3h7v7" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  )
+}
+
+function ImageFallback({ title }: { title: string }) {
+  return (
+    <div
+      className="relative flex h-full min-h-[280px] w-full items-end overflow-hidden bg-[#11110f] p-6 text-[#efeee8]"
+      aria-label={`Abstract illustration for ${title}`}
+      role="img"
     >
-      {/* Thumbnail */}
-      <div className="aspect-video w-full bg-white/5 overflow-hidden">
+      <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(239,238,232,0.18)_1px,transparent_1px),linear-gradient(90deg,rgba(239,238,232,0.18)_1px,transparent_1px)] [background-size:48px_48px]" />
+      <div className="absolute left-[12%] top-[22%] h-28 w-28 rounded-full border border-[#a3aa96]/60" />
+      <div className="absolute right-[16%] top-[32%] h-40 w-40 rotate-45 border border-[#efeee8]/25" />
+      <span className="relative font-mono text-[10px] uppercase tracking-[0.2em] text-[#dfe2d8]">
+        Aivory Editorial
+      </span>
+    </div>
+  )
+}
+
+function FeaturedStory({ post }: { post: BlogPost }) {
+  return (
+    <article className="grid border-t border-black/25 pt-8 lg:grid-cols-12 lg:gap-12">
+      <div className="flex flex-col pb-10 lg:col-span-5 lg:min-h-[430px] lg:pb-0">
+        <time
+          dateTime={post.published_at}
+          className="mb-6 font-mono text-[10px] uppercase tracking-[0.16em] text-black/60"
+        >
+          {formatDate(post.published_at)}
+        </time>
+        <h2 className="max-w-xl text-[32px] font-light leading-[1.05] tracking-[-0.035em] text-[#11110f] md:text-[46px]">
+          {post.title}
+        </h2>
+        {post.excerpt && (
+          <p className="mt-8 max-w-md text-[16px] font-light leading-[1.7] text-black/70 md:text-[17px]">
+            {post.excerpt}
+          </p>
+        )}
+        <Link
+          href={`/blog/${post.slug}`}
+          className="group mt-10 inline-flex w-fit items-center gap-3 border-b border-black pb-1 text-[13px] font-light text-black transition-opacity hover:opacity-55 lg:mt-auto"
+        >
+          Read article
+          <ArticleArrow />
+        </Link>
+      </div>
+
+      <Link
+        href={`/blog/${post.slug}`}
+        className="group block aspect-[16/10] overflow-hidden bg-[#11110f] lg:col-span-7"
+        aria-label={`Read ${post.title}`}
+      >
         {post.thumbnail_url ? (
           <img
             src={post.thumbnail_url}
             alt={post.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg
-              className="w-12 h-12 text-white/40"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"
-              />
-            </svg>
-          </div>
+          <ImageFallback title={post.title} />
+        )}
+      </Link>
+    </article>
+  )
+}
+
+function FeaturedRow({ post, index }: { post: BlogPost; index: number }) {
+  return (
+    <Link
+      href={`/blog/${post.slug}`}
+      className="group flex flex-col gap-4"
+    >
+      <div className="aspect-[16/10] overflow-hidden bg-[#11110f]">
+        {post.thumbnail_url ? (
+          <img
+            src={post.thumbnail_url}
+            alt={post.title}
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
+          />
+        ) : (
+          <ImageFallback title={post.title} />
         )}
       </div>
-
-      {/* Content */}
-      <div className="flex flex-col flex-1 p-5">
-        <h2 className="text-lg font-semibold text-white mb-2 group-hover:text-[#dfe2d8] transition-colors line-clamp-2">
+      <div>
+        <time
+          dateTime={post.published_at}
+          className="mb-3 block font-mono text-[10px] uppercase tracking-[0.16em] text-black/60"
+        >
+          {formatDate(post.published_at)}
+        </time>
+        <h3 className="text-[20px] font-light leading-[1.15] tracking-[-0.02em] text-[#11110f] md:text-[23px]">
           {post.title}
-        </h2>
-
+        </h3>
         {post.excerpt && (
-          <p className="text-sm text-gray-200 mb-4 line-clamp-3 flex-1">
+          <p className="mt-3 text-[14px] font-light leading-[1.6] text-black/60 md:text-[15px]">
             {post.excerpt}
           </p>
         )}
-
-        <div className="flex items-center justify-between text-xs text-gray-300 mt-auto pt-3 border-t border-white/5">
-          <span>{post.author_name}</span>
-          <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
-        </div>
+        <span className="mt-5 inline-flex items-center gap-2 border-b border-black pb-0.5 text-[12px] font-light text-black transition-opacity group-hover:opacity-55">
+          Read article
+          <ArticleArrow />
+        </span>
       </div>
     </Link>
   )
 }
 
-function EmptyState() {
+function ArchiveRow({ post }: { post: BlogPost }) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <svg
-        className="w-16 h-16 text-white/40 mb-6"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        aria-hidden="true"
+    <article className="border-t border-black/25">
+      <Link
+        href={`/blog/${post.slug}`}
+        className="group grid gap-6 py-7 text-black md:grid-cols-[150px_minmax(0,1fr)_180px] md:items-start md:py-9"
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1}
-          d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"
-        />
-      </svg>
-      <h2 className="text-xl font-semibold text-white mb-2">No posts yet</h2>
-      <p className="text-gray-200 max-w-sm">
-        We&apos;re working on some great content. Check back soon for articles about
-        AI, technology, and how Aivory can help your business.
-      </p>
-    </div>
-  )
-}
-
-function LoadingGrid() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex flex-col rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden animate-pulse"
+        <time
+          dateTime={post.published_at}
+          className="font-mono text-[10px] uppercase tracking-[0.14em] text-black/55"
         >
-          <div className="aspect-video w-full bg-white/5" />
-          <div className="p-5 space-y-3">
-            <div className="h-5 bg-white/10 rounded w-3/4" />
-            <div className="h-4 bg-white/5 rounded w-full" />
-            <div className="h-4 bg-white/5 rounded w-2/3" />
-            <div className="flex justify-between pt-3 border-t border-white/5">
-              <div className="h-3 bg-white/5 rounded w-20" />
-              <div className="h-3 bg-white/5 rounded w-24" />
-            </div>
-          </div>
+          {formatDate(post.published_at)}
+        </time>
+        <div className="max-w-3xl">
+          <h3 className="text-[25px] font-light leading-[1.1] tracking-[-0.025em] transition-opacity group-hover:opacity-55 md:text-[34px]">
+            {post.title}
+          </h3>
+          {post.excerpt && (
+            <p className="mt-4 max-w-2xl text-[14px] font-light leading-[1.65] text-black/65 md:text-[15px]">
+              {post.excerpt}
+            </p>
+          )}
+          <span className="mt-6 inline-flex items-center gap-3 text-[12px] font-light">
+            Read article <ArticleArrow />
+          </span>
         </div>
-      ))}
-    </div>
+        <div className="hidden aspect-[4/3] overflow-hidden bg-[#11110f] md:block">
+          {post.thumbnail_url ? (
+            <img
+              src={post.thumbnail_url}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+            />
+          ) : (
+            <ImageFallback title={post.title} />
+          )}
+        </div>
+      </Link>
+    </article>
   )
 }
 
-function PaginationControls({
-  page,
-  totalPages,
-}: {
-  page: number
-  totalPages: number
-}) {
+function PaginationControls({ page, totalPages }: { page: number; totalPages: number }) {
   if (totalPages <= 1) return null
 
+  const paginationLink =
+    "inline-flex min-h-[44px] items-center border border-black/30 px-5 text-[11px] font-light uppercase tracking-[0.12em] text-black transition-colors hover:bg-black hover:text-white"
+
   return (
-    <div className="flex items-center justify-center gap-4 mt-12">
+    <nav aria-label="Blog pagination" className="flex items-center justify-between border-t border-black/25 py-10">
       {page > 1 ? (
-        <Link
-          href={`/blog?page=${page - 1}`}
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors"
-          aria-label="Previous page"
-        >
-          ← Previous
+        <Link href={`/blog?page=${page - 1}`} className={paginationLink}>
+          Previous
         </Link>
       ) : (
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors opacity-30 cursor-not-allowed"
-          aria-label="Previous page"
-        >
-          ← Previous
-        </button>
+        <span />
       )}
-
-      <span className="text-sm text-gray-200">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-black/55">
         Page {page} of {totalPages}
       </span>
-
       {page < totalPages ? (
-        <Link
-          href={`/blog?page=${page + 1}`}
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors"
-          aria-label="Next page"
-        >
-          Next →
+        <Link href={`/blog?page=${page + 1}`} className={paginationLink}>
+          Next
         </Link>
       ) : (
-        <button
-          disabled
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-white/10 text-white hover:bg-white/5 transition-colors opacity-30 cursor-not-allowed"
-          aria-label="Next page"
-        >
-          Next →
-        </button>
+        <span />
       )}
-    </div>
+    </nav>
   )
-
 }
 
-export const revalidate = 60; // SSG with ISR (1 min)
+async function searchPublishedPosts(query: string): Promise<BlogPost[]> {
+  const first = await getBlogPosts(1, 100)
+  const posts = [...first.posts]
+  for (let page = 2; page <= first.total_pages; page += 1) {
+    const next = await getBlogPosts(page, 100)
+    posts.push(...next.posts)
+  }
+
+  const needle = query.toLocaleLowerCase("en-GB")
+  return posts.filter((post) =>
+    `${post.title} ${post.excerpt || ""} ${post.author_name}`
+      .toLocaleLowerCase("en-GB")
+      .includes(needle),
+  )
+}
+
+export const revalidate = 60
 
 export default async function BlogPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const searchParams = await props.searchParams;
-  const pageStr = searchParams?.page;
-  const page = typeof pageStr === 'string' ? parseInt(pageStr, 10) : 1;
-  const validPage = isNaN(page) || page < 1 ? 1 : page;
+  const searchParams = await props.searchParams
+  const pageValue = searchParams?.page
+  const queryValue = searchParams?.q
+  const parsedPage = typeof pageValue === "string" ? Number.parseInt(pageValue, 10) : 1
+  const page = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+  const query = typeof queryValue === "string" ? queryValue.trim().slice(0, 120) : ""
 
-  let posts: BlogPost[] = [];
-  let totalPages = 0;
-  let error: string | null = null;
+  let posts: BlogPost[] = []
+  let totalPages = 0
+  let error: string | null = null
 
   try {
-    const data: BlogPostsResponse = await getBlogPosts(validPage, 9);
-    posts = data.posts;
-    totalPages = data.total_pages;
+    if (query) {
+      posts = await searchPublishedPosts(query)
+      totalPages = posts.length > 0 ? 1 : 0
+    } else {
+      const data: BlogPostsResponse = await getBlogPosts(page, 9)
+      posts = data.posts
+      totalPages = data.total_pages
+    }
   } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to load blog posts";
+    error = err instanceof Error ? err.message : "Failed to load newsroom articles"
   }
 
+  const featuredPosts = !query && page === 1 ? posts.slice(0, 3) : []
+  const archivePosts = featuredPosts.length > 0 ? posts.slice(3) : posts
+
   return (
-    <div className="flex min-h-screen flex-col font-manrope" style={{ background: "#050505" }}>
+    <div className="flex min-h-screen flex-col bg-[#050505] font-manrope">
       <Navbar />
 
-      <main className="flex-1 px-6 py-24">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-12 text-center mt-12">
-            <h1 className="text-[36px] md:text-[56px] font-light mb-4 tracking-tight text-white/90" style={{ fontFamily: "'Manrope', sans-serif" }}>Blog</h1>
-            <p className="text-[#dfe2d8] text-lg max-w-2xl mx-auto font-light">
-              Insights, updates, and guides on AI readiness and how Aivory can
-              transform your business.
-            </p>
-          </div>
+      <main
+        className="flex-1 bg-[#efeee8] text-[#11110f]"
+        style={{
+          fontFamily: "'Manrope', sans-serif",
+          fontWeight: 300,
+          background: "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)",
+        }}
+      >
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "Blog",
+            name: "Aivory News & Insights",
+            description: metadata.description,
+            url: `${SITE_URL}/blog`,
+            publisher: { "@id": `${SITE_URL}/#organization` },
+            blogPost: posts.map((post) => ({
+              "@type": "BlogPosting",
+              headline: post.title,
+              url: absoluteUrl(`/blog/${post.slug}`),
+              datePublished: post.published_at,
+              author: { "@type": "Organization", name: post.author_name },
+            })),
+          }}
+        />
+        <JsonLd
+          data={createBreadcrumbList([
+            { name: 'Home', item: absoluteUrl('/') },
+            { name: 'News & Insights', item: absoluteUrl('/blog') },
+          ])}
+        />
 
-          {/* Content */}
-          {error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-red-400 mb-4">{error}</p>
-              <Link
-                href="/blog"
-                className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  fontFamily: "'Manrope', sans-serif",
-                  fontWeight: 400,
-                  fontSize: '0.75rem',
-                  letterSpacing: '0.1em',
-                }}
-              >
-                Try Again
-              </Link>
-            </div>
-          ) : posts.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {posts.map((post) => (
-                  <BlogPostCard key={post.id} post={post} />
+        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 md:pb-24 md:pt-52">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
+            Newsroom
+          </p>
+          <h1 className="mt-5 text-[52px] font-light leading-[0.95] tracking-[-0.055em] md:text-[82px] lg:text-[104px]">
+            News &amp; Insights
+          </h1>
+        </section>
+
+        {featuredPosts.length > 0 && (
+          <section className="mx-auto max-w-[1480px] px-6 pb-16 md:px-12 md:pb-24">
+            <FeaturedStory post={featuredPosts[0]} />
+            {featuredPosts.length > 1 && (
+              <div className="mt-12 grid gap-8 border-t border-black/25 pt-10 md:grid-cols-2">
+                {featuredPosts.slice(1).map((post, index) => (
+                  <FeaturedRow key={post.id} post={post} index={index + 1} />
                 ))}
               </div>
+            )}
+          </section>
+        )}
 
-              <PaginationControls
-                page={validPage}
-                totalPages={totalPages}
+        <section aria-labelledby="all-articles-heading">
+          <div className="mx-auto max-w-[1480px] px-6 pb-8 md:px-12 md:pb-12">
+            <h2 id="all-articles-heading" className="text-[34px] font-light tracking-[-0.035em] md:text-[52px]">
+              {query ? `Search results for “${query}”` : "All articles"}
+            </h2>
+          </div>
+
+          <div className="bg-[#050505] px-6 py-8 text-white md:px-12 md:py-10">
+            <form action="/blog" method="get" role="search" className="mx-auto flex max-w-[1480px] items-end gap-4">
+              <label htmlFor="newsroom-search" className="sr-only">Search newsroom</label>
+              <span aria-hidden="true" className="pb-3 text-white/60">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m16.5 16.5 4 4" />
+                </svg>
+              </span>
+              <input
+                id="newsroom-search"
+                name="q"
+                type="search"
+                defaultValue={query}
+                placeholder="Search news and insights"
+                className="min-w-0 flex-1 border-b border-white/40 bg-transparent py-3 text-[15px] font-light text-white outline-none placeholder:text-white/45 focus:border-white"
               />
-            </>
-          )}
-        </div>
+              <button
+                type="submit"
+                className="border-b border-white/40 py-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white transition-opacity hover:opacity-60"
+              >
+                Search
+              </button>
+            </form>
+          </div>
+
+          <div className="mx-auto max-w-[1480px] px-6 pb-24 pt-12 md:px-12 md:pb-36 md:pt-16">
+            {error ? (
+              <div className="border-t border-black/25 py-16">
+                <p className="max-w-xl text-[17px] font-light leading-relaxed text-black/70">{error}</p>
+                <Link href="/blog" className="mt-8 inline-flex border-b border-black pb-1 text-[13px] font-light">
+                  Try again
+                </Link>
+              </div>
+            ) : archivePosts.length === 0 ? (
+              <div className="border-t border-black/25 py-16">
+                <p className="text-[22px] font-light">No articles matched your search.</p>
+                <Link href="/blog" className="mt-8 inline-flex border-b border-black pb-1 text-[13px] font-light">
+                  View all articles
+                </Link>
+              </div>
+            ) : (
+              archivePosts.map((post) => <ArchiveRow key={post.id} post={post} />)
+            )}
+
+            {!query && <PaginationControls page={page} totalPages={totalPages} />}
+          </div>
+        </section>
       </main>
 
       <Footer />
