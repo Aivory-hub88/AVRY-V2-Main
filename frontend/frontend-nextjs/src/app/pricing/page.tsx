@@ -4,6 +4,13 @@ import Footer from '@/components/Footer';
 import PricingStepOne from '@/components/home/PricingStepOne';
 import PricingStepTwo from '@/components/home/PricingStepTwo';
 import PricingClientWrapper from './PricingClientWrapper';
+import {
+  JsonLd,
+  buildPricingPageGraph,
+  createBreadcrumbList,
+  AIVORY_UK_URL,
+  absoluteUrl,
+} from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'Pricing',
@@ -12,12 +19,19 @@ export const metadata: Metadata = {
 
 export default function PricingPage() {
   return (
-    <main className="relative bg-[#050505] min-h-screen pt-24 text-white font-manrope">
-      <Navbar />
-      
-      <PricingClientWrapper />
-
-      <Footer />
-    </main>
+    <>
+      <JsonLd data={buildPricingPageGraph(AIVORY_UK_URL)} />
+      <JsonLd
+        data={createBreadcrumbList([
+          { name: 'Home', item: absoluteUrl('/') },
+          { name: 'Pricing', item: absoluteUrl('/pricing') },
+        ])}
+      />
+      <main className="relative bg-[#050505] min-h-screen pt-24 text-white font-manrope">
+        <Navbar />
+        <PricingClientWrapper />
+        <Footer />
+      </main>
+    </>
   );
 }

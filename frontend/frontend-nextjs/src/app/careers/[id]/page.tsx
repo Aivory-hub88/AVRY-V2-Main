@@ -99,7 +99,10 @@ export async function generateMetadata(
   return {
     title: titleParts || vacancy.title,
     description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      languages: { en: url, id: url },
+    },
     openGraph: {
       type: "website",
       title: `${vacancy.title} — Careers at ${SITE_NAME}`,
