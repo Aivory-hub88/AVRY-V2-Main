@@ -54,7 +54,19 @@ const AI_TRAINING_BOTS = [
 ];
 
 // Paths that should never be indexed by anyone.
-const PRIVATE_PATHS = ["/api/", "/login", "/free-diagnostic/results"];
+// - /login, /payment, /checkout/* are private/auth flows behind a sign-in.
+//   Even though each page also emits `robots: { index: false }` via Next.js
+//   metadata, listing them here stops crawlers before the page is fetched.
+// - /api/ is internal only.
+// - /free-diagnostic/results is a results screen reached only after
+//   submitting the diagnostic, never linked publicly.
+const PRIVATE_PATHS = [
+  "/api/",
+  "/login",
+  "/payment",
+  "/checkout/",
+  "/free-diagnostic/results",
+];
 
 export default function robots(): MetadataRoute.Robots {
   return {
