@@ -36,17 +36,22 @@ export default function PricingPage() {
           { name: 'Pricing', item: absoluteUrl('/pricing') },
         ])}
       />
-      <main
-        className="relative min-h-screen font-manrope"
-        style={{
-          background:
-            'linear-gradient(to bottom, #050505 0, #050505 64px, #dfe4e5 64px, #dfe4e5 100%)',
-        }}
-      >
+      <div className="flex min-h-screen flex-col bg-[#050505] font-manrope">
         <Navbar />
-        <PricingClientWrapper />
+        <main
+          className="flex-1 bg-[#efeee8] text-[#11110f]"
+          style={{
+            fontFamily: "'Manrope', sans-serif",
+            fontWeight: 300,
+            background:
+              'linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)',
+          }}
+        >
+          <PricingClientWrapper />
+        </main>
+
         <Footer />
-      </main>
+      </div>
     </>
   );
 }
