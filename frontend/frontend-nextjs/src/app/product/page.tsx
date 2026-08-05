@@ -12,6 +12,25 @@ export const metadata: Metadata = {
   title: 'Products',
   description:
     'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+  alternates: {
+    canonical: '/product',
+    languages: { en: '/product', id: '/product' },
+  },
+  openGraph: {
+    type: 'website',
+    title: 'Products — Aivory',
+    description:
+      'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+    url: '/product',
+    images: ['/hero-video-poster.jpg'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Products — Aivory',
+    description:
+      'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+    images: ['/hero-video-poster.jpg'],
+  },
 };
 
 export default function ProductPage() {
