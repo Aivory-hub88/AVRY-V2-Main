@@ -158,7 +158,7 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
   };
 
   return (
-    <section ref={ref} onMouseMove={handleMouseMove} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} spotlight-section w-full bg-[#dfe4e5] text-[#494949] py-24 font-sans`}>
+    <section ref={ref} onMouseMove={handleMouseMove} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} spotlight-section w-full bg-[#efeee8] text-[#494949] py-24 font-sans`}>
       <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
         {/* Header */}
         <div className="mb-20 text-center md:text-left">
