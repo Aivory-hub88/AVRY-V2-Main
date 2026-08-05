@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "lint:seo": "eslint --config eslint.config.seo.mjs \"src/app/**/page.{ts,tsx}\""
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.3.0",
@@ -43,6 +44,7 @@
     "autoprefixer": "10.4.20",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.7",
+    "eslint-plugin-aivory-seo": "file:tools/eslint-plugin-aivory-seo",
     "fast-check": "^4.8.0",
     "jsdom": "^25.0.1",
     "playwright": "^1.61.0",

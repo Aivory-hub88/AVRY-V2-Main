@@ -1,0 +1,13 @@
+{
+  "name": "eslint-plugin-aivory-seo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Custom ESLint rules for Aivory's Next.js App Router SEO. Catches canonical drift, missing metadata, and 'use client' pages that fall back to the homepage canonical — same bugs that caused the /careers, /contact, /free-diagnostic, /company, and /product pages to inherit the homepage canonical before being fixed.",
+  "main": "./index.js",
+  "peerDependencies": {
+    "eslint": ">=8.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
