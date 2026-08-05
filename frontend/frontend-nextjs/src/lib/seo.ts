@@ -568,6 +568,7 @@ export function buildCareersListGraph(
     employment_type: string | null;
     description: unknown;
     posted_at: string | null;
+    created_at: string;
   }>,
 ): Record<string, unknown> {
   const careersUrl = absoluteUrlForSite(siteUrl, '/careers');
@@ -604,7 +605,7 @@ export function buildCareersListGraph(
             description: typeof v.description === 'string'
               ? v.description.slice(0, 500)
               : richContentToPlainText(v.description).slice(0, 500),
-            datePosted: v.posted_at || undefined,
+            datePosted: v.posted_at || v.created_at || undefined,
             employmentType:
               employmentTypeMap[v.employment_type || ''] || undefined,
             hiringOrganization: { '@id': `${siteUrl}/#organisation` },
