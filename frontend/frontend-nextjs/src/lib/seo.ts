@@ -137,6 +137,14 @@ export function createWebsite(siteUrl: PublicSiteUrl) {
     description: WEBSITE_DESCRIPTION,
     publisher: { '@id': `${siteUrl}/#organisation` },
     inLanguage: siteUrl === AIVORY_UK_URL ? ['en', 'id'] : ['id', 'en'],
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${siteUrl}/?s={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
   };
 }
 
@@ -474,6 +482,169 @@ export function buildAboutPageGraph(siteUrl: PublicSiteUrl): Record<string, unkn
 
 /** Build-time publisher retained for Article/JobPosting schemas. */
 export const ORGANIZATION = createOrganization(AIVORY_UK_URL);
+
+export function createBreadcrumbList(
+  items: ReadonlyArray<{ name: string; item: string }>,
+) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((entry, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: entry.name,
+      item: entry.item,
+    })),
+  };
+}
+
+const PRICING_DESCRIPTION =
+  'Simple, transparent pricing for AI-powered business transformation. One-time assessments, transformation blueprints, monthly platform licences, and Intelligence Credit packs.';
+
+export function buildPricingPageGraph(
+  siteUrl: PublicSiteUrl,
+): Record<string, unknown> {
+  const pricingUrl = absoluteUrlForSite(siteUrl, '/pricing');
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': `${pricingUrl}#webpage`,
+        url: pricingUrl,
+        name: 'Pricing — Aivory',
+        description: PRICING_DESCRIPTION,
+        isPartOf: { '@id': `${siteUrl}/#website` },
+        about: { '@id': `${siteUrl}/#software` },
+        mainEntity: { '@id': `${siteUrl}/#software` },
+        publisher: { '@id': `${siteUrl}/#organisation` },
+        inLanguage: siteUrl === AIVORY_UK_URL ? 'en' : 'id',
+      },
+      ...ONE_TIME_PRODUCTS.map((product) =>
+        createOffer(siteUrl, product),
+      ),
+      ...SUBSCRIPTION_PRODUCTS.map((product) =>
+        createOffer(siteUrl, product),
+      ),
+    ],
+  };
+}
+
+const CONTACT_DESCRIPTION =
+  'Get in touch with Aivory. Contact the team about AI readiness, transformation blueprints, platform enquiries, or partnership opportunities.';
+
+export function buildContactPageGraph(
+  siteUrl: PublicSiteUrl,
+): Record<string, unknown> {
+  const contactUrl = absoluteUrlForSite(siteUrl, '/contact');
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'ContactPage',
+        '@id': `${contactUrl}#webpage`,
+        url: contactUrl,
+        name: 'Contact — Aivory',
+        description: CONTACT_DESCRIPTION,
+        isPartOf: { '@id': `${siteUrl}/#website` },
+        about: { '@id': `${siteUrl}/#organisation` },
+        publisher: { '@id': `${siteUrl}/#organisation` },
+        inLanguage: siteUrl === AIVORY_UK_URL ? 'en' : 'id',
+      },
+    ],
+  };
+}
+
+const CAREERS_DESCRIPTION =
+  'Open roles at Aivory. We hire people who prefer clear thinking over noise. Browse current openings in engineering, product, and operations.';
+
+export function buildCareersListGraph(
+  siteUrl: PublicSiteUrl,
+  vacancies: ReadonlyArray<{
+    id: string;
+    title: string;
+    department: string | null;
+    location: string | null;
+    employment_type: string | null;
+    description: unknown;
+    posted_at: string | null;
+  }>,
+): Record<string, unknown> {
+  const careersUrl = absoluteUrlForSite(siteUrl, '/careers');
+  const employmentTypeMap: Record<string, string> = {
+    'full-time': 'FULL_TIME',
+    'part-time': 'PART_TIME',
+    contract: 'CONTRACTOR',
+    internship: 'INTERN',
+    temporary: 'TEMPORARY',
+  };
+
+  const jobPostings =
+    vacancies.length > 0
+      ? vacancies.map((v) => {
+          const vacancyUrl = absoluteUrlForSite(siteUrl, `/careers/${v.id}`);
+          const isRemote = (v.location || '')
+            .toLowerCase()
+            .includes('remote');
+          const jobLocation = isRemote
+            ? undefined
+            : v.location
+              ? {
+                  '@type': 'Place',
+                  address: {
+                    '@type': 'PostalAddress',
+                    addressLocality: v.location,
+                  },
+                }
+              : undefined;
+
+          return {
+            '@type': 'JobPosting',
+            title: v.title,
+            description: typeof v.description === 'string'
+              ? v.description.slice(0, 500)
+              : richContentToPlainText(v.description).slice(0, 500),
+            datePosted: v.posted_at || undefined,
+            employmentType:
+              employmentTypeMap[v.employment_type || ''] || undefined,
+            hiringOrganization: { '@id': `${siteUrl}/#organisation` },
+            industry: v.department || undefined,
+            directApply: true,
+            url: vacancyUrl,
+            ...(jobLocation ? { jobLocation } : {}),
+            ...(isRemote
+              ? {
+                  jobLocationType: 'TELECOMMUTE',
+                  applicantLocationRequirements: {
+                    '@type': 'Country',
+                    name: 'Worldwide',
+                  },
+                }
+              : {}),
+          };
+        })
+      : undefined;
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': `${careersUrl}#webpage`,
+        url: careersUrl,
+        name: 'Careers — Aivory',
+        description: CAREERS_DESCRIPTION,
+        isPartOf: { '@id': `${siteUrl}/#website` },
+        about: { '@id': `${siteUrl}/#organisation` },
+        publisher: { '@id': `${siteUrl}/#organisation` },
+        inLanguage: siteUrl === AIVORY_UK_URL ? 'en' : 'id',
+        ...(jobPostings
+          ? { mainEntity: { '@type': 'ItemList', itemListElement: jobPostings } }
+          : {}),
+      },
+    ],
+  };
+}
 
 export function richContentToPlainText(content: unknown): string {
   const parts: string[] = [];

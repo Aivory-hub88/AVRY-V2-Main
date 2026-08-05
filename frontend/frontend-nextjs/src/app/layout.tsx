@@ -52,6 +52,10 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: AIVORY_UK_URL,
+    languages: {
+      en: AIVORY_UK_URL,
+      id: AIVORY_UK_URL,
+    },
   },
   robots: {
     index: true,
@@ -78,6 +82,8 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [DEFAULT_OG_IMAGE],
   },
+  themeColor: '#050505',
+  formatDetection: { telephone: false },
 };
 
 export default function RootLayout({
@@ -92,6 +98,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Doto:wght@400;700;900&display=swap"
           rel="stylesheet"
         />
+        <link rel="alternate" hrefLang="x-default" href={AIVORY_UK_URL} />
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-XYJ0EDEYS8" />
         <script
           dangerouslySetInnerHTML={{
