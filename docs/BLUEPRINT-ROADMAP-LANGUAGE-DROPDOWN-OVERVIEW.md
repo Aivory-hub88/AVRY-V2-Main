@@ -1,11 +1,13 @@
 # Blueprint & Roadmap — Language Dropdown
 
-**Status:** ✅ **SHIPPED to the repo** 2026-08-05, pushed as `9c0c1b2` to
-`avry-user-dashboard` on `Aivory-hub88` (canonical remote). **Not yet
-deployed to the live VPS.**
+**Status:** ✅ **SHIPPED to the repo** 2026-08-05 (`9c0c1b2`) and ✅
+**DEPLOYED to the live VPS** 2026-08-05, in `avry-user-dashboard` on
+`Aivory-hub88` (canonical remote). 🟡 **One item still needs a human
+pass**: the dropdown has not been visually confirmed against the live,
+logged-in production site — see §6.
 **Owner:** Irfan · **Source:** product request, 2026-08-05 — extend the same
 EN/ID language switcher already shipped for Deep Diagnostic
-(`[[deep-diagnostic-indonesian-language-planning]]`) to the Blueprint and
+(`[[deep-diagnostic-indonesian-language]]`) to the Blueprint and
 Roadmap pages.
 **Scope:** `app/blueprint/page.tsx` + its 6 child components under
 `components/blueprint/`, and `app/roadmap/page.tsx`, in `avry-user-dashboard`.
@@ -115,11 +117,41 @@ the only errors present (`/api/storage/blueprint` and `/api/storage/roadmap`
 500s) are pre-existing local-dev artefacts from no local Postgres connection,
 unrelated to this change (falls back to localStorage correctly).
 
-## 6 · Open items
+## 6 · Deploy to the live VPS — ✅ DONE 2026-08-05
 
-- **Not deployed to the VPS.** Pushed to `main` on `Aivory-hub88` only.
-- No production/live-site check has been done (same caveat as Deep
-  Diagnostic's §6.5 — needs a real login, which the agent cannot do).
+Same target as the Deep Diagnostic Indonesian deploy: `tencent-vps`
+(129.226.155.216), live checkout `/home/ubuntu/avry-user-dashboard`,
+compose project `/home/ubuntu/AVRY-V2-Main/docker-compose.prod.yml`.
+
+- Checked the live checkout first: `git status` clean, `main` at `bfd94f4`,
+  no new uncommitted VPS-local work (the payment/invoicing WIP stashed
+  during the Deep Diagnostic Phase 1/2 deploy was still sitting untouched
+  on `stash@{0}` on a different branch — not a blocker for `main`).
+- `git fetch` + `git pull --ff-only origin main` → clean fast-forward
+  `bfd94f4..9c0c1b2`, exactly the 16 files from this commit, no
+  divergence.
+- `docker compose -f docker-compose.prod.yml up -d --build --no-deps
+  avry-user-dashboard` — build succeeded (`next build` compiled clean,
+  same 54-route manifest as before), container recreated and started
+  ("Ready in 0ms" in logs, no errors).
+- `curl` confirmed both `https://aivory.id/dashboard/blueprint` and
+  `/roadmap` return 200.
+
+**Not verified:** the actual dropdown rendering behind login. Navigating
+there in a browser correctly redirects to the login page (proving the
+route/build is healthy) but the agent has no production credentials and,
+per its own operating rules, will not enter a password or fabricate a
+production auth session — the exact same constraint as Deep Diagnostic's
+§6.5. **This is the one remaining step before calling this feature's
+rollout fully closed**: log in on `https://aivory.id/dashboard`, open
+Blueprint and Roadmap, confirm the "Language" dropdown appears top-right
+in every state (empty, error, and full) and switches correctly, and that
+it stays in sync with the sidebar's `LanguagePill`.
+
+## 7 · Open items
+
+- §6's live logged-in verification (not blocking the deploy itself, but
+  blocking calling the feature done).
 - LLM-generated blueprint/roadmap content stays English-only regardless of
   the dropdown, same open item as Deep Diagnostic's `aiAnalysis` section —
   giving the upstream LLM a locale hint is a separate, larger, cross-repo

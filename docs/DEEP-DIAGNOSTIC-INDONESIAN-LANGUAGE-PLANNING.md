@@ -1,20 +1,21 @@
 # Deep Diagnostic — Bahasa Indonesia Language Support
 
 **Status:** Phase 1 (Intake flow), Phase 2 (Results page + PDF report), and
-Phase 3 (PDF QA pass + bug fixes) — ✅ **ALL SHIPPED to the repo**, Phase 1+2
-✅ **DEPLOYED to the live VPS** 2026-08-05. Phase 1 pushed as `84dfd62`,
-Phase 2 pushed as `bfd94f4`, Phase 3 pushed as `9c0c1b2` (not yet deployed to
-the VPS — see note in §8), all in `avry-user-dashboard` on `Aivory-hub88`
-(canonical remote). The full assessment — intake, review, results page, and
-the downloadable PDF — now renders end to end in Bahasa Indonesia **in the
-codebase**, and Phase 1+2 are live in production at
-`https://aivory.id/dashboard`. 🟡 **One item still needs a human pass**: the
-logged-in, end-to-end Indonesian flow check (dropdown → intake → summary →
-results → PDF download) against the **live production site** has still not
-been done by either the agent or Irfan — see §6.5 and §8 for why, and do
-this before calling the rollout fully closed. Phase 3's QA (§8) was done
-against a real downloaded report and a locally-regenerated PDF, which is
-strong evidence but is not the same as a live-site check.
+Phase 3 (PDF QA pass + bug fixes) — ✅ **ALL SHIPPED to the repo AND
+DEPLOYED to the live VPS**, Phase 1+2 on 2026-08-05, Phase 3 also on
+2026-08-05 (deployed same day as shipped — see §8). Phase 1 pushed as
+`84dfd62`, Phase 2 pushed as `bfd94f4`, Phase 3 pushed as `9c0c1b2`, all in
+`avry-user-dashboard` on `Aivory-hub88` (canonical remote), all three now
+running in production. The full assessment — intake, review, results page,
+and the downloadable PDF — now renders end to end in Bahasa Indonesia **in
+the codebase and in production** at `https://aivory.id/dashboard`. 🟡 **One
+item still needs a human pass**: the logged-in, end-to-end Indonesian flow
+check (dropdown → intake → summary → results → PDF download) against the
+**live production site** has still not been done by either the agent or
+Irfan — see §6.5 and §8 for why, and do this before calling the rollout
+fully closed. Phase 3's QA (§8) was done against a real downloaded report
+and a locally-regenerated PDF, which is strong evidence but is not the same
+as a live-site check.
 **Owner:** Irfan · **Source:** product request, 2026-08-04 — parity with the
 free assessment landing page, which already ships a bilingual EN/ID
 experience.
@@ -430,12 +431,24 @@ fetch the embedded Manrope font — not present in the real
 browser-generated PDF that triggered this review, and not related to any
 of the 4 fixes.
 
+**Deployed to the VPS — ✅ DONE 2026-08-05, same day as shipped.** Same
+target/procedure as §6: checked the live checkout first (`main` clean at
+`bfd94f4`, no new uncommitted VPS-local work; the payment/invoicing WIP
+stashed during the Phase 1/2 deploy was still sitting untouched on a
+different branch, not a blocker), `git pull --ff-only` → clean fast-forward
+`bfd94f4..9c0c1b2`, then `docker compose ... up -d --build --no-deps
+avry-user-dashboard` — build succeeded, container recreated and started
+with no errors. `curl` confirmed `/dashboard/blueprint` and `/dashboard/roadmap`
+both return 200 (this commit also carries the Blueprint/Roadmap dropdown
+feature, see `[[blueprint-roadmap-language-dropdown]]`).
+
 **Not done / still open:**
-- Phase 3 has **not** been deployed to the VPS (unlike Phase 1+2, which
-  are live). It is committed and pushed to `Aivory-hub88/avry-user-dashboard`
-  `main` (`9c0c1b2`) only.
-- §6.5's live-site logged-in verification is still open and unaffected by
-  this phase — Phase 3's QA used an already-downloaded PDF and a local
+- §6.5's live-site logged-in verification is still open, now covering
+  Phase 3 too — the deploy above confirms the infrastructure (build,
+  container, routing) is healthy, but nobody has confirmed the actual
+  rendered output (correct ROI caption, no table overlap, correct FX date,
+  AI-section disclaimer) against the live, logged-in production site. Phase
+  3's own QA (this section) used an already-downloaded PDF and a local
   regeneration, not the production site.
 - The maturity-scale labels "Baru Mulai" and "Memulai" (Nascent/Initiating)
   read as near-synonyms in Indonesian — noted during review, not fixed
