@@ -100,11 +100,18 @@ export default function Footer() {
                   alt="Aivory Logo"
                   className="h-[28px] md:h-[36px] w-auto opacity-90"
                 />
-                <img
-                  src="/images/Nvidia Inception/nvidia-inception-program-badge-rgb-for-screen.svg"
-                  alt="NVIDIA Inception Program"
-                  className="h-[35px] md:h-[45px] w-auto"
-                />
+                <Link
+                  href="/nvidia-inception"
+                  className="transition-opacity hover:opacity-70"
+                  aria-label="Aivory AI is a member of the NVIDIA Inception Program (2026 cohort)"
+                  title="NVIDIA Inception Program — 2026 cohort"
+                >
+                  <img
+                    src="/images/Nvidia Inception/nvidia-inception-program-badge-rgb-for-screen.svg"
+                    alt="NVIDIA Inception Program — Aivory AI is a member (2026 cohort)"
+                    className="h-[35px] md:h-[45px] w-auto"
+                  />
+                </Link>
               </div>
             </div>
           </div>
