@@ -46,18 +46,35 @@ async function getAllBlogPosts() {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
-  const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => ({
-    url: absoluteUrl(r.path),
-    lastModified: now,
-    changeFrequency: r.changeFrequency,
-    priority: r.priority,
-    alternates: hreflangAlternate(absoluteUrl(r.path)),
-  }));
-
   const [posts, vacancies] = await Promise.all([
     getAllBlogPosts(),
     getVacancies().catch(() => []),
   ]);
+
+  const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => {
+    // When there are zero open vacancies, /careers is a thin empty-state
+    // shell. Lowering its priority + changeFrequency stops Google from
+    // over-fetching a near-empty page that would otherwise look like a
+    // duplicate of the homepage canonical-wise. Real openings restore the
+    // higher priority automatically.
+    if (r.path === "/careers") {
+      const hasOpenings = vacancies.length > 0;
+      return {
+        url: absoluteUrl(r.path),
+        lastModified: now,
+        changeFrequency: hasOpenings ? ("daily" as const) : ("weekly" as const),
+        priority: hasOpenings ? 0.8 : 0.3,
+        alternates: hreflangAlternate(absoluteUrl(r.path)),
+      };
+    }
+    return {
+      url: absoluteUrl(r.path),
+      lastModified: now,
+      changeFrequency: r.changeFrequency,
+      priority: r.priority,
+      alternates: hreflangAlternate(absoluteUrl(r.path)),
+    };
+  });
 
   const blogEntries: MetadataRoute.Sitemap = posts.map((post) => ({
     url: absoluteUrl(`/blog/${post.slug}`),
