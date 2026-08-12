@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 const messages = [
   'Make AI Make Sense&reg;',
+  'From Data &rarr; Decisions &rarr; Action.',
   'For your business operation.',
   'Start with clarity.',
   'Discover where AI creates measurable value.',
@@ -12,7 +13,6 @@ const messages = [
   'Transform operations with confidence.',
   'Build intelligence that delivers business outcomes.',
   'Transforming business complexity into operational clarity.',
-  'From Data &rarr; Decisions &rarr; Action.',
 ];
 
 export default function RotatingText() {
