@@ -25,7 +25,7 @@ const doto = Doto({
 });
 
 const SITE_NAME = 'Aivory AI';
-const SITE_TITLE = 'Aivory AI: An AI-Powered Business Transformation Platform';
+const SITE_TITLE = 'Aivory AI: AI Infrastructure for Business Transformation';
 const SITE_DESCRIPTION =
   'Aivory helps businesses assess operations, design AI transformation blueprints, and deploy governed AI agents, workflow automation and operational intelligence.';
 

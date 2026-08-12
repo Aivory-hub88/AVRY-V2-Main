@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'Pricing | Aivory',
-    description: 'Simple, transparent pricing for AI-powered business transformation.',
+    description: 'Simple, transparent pricing for AI infrastructure and business transformation.',
     url: '/pricing',
   },
 };
