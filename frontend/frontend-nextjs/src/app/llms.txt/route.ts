@@ -14,7 +14,7 @@ export async function GET() {
   const lines: string[] = [
     "# Aivory",
     "",
-    "> Aivory is an AI-powered business transformation platform — from diagnostic to deployment, everything you need to integrate AI into your business operations.",
+    "> Aivory is AI infrastructure for business transformation — from diagnostic to deployment, everything you need to integrate AI into your business operations.",
     "",
     "Aivory helps businesses assess AI readiness, design blueprints and roadmaps, and deploy AI workflows and automations.",
     "",

@@ -17,13 +17,13 @@ export const SITE_NAME = 'Aivory';
 export const DEFAULT_OG_IMAGE = '/hero-video-poster.jpg';
 
 const ORGANIZATION_DESCRIPTION =
-  'Aivory (also known as Aivory AI) is an AI-powered business transformation and operational intelligence platform that helps organisations move from operational clarity to governed AI agents and autonomous workflows.';
+  'Aivory (also known as Aivory AI) is AI infrastructure for business transformation and operational intelligence, helping organisations move from operational clarity to governed AI agents and autonomous workflows.';
 const ORGANIZATION_DISAMBIGUATION =
   'Business transformation and AI operations platform (United Kingdom / global). Distinct from dental practice software, HRMS platforms, code-compliance tooling, consumer AI apps, or creative studios that share a similar name.';
 const WEBSITE_DESCRIPTION =
-  'AI-powered business transformation platform — from operational assessment to autonomous AI agents.';
+  'AI infrastructure for business transformation — from operational assessment to autonomous AI agents.';
 const HOMEPAGE_DESCRIPTION =
-  'AI-powered business transformation for operational intelligence, governed AI agents, and workflow automation. Assess operations, design your blueprint, and deploy with confidence.';
+  'AI infrastructure for business transformation, operational intelligence, governed AI agents, and workflow automation. Assess operations, design your blueprint, and deploy with confidence.';
 const PLATFORM_DESCRIPTION =
   'AI operations platform that guides organisations from business operations assessment to governed AI agent deployment, workflow automation, and operational intelligence.';
 const BASTION_DESCRIPTION =
@@ -289,7 +289,7 @@ function createTransformationService(siteUrl: PublicSiteUrl) {
 export const FAQ_ENTITIES = [
   {
     question: 'What is Aivory?',
-    answer: 'Aivory is an AI-powered business transformation and operational intelligence platform founded by Irfan Reichmann. It helps organisations start with operational clarity, design transformation blueprints, and deploy governed AI agents and workflows. It is not dental software, HRMS, or code-compliance tooling.',
+    answer: 'Aivory is AI infrastructure for business transformation and operational intelligence, founded by Irfan Reichmann. It helps organisations start with operational clarity, design transformation blueprints, and deploy governed AI agents and workflows. It is not dental software, HRMS, or code-compliance tooling.',
   },
   {
     question: 'Is Aivory the same as Aivory AI?',
@@ -417,7 +417,7 @@ export function buildHomePageGraph(siteUrl: PublicSiteUrl): Record<string, unkno
         '@type': 'WebPage',
         '@id': `${siteUrl}/#webpage`,
         url: `${siteUrl}/`,
-        name: 'Aivory — AI-Powered Business Transformation | Make AI Make Sense®',
+        name: 'Aivory — AI Infrastructure for Business Transformation | Make AI Make Sense®',
         description: HOMEPAGE_DESCRIPTION,
         isPartOf: { '@id': `${siteUrl}/#website` },
         about: { '@id': `${siteUrl}/#organisation` },
@@ -504,7 +504,7 @@ export function createBreadcrumbList(
 }
 
 const PRICING_DESCRIPTION =
-  'Simple, transparent pricing for AI-powered business transformation. One-time assessments, transformation blueprints, monthly platform licences, and Intelligence Credit packs.';
+  'Simple, transparent pricing for AI infrastructure and business transformation. One-time assessments, transformation blueprints, monthly platform licences, and Intelligence Credit packs.';
 
 export function buildPricingPageGraph(
   siteUrl: PublicSiteUrl,

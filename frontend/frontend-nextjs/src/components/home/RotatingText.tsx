@@ -12,6 +12,7 @@ const messages = [
   'Transform operations with confidence.',
   'Build intelligence that delivers business outcomes.',
   'Transforming business complexity into operational clarity.',
+  'From Data &rarr; Decisions &rarr; Action.',
 ];
 
 export default function RotatingText() {
