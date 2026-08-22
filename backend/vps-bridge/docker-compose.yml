@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  aivory-bridge:
+    build: .
+    container_name: aivory-bridge
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - avry-admin-dashboard_app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.aivory-bridge.rule=Host(`api.aivory.id`)"
+      - "traefik.http.routers.aivory-bridge.entrypoints=websecure"
+      - "traefik.http.routers.aivory-bridge.tls.certresolver=letsencrypt"
+      - "traefik.http.services.aivory-bridge.loadbalancer.server.port=3003"
+
+networks:
+  avry-admin-dashboard_app-network:
+    external: true

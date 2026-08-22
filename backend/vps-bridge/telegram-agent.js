@@ -19,6 +19,13 @@
  *   BACKEND_INTERNAL_URL   avry-backend base        (default http://localhost:8081)
  *   COMPOSIO_API_KEY       enables Composio tools when set
  *   N8N_BASE_URL           n8n base for workflow triggers (default http://localhost:5678)
+ *   CERVEAU_WEBHOOK_URL    Aivory Cerveau's HAProxy LB (default http://127.0.0.1:3105/webhook)
+ *   CERVEAU_WEBHOOK_SECRET shared secret for Cerveau's X-Webhook-Secret (required for any
+ *                          tenant flagged engine='cerveau' — see callCerveau())
+ *   CERVEAU_FETCH_TIMEOUT_MS  Cerveau call timeout (default 185000 — 5s over Cerveau's own
+ *                          180s wall-clock cap)
+ *   AGENT_PROFILE_TTL_MS   profile-cache TTL (default 30000 — governs how fast an
+ *                          engine='legacy'/'cerveau' flip in Postgres takes effect)
  */
 
 'use strict';
@@ -27,6 +34,9 @@ const AGENT_MODEL = () => process.env.TELEGRAM_AGENT_MODEL || 'deepseek/deepseek
 const SEARCH_MODEL = () => process.env.TELEGRAM_SEARCH_MODEL || 'perplexity/sonar';
 const BACKEND_URL = () => (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8081').replace(/\/$/, '');
 const N8N_URL = () => (process.env.N8N_BASE_URL || 'http://localhost:5678').replace(/\/$/, '');
+const CERVEAU_WEBHOOK_URL = () => process.env.CERVEAU_WEBHOOK_URL || 'http://127.0.0.1:3105/webhook';
+const CERVEAU_WEBHOOK_SECRET = () => process.env.CERVEAU_WEBHOOK_SECRET || '';
+const CERVEAU_FETCH_TIMEOUT_MS = () => Math.max(5000, parseInt(process.env.CERVEAU_FETCH_TIMEOUT_MS, 10) || 185000);
 
 const MAX_TOOL_ROUNDS = 5;
 const HISTORY_MAX = 12;
@@ -125,6 +135,31 @@ function calculate(expr) {
   if (pos !== s.length) throw new Error('Invalid expression');
   if (!Number.isFinite(result)) throw new Error('Result is not a finite number');
   return result;
+}
+
+/**
+ * Chat channels (Telegram/Slack) render replies verbatim — a stray '**' or
+ * '#' shows up as a literal, broken-looking symbol. Applied to every non-
+ * console reply on both engine paths (Phase 6.1): the legacy loop already
+ * avoids markdown via a prompt instruction (FORMAT_RULE_CHAT) so this is a
+ * no-op passthrough for it; Cerveau's /webhook has no such instruction and
+ * no format hint in its contract, so this is the only place to catch it.
+ * Pure string function, no external deps — safe to unit test in isolation.
+ */
+function stripMarkdownForChat(text) {
+  if (!text) return text;
+  let s = String(text);
+  s = s.replace(/```[a-zA-Z0-9_-]*\n?([\s\S]*?)```/g, '$1'); // fenced code blocks, keep content
+  s = s.replace(/`([^`]+)`/g, '$1'); // inline code
+  s = s.replace(/\*\*([^*]+)\*\*/g, '$1'); // **bold**
+  s = s.replace(/__([^_]+)__/g, '$1'); // __bold__
+  s = s.replace(/(?<![*\w])\*([^*\n]+)\*(?!\*)/g, '$1'); // *italic*
+  s = s.replace(/(?<![_\w])_([^_\n]+)_(?!_)/g, '$1'); // _italic_
+  s = s.replace(/^#{1,6}\s+/gm, ''); // # headers
+  s = s.replace(/^\s*([-*_]\s*){3,}\s*$/gm, ''); // --- / *** rule lines
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)'); // [text](url)
+  s = s.replace(/\|/g, ' '); // table pipes
+  return s.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,7 +411,11 @@ const PROFILE_FIELDS = [
 ];
 
 const _profileCache = new Map(); // `${user_id}:${agent_type}` -> { at, profile }
-const PROFILE_TTL_MS = 5 * 60 * 1000;
+// Was a bare 5-minute constant. Lowered to a 30s default (Phase 6.1): `engine`
+// (the Cerveau rollout flag) rides in this same cached profile object, so a
+// long TTL here directly delayed how fast a legacy<->cerveau flip in Postgres
+// took effect — "instant rollback" was actually "rollback within 5 minutes".
+const PROFILE_TTL_MS = () => Math.max(5000, parseInt(process.env.AGENT_PROFILE_TTL_MS, 10) || 30000);
 
 function sanitizeProfileValue(value, cap) {
   if (value == null) return '';
@@ -389,7 +428,7 @@ function sanitizeProfileValue(value, cap) {
 async function getAgentProfile(userId, agentType, internalKey) {
   const key = `${userId}:${agentType}`;
   const cached = _profileCache.get(key);
-  if (cached && Date.now() - cached.at < PROFILE_TTL_MS) return cached.profile;
+  if (cached && Date.now() - cached.at < PROFILE_TTL_MS()) return cached.profile;
   let profile = null;
   try {
     const res = await fetch(
@@ -447,7 +486,7 @@ const OUT_OF_CREDITS_REPLY =
  * Fails OPEN on transient errors (a metering hiccup must not take every
  * customer conversation down) and CLOSED on an explicit 402.
  */
-async function consumeMessageCredit(ctx) {
+async function consumeMessageCredit(ctx, reason = 'agent_message') {
   try {
     const res = await fetch(`${BACKEND_URL()}/api/v1/credits/internal/consume`, {
       method: 'POST',
@@ -455,7 +494,7 @@ async function consumeMessageCredit(ctx) {
       body: JSON.stringify({
         user_id: ctx.user_id,
         amount: MESSAGE_COST(),
-        reason: 'agent_message',
+        reason,
         meta: { agent_type: ctx.agent_type, channel: ctx.channel, session_id: ctx.session_id },
       }),
       signal: AbortSignal.timeout(8000),
@@ -768,6 +807,75 @@ async function runAgentLoop({ systemPrompt, history, userText, tools, ctx }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Aivory Cerveau routing (Phase 6.1) — the tenant-flagged alternative to
+// runAgentLoop() above. Cerveau owns identity resolution, tool selection, and
+// conversation continuity itself; this is just the caller.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Forward one message to Aivory Cerveau's /webhook and return its reply.
+ *
+ * Deliberately throws on anything but a clean 200 — exactly like callLLM()
+ * does for OpenRouter failures — so it falls into the handler's existing
+ * try/catch and produces the same 502 {error:true} response runAgentLoop()
+ * failures already produce today. No silent fallback to the legacy loop:
+ * consumeMessageCredit() already ran for this message (credit gating must
+ * stay before any LLM call), so re-running runAgentLoop() after a Cerveau
+ * failure would either double-charge or need new bypass logic — not worth it
+ * for a staged rollout whose whole point is to surface real failure rates,
+ * not mask them.
+ */
+async function callCerveau(ctx, userText) {
+  const secret = CERVEAU_WEBHOOK_SECRET();
+  if (!secret) {
+    // Fail closed to the known-working path rather than send a request
+    // guaranteed to 401 on every single message for every cerveau-flagged
+    // tenant until someone notices.
+    console.error('[telegram-agent] CERVEAU CONFIG ERROR: CERVEAU_WEBHOOK_SECRET is unset — treating as engine=legacy for this message');
+    throw new Error('Cerveau not configured (missing webhook secret)');
+  }
+
+  let res;
+  try {
+    res = await fetch(CERVEAU_WEBHOOK_URL(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': secret,
+        'X-Tenant-Id': ctx.user_id,
+        'X-Agent-Type': ctx.agent_type,
+        'X-Session-Id': ctx.session_id,
+      },
+      body: JSON.stringify({ message: userText }),
+      signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
+    });
+  } catch (err) {
+    console.error(`[telegram-agent] cerveau network/abort error for ${ctx.agent_type}:`, err.message);
+    throw new Error(`Cerveau request failed: ${err.message}`);
+  }
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '');
+    const reason =
+      res.status === 408 ? 'cerveau timed out (180s cap)'
+      : res.status === 429 ? 'cerveau rate-limited this tenant'
+      : res.status === 503 ? 'cerveau admission queue saturated / tenant lookup failed'
+      : (res.status === 400 || res.status === 401) ? 'CERVEAU CONFIG ERROR — check webhook secret / tenant headers'
+      : 'cerveau generic error';
+    console.error(`[telegram-agent] ${reason} (${res.status}) for ${ctx.agent_type}: ${bodyText.slice(0, 200)}`);
+    throw new Error(`Cerveau ${res.status}: ${bodyText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const reply = data && data.response;
+  if (!reply) throw new Error('Empty Cerveau response');
+  // Cerveau patch 0035: additive field, null on every normal turn. Relayed
+  // as-is (already {id, tool_name, risk_tier} | null) — this bridge never
+  // needs to inspect its shape, only pass it through to avry-backend.
+  return { reply, pendingApproval: (data && data.pending_approval) || null };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Express handler factory
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -778,11 +886,12 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
     if ((req.headers['x-internal-token'] || '') !== internalKey) {
       return res.status(403).json({ error: true, message: 'Forbidden' });
     }
+    // Not required up front (Phase 6.1): a cerveau-routed tenant never calls
+    // OpenRouter from here, so this is only enforced inside the legacy branch
+    // below — otherwise an unset/exhausted key would 500 every cerveau tenant
+    // too, defeating the point of having an alternate path.
     const orKey =
       nextOpenRouterKey() || process.env.OPENROUTER_API_KEY_1 || process.env.OPENROUTER_API_KEY;
-    if (!orKey) {
-      return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
-    }
 
     const { agent_type, chat_id, text, user_id, session_id } = req.body || {};
     // chat_id 0 is valid (console pseudo-chats) — only reject absent values
@@ -792,11 +901,14 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
 
     const agentType = AGENT_PROMPTS[agent_type] ? agent_type : 'autonomous';
     const historyKey = session_id || String(chat_id);
-    const history = histories.get(historyKey) || [];
     const userText = String(text).slice(0, 8000);
 
+    // Cerveau ADR-006 Part A: 'api' is avry-backend's agent_api_keys.py
+    // relaying a tenant-infra message — everything downstream (credit
+    // gating, engine routing, tool loop) is already generic over channel,
+    // so this whitelist addition is the entire bridge-side change.
     const requestedChannel = String(req.body.channel || '').toLowerCase();
-    const channel = ['console', 'telegram', 'slack'].includes(requestedChannel)
+    const channel = ['console', 'telegram', 'slack', 'api'].includes(requestedChannel)
       ? requestedChannel
       : String(historyKey).startsWith('slack_') ? 'slack' : 'telegram';
 
@@ -811,31 +923,167 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
 
     try {
       // Credit gate first: when the operator's quota is spent, reply without
-      // ever reaching the LLM so usage cost stays hard-capped per tier.
+      // ever reaching the LLM so usage cost stays hard-capped per tier. This
+      // must stay ahead of the engine branch below — both paths spend credit.
       const credit = await consumeMessageCredit(ctx);
       if (!credit.allowed) {
         return res.json({ reply: credit.reply });
       }
 
-      const [{ tools, tierHint }, profile] = await Promise.all([
-        buildToolset(agentType, ctx.user_id),
-        getAgentProfile(ctx.user_id, agentType, internalKey),
-      ]);
-      // Layered prompt: agent role -> security rules -> operator identity
-      // (data, per-request, per-user) -> channel rules. Identity rides in the
-      // request, never in shared state, so concurrent operators can't collide.
-      const systemPrompt =
-        AGENT_PROMPTS[agentType] + SECURITY_RULES + operatorConfigBlock(profile) + commonRules(channel) + tierHint;
-      const reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
+      // Sequential (not Promise.all'd with buildToolset, unlike before Phase
+      // 6.1): `engine` rides in this same profile fetch, and a cerveau-routed
+      // tenant needs no local toolset at all — resolving identity first
+      // avoids that wasted Composio/tier lookup work for those tenants.
+      const profile = await getAgentProfile(ctx.user_id, agentType, internalKey);
+      const engine = (profile && profile.engine) || 'legacy';
 
-      histories.set(
-        historyKey,
-        [...history, { role: 'user', content: userText }, { role: 'assistant', content: reply }].slice(-HISTORY_MAX)
-      );
-      return res.json({ reply: reply.slice(0, REPLY_MAX) });
+      let reply;
+      let pendingApproval = null;
+      if (engine === 'cerveau') {
+        console.log('[telegram-agent] routing to cerveau', {
+          user_id: ctx.user_id, agent_type: agentType, session_id: historyKey,
+        });
+        // Cerveau owns conversation continuity itself via its own tenant-
+        // scoped memory — this path deliberately never reads or writes the
+        // legacy `histories` Map. See stripMarkdownForChat() below: Cerveau's
+        // /webhook has no format hint in its contract, so replies need the
+        // same chat-channel cleanup the legacy path gets from a prompt rule.
+        ({ reply, pendingApproval } = await callCerveau(ctx, userText));
+      } else {
+        if (!orKey) {
+          return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
+        }
+        const history = histories.get(historyKey) || [];
+        const { tools, tierHint } = await buildToolset(agentType, ctx.user_id);
+        // Layered prompt: agent role -> security rules -> operator identity
+        // (data, per-request, per-user) -> channel rules. Identity rides in the
+        // request, never in shared state, so concurrent operators can't collide.
+        const systemPrompt =
+          AGENT_PROMPTS[agentType] + SECURITY_RULES + operatorConfigBlock(profile) + commonRules(channel) + tierHint;
+        reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
+        histories.set(
+          historyKey,
+          [...history, { role: 'user', content: userText }, { role: 'assistant', content: reply }].slice(-HISTORY_MAX)
+        );
+      }
+
+      if (channel !== 'console') reply = stripMarkdownForChat(reply);
+      // Additive field, mirrors Cerveau's own /webhook contract (patch
+      // 0035) — null on every turn that didn't hit a Pending approval, so
+      // any existing caller of this route is unaffected.
+      return res.json({ reply: reply.slice(0, REPLY_MAX), pending_approval: pendingApproval });
     } catch (err) {
       console.error('[telegram-agent] error:', err.message);
       return res.status(502).json({ error: true, message: 'Agent gateway error' });
+    }
+  };
+};
+
+/**
+ * Resolve a pending Cerveau approval (Telegram inline-button tap) and
+ * return the continuation reply in one synchronous round trip.
+ *
+ * A button tap is its own fresh, short-lived request — independent of the
+ * original (already-closed) /telegram/message call — so this synchronously
+ * calls Cerveau's tenant-scoped resolve route and relays its response.
+ * Cerveau's own PendingApprovalsStore.resolve() is already atomic/
+ * idempotent (a second resolve on the same id short-circuits to
+ * "already_resolved", never a second tool execution or continuation
+ * turn), so a duplicate button tap or a retried request from avry-backend
+ * is safe to just forward again rather than needing its own dedupe here.
+ *
+ * Wire-up in server.js (same pattern as /telegram/message):
+ *   app.post('/telegram/approval-decision',
+ *     createApprovalDecisionHandler({ internalKey }));
+ */
+async function resolveCerveauApproval({ userId, agentType, pendingId, decision }) {
+  const secret = CERVEAU_WEBHOOK_SECRET();
+  if (!secret) {
+    throw new Error('Cerveau not configured (missing webhook secret)');
+  }
+  const url = `${CERVEAU_WEBHOOK_URL()}/approvals/${encodeURIComponent(pendingId)}/resolve`;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Webhook-Secret': secret,
+        'X-Tenant-Id': userId,
+        'X-Agent-Type': agentType,
+      },
+      body: JSON.stringify({ decision }),
+      signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
+    });
+  } catch (err) {
+    console.error('[telegram-agent] approval-resolve network/abort error:', err.message);
+    const wrapped = new Error(`Cerveau request failed: ${err.message}`);
+    wrapped.status = 502;
+    throw wrapped;
+  }
+
+  const bodyText = await res.text();
+  let data = null;
+  try { data = JSON.parse(bodyText); } catch { /* fall through to the ok-check below */ }
+
+  if (!res.ok) {
+    console.error(`[telegram-agent] approval-resolve cerveau ${res.status}: ${bodyText.slice(0, 200)}`);
+    const wrapped = new Error((data && data.error) || `Cerveau ${res.status}`);
+    // 404 = no such row / not this tenant's row (never leaked as anything
+    // more specific than "not found" — matches Cerveau's own boundary).
+    // Everything else collapses to 502 for the caller.
+    wrapped.status = res.status === 404 ? 404 : 502;
+    throw wrapped;
+  }
+
+  return {
+    outcome: data && data.outcome,
+    replyText: data && typeof data.reply_text === 'string' ? data.reply_text : null,
+  };
+}
+
+module.exports.createApprovalDecisionHandler = function createApprovalDecisionHandler({ internalKey }) {
+  return async function approvalDecisionHandler(req, res) {
+    if ((req.headers['x-internal-token'] || '') !== internalKey) {
+      return res.status(403).json({ error: true, message: 'Forbidden' });
+    }
+
+    const { user_id, agent_type, session_id, pending_id, decision } = req.body || {};
+    if (!user_id || !agent_type || !pending_id || !['approve', 'deny'].includes(decision)) {
+      return res.status(400).json({
+        error: true,
+        message: 'user_id, agent_type, pending_id, and decision ("approve"|"deny") are required',
+      });
+    }
+
+    const ctx = {
+      user_id, agent_type, session_id: session_id || null, channel: 'telegram', internalKey,
+    };
+
+    try {
+      // The continuation turn is a real LLM call, distinct from the message
+      // that originally triggered the approval (already charged its own
+      // credit) — charged here, before resolving, with a distinct reason so
+      // it's traceable in the ledger. On exhaustion: never resolve the row
+      // (approve/deny-by-starvation would be wrong), still return 200 so
+      // the caller can ack the button tap and show the normal out-of-credit
+      // reply instead of leaving it spinning — outcome is explicitly null so
+      // the caller can tell this apart from a real approve/deny.
+      const credit = await consumeMessageCredit(ctx, 'approval_resume');
+      if (!credit.allowed) {
+        return res.json({ outcome: null, reply_text: credit.reply });
+      }
+
+      const { outcome, replyText } = await resolveCerveauApproval({
+        userId: user_id, agentType: agent_type, pendingId: pending_id, decision,
+      });
+      const reply = replyText ? stripMarkdownForChat(replyText).slice(0, REPLY_MAX) : null;
+      return res.json({ outcome, reply_text: reply });
+    } catch (err) {
+      console.error('[telegram-agent] approval-decision error:', err.message);
+      const status = err.status === 404 ? 404 : 502;
+      return res.status(status).json({ error: true, message: err.message });
     }
   };
 };
@@ -850,5 +1098,8 @@ module.exports._internals = {
   SECURITY_RULES,
   AGENT_PROMPTS,
   commonRules,
+  stripMarkdownForChat,
+  callCerveau,
+  resolveCerveauApproval,
 };
 module.exports.calculate = calculate;

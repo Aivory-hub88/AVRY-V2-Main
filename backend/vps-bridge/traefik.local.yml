@@ -1,0 +1,23 @@
+# traefik.local.yml — minimalist local Traefik, mirrors VPS setup
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
+
+log:
+  level: INFO
+
+api:
+  dashboard: true
+  insecure: true  # dashboard at http://localhost:8080
