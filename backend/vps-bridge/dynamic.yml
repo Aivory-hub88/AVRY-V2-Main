@@ -1,0 +1,23 @@
+# dynamic.yml — local routing rules for vps-bridge SSE endpoints
+http:
+  routers:
+    vps-bridge-local:
+      rule: "Host(`api.localhost`)"
+      entryPoints:
+        - web
+      service: vps-bridge-local
+
+  services:
+    vps-bridge-local:
+      loadBalancer:
+        servers:
+          - url: "http://aivory-bridge:3003"
+        responseForwarding:
+          flushInterval: "1ms"   # critical for SSE streaming
+
+  middlewares:
+    sse:
+      headers:
+        customResponseHeaders:
+          X-Accel-Buffering: "no"
+          Cache-Control: "no-cache"

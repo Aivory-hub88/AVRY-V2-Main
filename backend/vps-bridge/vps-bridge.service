@@ -1,0 +1,23 @@
+[Unit]
+Description=VPS Bridge Thin Proxy - Forwards requests to Zeroclaw
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/vps-bridge
+Environment=NODE_ENV=production
+Environment=PORT=3003
+Environment=ZEROCLAW_URL=http://127.0.0.1:3010
+Environment=INTERNAL_TOKEN=aivory-internal-2026
+Environment=CORS_ORIGIN=*
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vps-bridge
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,36 @@
+# Usage: docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik-local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"    # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.local.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - bridge-net
+
+  aivory-bridge:
+    environment:
+      # Mac/Windows: host.docker.internal | Linux: 172.17.0.1
+      - ZEROCLAW_URL=http://host.docker.internal:3010
+      - CORS_ORIGIN=http://localhost:3000
+    healthcheck:
+      disable: true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.aivory-bridge-local.rule=Host(`api.localhost`)"
+      - "traefik.http.routers.aivory-bridge-local.entrypoints=web"
+      - "traefik.http.services.aivory-bridge-local.loadbalancer.server.port=3003"
+      - "traefik.http.services.aivory-bridge-local.loadbalancer.responseforwarding.flushinterval=1ms"
+    networks:
+      - bridge-net
+
+networks:
+  bridge-net:
+    name: bridge-net
+    driver: bridge
