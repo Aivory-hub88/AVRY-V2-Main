@@ -162,6 +162,26 @@ async function inspectStepWithMcp(step) {
   };
 }
 
+// 2026-08-22: step inspection parallelized with bounded concurrency. The old
+// sequential loop paid ~4 MCP round-trips per step one after another (8 steps
+// ≈ 32 sequential round-trips) on every copilot confirm/draft-test. Results
+// stay in input order and per-step error handling is unchanged; the bound
+// keeps the single shared n8n MCP session from being flooded.
+const INSPECT_CONCURRENCY = parseInt(process.env.WORKFLOW_INSPECT_CONCURRENCY || '5', 10);
+
+async function mapWithConcurrency(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 async function enrichStepsWithMcp(steps) {
   const available = await isN8nMcpAvailable();
   if (!available) {
@@ -176,40 +196,52 @@ async function enrichStepsWithMcp(steps) {
     };
   }
 
+  const t0 = Date.now();
+  const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step) => {
+    try {
+      return { ok: true, inspection: await inspectStepWithMcp(step) };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  });
+  console.log(`[workflow-draft] inspected ${steps.length} step(s) concurrently=${INSPECT_CONCURRENCY} elapsedMs=${Date.now() - t0}`);
+
   const inspected = [];
   const enrichedSteps = [];
 
-  for (const step of steps) {
-    try {
-      const inspection = await inspectStepWithMcp(step);
-      inspected.push({
-        stepId: step.id,
-        title: step.title,
-        ...inspection,
-      });
-      // Extract selectedNodeType from inspection as top-level nodeType
-      // This allows n8n-as-code-service to use the exact n8n node type
-      const selectedNodeType = inspection.selectedWorkflowNodeType || inspection.selectedNodeType || null;
-      // n8n-as-code reads node parameters from step.parameters when a direct
-      // nodeType is provided. UI/copilot steps carry their config under
-      // step.config, so map it through to avoid building parameter-less nodes
-      // that fail n8n pre-execution validation.
-      const mappedParameters = step.parameters || step.config || {};
-      enrichedSteps.push({
-        ...step,
-        nodeType: selectedNodeType,
-        parameters: mappedParameters,
-        n8nInspection: inspection,
-      });
-    } catch (error) {
+  for (let idx = 0; idx < steps.length; idx++) {
+    const step = steps[idx];
+    const result = results[idx];
+    if (!result.ok) {
       inspected.push({
         stepId: step.id,
         title: step.title,
         mcpAvailable: true,
-        error: error.message,
+        error: result.error.message,
       });
       enrichedSteps.push(step);
+      continue;
     }
+    const inspection = result.inspection;
+    inspected.push({
+      stepId: step.id,
+      title: step.title,
+      ...inspection,
+    });
+    // Extract selectedNodeType from inspection as top-level nodeType
+    // This allows n8n-as-code-service to use the exact n8n node type
+    const selectedNodeType = inspection.selectedWorkflowNodeType || inspection.selectedNodeType || null;
+    // n8n-as-code reads node parameters from step.parameters when a direct
+    // nodeType is provided. UI/copilot steps carry their config under
+    // step.config, so map it through to avoid building parameter-less nodes
+    // that fail n8n pre-execution validation.
+    const mappedParameters = step.parameters || step.config || {};
+    enrichedSteps.push({
+      ...step,
+      nodeType: selectedNodeType,
+      parameters: mappedParameters,
+      n8nInspection: inspection,
+    });
   }
 
   return {
@@ -267,4 +299,6 @@ async function prepareWorkflowDraft({ workflowId, description, steps }) {
 
 module.exports = {
   prepareWorkflowDraft,
+  // exposed for smoke tests / operational diagnostics
+  enrichStepsWithMcp,
 };
