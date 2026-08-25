@@ -56,7 +56,14 @@ const blueprintQueue = new Queue(QUEUE_NAME, { connection: queueConnection });
 // falls back to one slower reasoning-enabled attempt (the old behavior).
 const BLUEPRINT_MODEL = process.env.BLUEPRINT_MODEL || 'deepseek/deepseek-v4-flash-0731';
 const BLUEPRINT_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_TIMEOUT_MS || '90000', 10);
-const BLUEPRINT_FALLBACK_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FALLBACK_TIMEOUT_MS || '240000', 10);
+// 2026-08-25: raised 240000 -> 300000. Job #21's documented incident (two
+// straight fallback timeouts under provider load) shows 240s has no margin
+// left for real-world provider slowness, and every fallback timeout is a
+// hard failure surfaced to the user (there is deliberately no generic-
+// template fallback here — see the 2026-08-09 note above on why that was
+// removed). The extra 60s gives the reasoning-enabled attempt room to
+// finish under load instead of getting cut off right as it's converging.
+const BLUEPRINT_FALLBACK_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FALLBACK_TIMEOUT_MS || '300000', 10);
 
 // Same short persona used for every other Zeroclaw-routed console/copilot
 // message (server.js identityPrefix) — kept identical here so blueprint
