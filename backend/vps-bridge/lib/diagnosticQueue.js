@@ -51,8 +51,42 @@ function ensureArray(value) {
 }
 
 /**
+ * Structural validation — is this a usable diagnostic assessment at all?
+ * Before this existed, a malformed/partial LLM response (missing score,
+ * missing maturity_level, or literally no findings) was silently papered
+ * over with hardcoded defaults ('Developing', score 0) below and returned
+ * as a normal "completed" job — indistinguishable from a real assessment to
+ * both the job queue and the user. Mirrors blueprintQueue.js's
+ * isUsableBlueprint: reject here so the job legitimately fails/retries
+ * instead of shipping a fake-looking result.
+ */
+function isUsableDiagnosticResult(result) {
+  if (!result || typeof result !== 'object') return false;
+  const score = typeof result.ai_readiness_score === 'number' ? result.ai_readiness_score : result.score;
+  if (typeof score !== 'number' || score < 0 || score > 100) {
+    console.warn('[diagnostic-validator] reject: ai_readiness_score missing or out of range');
+    return false;
+  }
+  if (typeof result.maturity_level !== 'string' || !result.maturity_level.trim()) {
+    console.warn('[diagnostic-validator] reject: maturity_level missing/empty');
+    return false;
+  }
+  const strengths = ensureArray(result.strengths);
+  const constraints = ensureArray(result.primary_constraints);
+  const opportunities = ensureArray(result.automation_opportunities);
+  if (strengths.length === 0 && constraints.length === 0 && opportunities.length === 0) {
+    console.warn('[diagnostic-validator] reject: no strengths/constraints/opportunities at all');
+    return false;
+  }
+  return true;
+}
+
+/**
  * Run the deep diagnostic against OpenRouter and return the normalized result.
- * Throws on any failure (worker marks the job failed).
+ * Throws on any failure (worker marks the job failed) — including a
+ * structurally unusable result, so BullMQ's retry (see server.js
+ * diagnosticQueue.add) gets a real second attempt instead of the caller
+ * silently receiving placeholder content.
  */
 async function runDeepDiagnostic(payload) {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -96,21 +130,32 @@ async function runDeepDiagnostic(payload) {
     result = JSON.parse(jsonStr);
   }
 
+  if (!isUsableDiagnosticResult(result)) {
+    throw new Error('Diagnostic generation returned an incomplete/malformed assessment (missing score, maturity_level, or any findings)');
+  }
+
   const diagnosticId = `DIAG_${uuidv4().replace(/-/g, '').substring(0, 12).toUpperCase()}`;
+  const score = result.ai_readiness_score ?? result.score;
   return {
     ...result,
     diagnostic_id: diagnosticId,
-    ai_readiness_score: result.ai_readiness_score || result.score || 0,
-    score: result.ai_readiness_score || result.score || 0,
-    maturity_level: result.maturity_level || 'Developing',
+    // score/maturity_level are validated present above — no silent default
+    // here; a genuinely missing value now fails the job instead of shipping
+    // a placeholder that looks like a real assessment.
+    ai_readiness_score: score,
+    score,
+    maturity_level: result.maturity_level,
     strengths: ensureArray(result.strengths),
     primary_constraints: ensureArray(result.primary_constraints),
     automation_opportunities: ensureArray(result.automation_opportunities),
     blockers: ensureArray(result.primary_constraints || result.blockers),
     opportunities: ensureArray(result.automation_opportunities || result.opportunities),
+    // narrative_summary/recommended_next_step stay optional-with-empty-
+    // default — cosmetic prose, not a number/label a user could mistake for
+    // a real finding the way a defaulted score or maturity level would be.
     narrative_summary: result.narrative_summary || result.narrative || '',
     recommended_next_step: result.recommended_next_step || '',
   };
 }
 
-module.exports = { QUEUE_NAME, redisOptions, connection, diagnosticQueue, runDeepDiagnostic };
+module.exports = { QUEUE_NAME, redisOptions, connection, diagnosticQueue, runDeepDiagnostic, isUsableDiagnosticResult, ensureArray };
