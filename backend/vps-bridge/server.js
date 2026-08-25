@@ -1835,7 +1835,7 @@ Return this EXACT JSON structure:
 
 Base your assessment on the four diagnostic phases provided: business objectives & KPIs, data & process readiness, risk & constraints, and AI opportunity mapping.
 
-Recommendations must be things a non-technical business owner can actually act on this quarter (e.g. adopt a specific no-code/low-code automation, restructure a process, hire a role, get an off-the-shelf integration) — grounded in the diagnostic answers given. Do NOT recommend building custom software, an SDK, an API, or any in-house engineering deliverable unless the business's own stated objectives are literally to build/sell software.`;
+Every recommendation — whether it's adopting a no-code automation, building custom software/an SDK/an API, purchasing or installing a specific tool, restructuring a process, or hiring a role — must be tied explicitly to a specific answer or pain point from THIS diagnostic, not a generic best practice. If you recommend building or buying something, name what it should do and which of the business's actual constraints/systems it addresses. Never suggest a solution that doesn't map to a concrete signal in the data provided.`;
 
 app.post('/diagnostics/run', async (req, res) => {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
