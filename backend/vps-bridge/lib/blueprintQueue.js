@@ -68,14 +68,28 @@ const BLUEPRINT_FALLBACK_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FALLBACK_TI
 // wasn't a slow model, it was BLUEPRINT_MODEL's provider having a bad
 // window — a longer timeout just waits longer for the same overloaded
 // provider. The actual fix for "one provider is degraded" is a DIFFERENT
-// provider, not more patience. If set, this is tried (fast, no-reasoning,
-// tight timeout) as a last resort only after BOTH the primary model's fast
-// and reasoning-on attempts have failed/timed out — cheap because it's the
-// no-reasoning profile, and it sidesteps whatever is specifically wrong
-// with BLUEPRINT_MODEL's provider right now. Unset by default: picking a
-// concrete model here is a real product/cost decision, left to be
-// configured deliberately rather than guessed.
-const BLUEPRINT_FAILOVER_MODEL = process.env.BLUEPRINT_FAILOVER_MODEL || '';
+// provider, not more patience. If set, these are tried IN ORDER (fast,
+// no-reasoning, tight timeout each) as a last resort only after BOTH the
+// primary model's fast and reasoning-on attempts have failed/timed out —
+// cheap because it's the no-reasoning profile, and each sidesteps whatever
+// is specifically wrong with BLUEPRINT_MODEL's provider right now.
+// Comma-separated; unset by default: picking concrete models here is a real
+// product/cost decision, left to be configured deliberately rather than
+// guessed. 2026-08-25: set to qwen/qwen3-235b-a22b,qwen/qwen3.6-plus —
+// deliberately NOT a "thinking"/reasoning-tuned model (e.g.
+// qwen3-max-thinking): tier 2 above already covers "give it time to think";
+// stacking another slow/variable-latency reasoning tier here would risk the
+// same unpredictable-latency failure mode this whole ladder exists to avoid.
+// Both Qwen models are single-provider on OpenRouter (Alibaba Cloud
+// International only, no multi-host redundancy the way BLUEPRINT_MODEL's
+// DeepSeek family has) — real infra-outage protection would need a
+// differently-hosted model (e.g. Google/OpenAI), but two separately-served
+// Qwen models still gives protection against a model-specific queue/issue,
+// which is what was chosen here.
+const BLUEPRINT_FAILOVER_MODELS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3-235b-a22b,qwen/qwen3.6-plus')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean);
 const BLUEPRINT_FAILOVER_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FAILOVER_TIMEOUT_MS || '60000', 10);
 
 // Same short persona used for every other Zeroclaw-routed console/copilot
@@ -232,11 +246,11 @@ async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model =
 }
 
 /**
- * Three-tier generation, escalating only as far as needed:
- *   1. fast   — primary model, reasoning off (~15s typical measured).
+ * Escalating generation, going only as far as needed:
+ *   1. fast     — primary model, reasoning off (~15s typical measured).
  *   2. fallback — primary model, reasoning on (~15-300s) — the "real" attempt,
  *      only reached when tier 1 didn't produce a usable blueprint.
- *   3. failover — a DIFFERENT model (opt-in via BLUEPRINT_FAILOVER_MODEL),
+ *   3+. failover — each model in BLUEPRINT_FAILOVER_MODELS, in order,
  *      reasoning off, only reached when BOTH primary-model tiers failed.
  *
  * The point of tier 3: job #21's real incident was the primary model's own
@@ -284,21 +298,23 @@ async function runBlueprintGeneration({ messages }) {
   } catch (err) {
     fallbackErr = err;
   }
-  console.warn(`[blueprint-worker] tier=fallback failed (${fallbackErr.message})${BLUEPRINT_FAILOVER_MODEL ? ' — escalating to tier=failover' : ' — BLUEPRINT_FAILOVER_MODEL not configured, failing job'}`);
+  console.warn(`[blueprint-worker] tier=fallback failed (${fallbackErr.message})${BLUEPRINT_FAILOVER_MODELS.length ? ` — escalating to failover models: ${BLUEPRINT_FAILOVER_MODELS.join(', ')}` : ' — no BLUEPRINT_FAILOVER_MODELS configured, failing job'}`);
 
-  // Tier 3: fast, no-reasoning, a DIFFERENT model — last resort, opt-in only.
-  if (BLUEPRINT_FAILOVER_MODEL) {
+  // Tier 3+: fast, no-reasoning, each configured DIFFERENT model in order —
+  // last resort, opt-in only. Stops at the first usable result.
+  for (const failoverModel of BLUEPRINT_FAILOVER_MODELS) {
+    const tierLabel = `failover:${failoverModel}`;
     try {
-      const failover = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_FAILOVER_TIMEOUT_MS, model: BLUEPRINT_FAILOVER_MODEL, tier: 'failover' });
+      const failover = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_FAILOVER_TIMEOUT_MS, model: failoverModel, tier: tierLabel });
       if (failover.length >= MIN_BLUEPRINT_CHARS) {
         if (!isUsableBlueprint(failover)) {
-          console.warn('[blueprint-worker] tier=failover result not structurally clean — returning it anyway for Next.js-layer normalization');
+          console.warn(`[blueprint-worker] tier=${tierLabel} result not structurally clean — returning it anyway for Next.js-layer normalization`);
         }
-        return { content: failover, tier: 'failover' };
+        return { content: failover, tier: tierLabel };
       }
-      console.warn(`[blueprint-worker] tier=failover result too small (${failover.length} chars) — failing job`);
+      console.warn(`[blueprint-worker] tier=${tierLabel} result too small (${failover.length} chars) — trying next tier`);
     } catch (err) {
-      console.warn(`[blueprint-worker] tier=failover failed too (${err.message}) — failing job`);
+      console.warn(`[blueprint-worker] tier=${tierLabel} failed (${err.message}) — trying next tier`);
     }
   }
 
