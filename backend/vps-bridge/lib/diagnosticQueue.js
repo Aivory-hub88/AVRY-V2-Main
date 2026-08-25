@@ -40,7 +40,9 @@ Return this EXACT JSON structure:
   "recommended_next_step": "<single most important next action>"
 }
 
-Base your assessment on the four diagnostic phases provided: business objectives & KPIs, data & process readiness, risk & constraints, and AI opportunity mapping.`;
+Base your assessment on the four diagnostic phases provided: business objectives & KPIs, data & process readiness, risk & constraints, and AI opportunity mapping.
+
+Recommendations must be things a non-technical business owner can actually act on this quarter (e.g. adopt a specific no-code/low-code automation, restructure a process, hire a role, get an off-the-shelf integration) — grounded in the diagnostic answers given. Do NOT recommend building custom software, an SDK, an API, or any in-house engineering deliverable unless the business's own stated objectives are literally to build/sell software.`;
 
 function ensureArray(value) {
   if (Array.isArray(value)) return value;
