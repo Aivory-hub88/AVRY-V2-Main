@@ -64,6 +64,19 @@ const BLUEPRINT_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_TIMEOUT_MS || '90000
 // removed). The extra 60s gives the reasoning-enabled attempt room to
 // finish under load instead of getting cut off right as it's converging.
 const BLUEPRINT_FALLBACK_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FALLBACK_TIMEOUT_MS || '300000', 10);
+// 2026-08-25 (real hardening, not just a longer wait): job #21's failure
+// wasn't a slow model, it was BLUEPRINT_MODEL's provider having a bad
+// window — a longer timeout just waits longer for the same overloaded
+// provider. The actual fix for "one provider is degraded" is a DIFFERENT
+// provider, not more patience. If set, this is tried (fast, no-reasoning,
+// tight timeout) as a last resort only after BOTH the primary model's fast
+// and reasoning-on attempts have failed/timed out — cheap because it's the
+// no-reasoning profile, and it sidesteps whatever is specifically wrong
+// with BLUEPRINT_MODEL's provider right now. Unset by default: picking a
+// concrete model here is a real product/cost decision, left to be
+// configured deliberately rather than guessed.
+const BLUEPRINT_FAILOVER_MODEL = process.env.BLUEPRINT_FAILOVER_MODEL || '';
+const BLUEPRINT_FAILOVER_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FAILOVER_TIMEOUT_MS || '60000', 10);
 
 // Same short persona used for every other Zeroclaw-routed console/copilot
 // message (server.js identityPrefix) — kept identical here so blueprint
@@ -127,12 +140,12 @@ function isUsableBlueprint(content) {
  * (measured: 14.5s vs 128.6s+ on the same prompt); {exclude:true} does NOT —
  * it merely hides the reasoning while still paying for it.
  */
-async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs }) {
+async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model = BLUEPRINT_MODEL, tier = 'unnamed' }) {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
 
   const body = {
-    model: BLUEPRINT_MODEL,
+    model,
     messages: [
       { role: 'system', content: identityPrefix },
       { role: 'user', content: lastUserMessage },
@@ -150,23 +163,36 @@ async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs }) {
   if (!reasoningEnabled) body.reasoning = { enabled: false };
 
   const t0 = Date.now();
-  console.log(`[blueprint-worker] model call start reasoning=${reasoningEnabled ? 'on' : 'off'} promptChars=${lastUserMessage.length}`);
-  const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://aivory.app',
-      'X-Title': 'Aivory',
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  console.log(`[blueprint-worker] model call headers reasoning=${reasoningEnabled ? 'on' : 'off'} status=${orRes.status} elapsedMs=${Date.now() - t0}`);
+  console.log(`[blueprint-worker] model call start tier=${tier} model=${model} reasoning=${reasoningEnabled ? 'on' : 'off'} promptChars=${lastUserMessage.length}`);
+  let orRes;
+  try {
+    orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://aivory.app',
+        'X-Title': 'Aivory',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    // Distinguish "we gave up waiting" (the provider may still be fine, just
+    // slow right now) from a real connection failure — callers use this to
+    // decide whether escalating to a different model is actually likely to
+    // help, vs. retrying the same call being pointless either way.
+    const isTimeout = err && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    console.warn(`[blueprint-worker] model call ${isTimeout ? 'TIMED OUT' : 'NETWORK ERROR'} tier=${tier} model=${model} elapsedMs=${Date.now() - t0}: ${err.message}`);
+    const wrapped = new Error(`${isTimeout ? 'Timeout' : 'Network error'} calling ${model}: ${err.message}`);
+    wrapped.isTimeout = isTimeout;
+    throw wrapped;
+  }
+  console.log(`[blueprint-worker] model call headers tier=${tier} model=${model} reasoning=${reasoningEnabled ? 'on' : 'off'} status=${orRes.status} elapsedMs=${Date.now() - t0}`);
 
   if (!orRes.ok || !orRes.body) {
     const errText = orRes.body ? await orRes.text().catch(() => 'unknown error') : 'no body';
-    throw new Error(`OpenRouter error ${orRes.status}: ${String(errText).substring(0, 200)}`);
+    throw new Error(`OpenRouter error ${orRes.status} (model=${model}): ${String(errText).substring(0, 200)}`);
   }
 
   // Accumulate the OpenRouter SSE stream into the full completion text.
@@ -200,15 +226,28 @@ async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs }) {
       if (evt.usage?.completion_tokens) completionTokens = evt.usage.completion_tokens;
     }
   }
-  console.log(`[blueprint-worker] model call done reasoning=${reasoningEnabled ? 'on' : 'off'} elapsedMs=${Date.now() - t0} ttftMs=${ttftMs} finish=${finishReason} completionTokens=${completionTokens} chars=${content.length}`);
+  console.log(`[blueprint-worker] model call done tier=${tier} model=${model} reasoning=${reasoningEnabled ? 'on' : 'off'} elapsedMs=${Date.now() - t0} ttftMs=${ttftMs} finish=${finishReason} completionTokens=${completionTokens} chars=${content.length}`);
   if (!content.trim()) throw new Error('Blueprint generation returned empty content');
   return content;
 }
 
 /**
- * Fast path first (reasoning off, ~15s measured), validated structurally;
- * one fallback attempt with reasoning on (the pre-2026-08-22 behavior) only
- * when the fast result isn't a usable blueprint. Returns { content }.
+ * Three-tier generation, escalating only as far as needed:
+ *   1. fast   — primary model, reasoning off (~15s typical measured).
+ *   2. fallback — primary model, reasoning on (~15-300s) — the "real" attempt,
+ *      only reached when tier 1 didn't produce a usable blueprint.
+ *   3. failover — a DIFFERENT model (opt-in via BLUEPRINT_FAILOVER_MODEL),
+ *      reasoning off, only reached when BOTH primary-model tiers failed.
+ *
+ * The point of tier 3: job #21's real incident was the primary model's own
+ * provider being overloaded, not the model being slow in general — a longer
+ * timeout on the SAME provider just waits longer for the same congestion.
+ * Switching models/providers is the actual fix for "this specific backend is
+ * degraded right now"; a longer timeout only helps "this is just slow".
+ *
+ * Every tier's outcome is logged with its tier name so a repeat failure
+ * (like job #21) is diagnosable from logs alone — which tier(s) were tried,
+ * which timed out vs. errored vs. returned garbage.
  */
 async function runBlueprintGeneration({ messages }) {
   if (!Array.isArray(messages)) throw new Error('messages array required');
@@ -218,29 +257,55 @@ async function runBlueprintGeneration({ messages }) {
   if (!lastUserMessage) throw new Error('No user message provided');
   const userContent = lastUserMessage.content;
 
+  // Tier 1: fast, no-reasoning, primary model.
   try {
-    const fast = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_TIMEOUT_MS });
-    if (isUsableBlueprint(fast)) return { content: fast };
-    console.warn('[blueprint-worker] fast (no-reasoning) result not a usable blueprint — falling back to reasoning-on attempt');
+    const fast = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fast' });
+    if (isUsableBlueprint(fast)) return { content: fast, tier: 'fast' };
+    console.warn('[blueprint-worker] tier=fast result not a usable blueprint — escalating to tier=fallback');
   } catch (err) {
-    console.warn(`[blueprint-worker] fast (no-reasoning) attempt failed (${err.message}) — falling back to reasoning-on attempt`);
+    console.warn(`[blueprint-worker] tier=fast failed (${err.message}) — escalating to tier=fallback`);
   }
 
-  const content = await callModel({ lastUserMessage: userContent, reasoningEnabled: true, timeoutMs: BLUEPRINT_FALLBACK_TIMEOUT_MS });
-  // Fallback attempt: warn-only on structure. The Next.js layer
-  // (lib/blueprintGeneration.ts) owns parsing/normalization and has its own
-  // text-fallback repair — failing the job here on format alone would throw
-  // away a result it might have salvaged (pre-2026-08-22 behavior returned
-  // whatever came back). EXCEPTION: a suspiciously SMALL result cannot be
-  // repaired into a real blueprint by anyone — fail the job visibly instead
-  // of handing the user garbage.
-  if (!isUsableBlueprint(content)) {
-    if (content.length < MIN_BLUEPRINT_CHARS) {
-      throw new Error(`Blueprint generation degenerate: ${content.length} chars even with reasoning enabled`);
+  // Tier 2: reasoning-on, primary model — the "real" attempt. Warn-only on
+  // structure (the Next.js layer has its own text-fallback repair — failing
+  // here on format alone would throw away a result it might salvage) but a
+  // suspiciously SMALL result can't be repaired by anyone, so that alone
+  // triggers tier 3 / final failure.
+  let fallbackErr = null;
+  try {
+    const fallback = await callModel({ lastUserMessage: userContent, reasoningEnabled: true, timeoutMs: BLUEPRINT_FALLBACK_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fallback' });
+    if (fallback.length >= MIN_BLUEPRINT_CHARS) {
+      if (!isUsableBlueprint(fallback)) {
+        console.warn('[blueprint-worker] tier=fallback result not structurally clean — returning it anyway for Next.js-layer normalization');
+      }
+      return { content: fallback, tier: 'fallback' };
     }
-    console.warn('[blueprint-worker] reasoning-on fallback result not structurally clean — returning it anyway for Next.js-layer normalization');
+    fallbackErr = new Error(`Blueprint generation degenerate: ${fallback.length} chars even with reasoning enabled`);
+  } catch (err) {
+    fallbackErr = err;
   }
-  return { content };
+  console.warn(`[blueprint-worker] tier=fallback failed (${fallbackErr.message})${BLUEPRINT_FAILOVER_MODEL ? ' — escalating to tier=failover' : ' — BLUEPRINT_FAILOVER_MODEL not configured, failing job'}`);
+
+  // Tier 3: fast, no-reasoning, a DIFFERENT model — last resort, opt-in only.
+  if (BLUEPRINT_FAILOVER_MODEL) {
+    try {
+      const failover = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_FAILOVER_TIMEOUT_MS, model: BLUEPRINT_FAILOVER_MODEL, tier: 'failover' });
+      if (failover.length >= MIN_BLUEPRINT_CHARS) {
+        if (!isUsableBlueprint(failover)) {
+          console.warn('[blueprint-worker] tier=failover result not structurally clean — returning it anyway for Next.js-layer normalization');
+        }
+        return { content: failover, tier: 'failover' };
+      }
+      console.warn(`[blueprint-worker] tier=failover result too small (${failover.length} chars) — failing job`);
+    } catch (err) {
+      console.warn(`[blueprint-worker] tier=failover failed too (${err.message}) — failing job`);
+    }
+  }
+
+  // Every configured tier is exhausted — surface the tier-2 (primary,
+  // reasoning-on) error since that's the tier that was actually supposed to
+  // succeed; tier 1/3 are cheap insurance around it.
+  throw fallbackErr;
 }
 
 module.exports = { QUEUE_NAME, blueprintQueue, runBlueprintGeneration };
