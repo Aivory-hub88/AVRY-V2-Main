@@ -1,7 +1,9 @@
 # ADR-003 — Aivory Cerveau Phase 2.5: Durability (F-1 / F-2)
 
 **Date:** 2026-07-17
-**Status:** F-2 ledger primitive landed; F-2 wiring + F-1 deferred to dedicated patches
+**Status:** F-2 ledger primitive landed AND wired (patch 0013, 2026-07-26). F-1 landed 2026-08-09 (patch 0025) — see the update below.
+
+**2026-08-09 update:** F-1 is implemented, CI-verified locally (63 `control_plane::` tests, zero LLM calls), pushed to `cerveau-main` (commit `a1e0305b`), CI-green on GitHub (run `31273610009`, 25m14s), and **deployed to `:3100`** — no config change needed (pure code patch), new PID `3572501`, stable 2+ min post-restart, health ok, 0 errors. See `docs/CERVEAU-STATUS.md` §4/§5 for the patch-0025 account. Summary: `recovery_pass` no longer reconciles a `Goal`-kind orphan with a persisted `TaskContinuationContext` to `Lost` — it durably parks it `Paused`/`GoalPauseReason::DaemonRestart` instead (safe on its own, real/inspectable/resumable state, independent of anything else). A new `continuation_drive` module then attempts ONE automatic continuation turn per candidate, gated by the F-2 ledger keyed on `(task_id, crashed_boot_id)` so a repeat crash mid-drive can't double-fire. It reuses `agent::run` + the `cron::scheduler::register_delivery_fn` hook — the exact same "runtime-initiated turn, delivered via channel, no `zeroclaw-channels` import needed" pattern `cron` already proves — rather than inventing a new crate-graph-inversion hook. **Important scope note surfaced during implementation:** `TaskKind::Goal`/`GoalTaskRegistry`/the `/goal` command have **zero producers anywhere in this fork** — `/goal` is registered in the command parser but has no execution wiring, so nothing today ever creates a resumable goal task in production. F-1 is therefore forward-looking infrastructure, not a fix for an observed failure, consistent with how this fork already ships several EPIC A–E primitives ahead of their consumers. The user was asked and explicitly chose to build it in full per this ADR anyway.
 **Context:** Phase 2.5 of [DEPLOYABLE_AGENT_RUNTIME_PLANNING.md](DEPLOYABLE_AGENT_RUNTIME_PLANNING.md); builds on [ADR-001 §0.2](ADR-001-AIVORY-CERVEAU-PHASE0.md) (durability findings) against the v0.8.3 `control_plane`.
 
 ---
@@ -36,3 +38,7 @@ Intended: at boot, an owned prior-boot task that has a persisted `TaskContinuati
 
 - **Identity + isolation half — MET and live-verified** (two data-row-only tenants, distinct personas, no cross-tenant knowledge/memory leak; 5 CI isolation tests).
 - **Durability half — partially met:** hold/resume durable (upstream v0.8.3); no-double-execute primitive landed (F-2 ledger). Auto-resume of a crashed *in-flight* multi-day task (F-1) + ledger hot-path wiring are tracked follow-ups, not blockers for the identity/isolation cutover that Phase 6 depends on.
+
+## 2026-08-26 note
+
+No change to the durability mechanism (F-1/F-2) this round. The dashboard surfaces that consume F-1's approval-turn resume — the `/approvals` page and the Console inline Approve/Deny card, both via `lib/agentApprovals.ts` — got a production-build fix: the shared `describeTool` export was being dropped by a Turbopack JSDoc-parse bug (an em-dash in the comment above it) and the whole dashboard build failed with "Export describeTool doesn't exist." Resolved (comment removed); full account in `docs/CERVEAU-STATUS.md`'s 2026-08-26 deploy entry. Durability behavior itself is unchanged and still live on `:3100`/`:3101`.
