@@ -2,7 +2,19 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-26 (Dashboard round: deep-diagnostic PDF hardening + ID-locale industry map; workflow copilot latency 40s→sub-4s via small-talk fast-path + OpenRouter provider-throughput routing — the "slow model" was a slow provider; blueprint warm pings + throughput routing. Full account in the entry directly below; the 2026-08-25 Console approve/deny entry is unchanged, further down.)
+**Last updated:** 2026-08-26 — two 2026-08-26 entries below: the Dashboard round (PDF/copilot/blueprint warm-ping) and the later Dashboard deploy (Composio connection reconciliation + Turbopack `describeTool` build fix, live at commit `3b8112d`).
+
+## 2026-08-26 — Dashboard deploy: Composio connection reconciliation fixed + production build unblocked (live at `3b8112d`)
+
+**Scope.** `avry-user-dashboard`, pushed to `aivory-hub/main` and deployed live to the Tencent VPS (`/home/ubuntu/AVRY-V2-Main/frontend/avry-user-dashboard` → `docker compose build` + `up -d`; container recreated, `/dashboard` returns 200). A seven-file typecheck/lint/test fix plus two follow-up build fixes, all verified end-to-end in production.
+
+**Cerveau-relevant impact.**
+- `app/integrations/callback/route.ts`: the OAuth callback's connection-status reconciliation called a removed Composio API (`composio.getEntity()`), so every connection silently stayed `Not connected` and the dashboard "Reconnect" path did nothing. Replaced with `connectedAccounts.get()`, so a completed OAuth flow now correctly flips the row to `connected`/`failed`. That row is the input to Cerveau's `apply_toolkit_connection_gate` (the `product.agent_toolkit_connections` `ACTIVE` row) — connections now actually surface to Cerveau instead of failing closed.
+- `lib/agentApprovals.ts` `describeTool()`: the shared approval-display helper (used by the dashboard `/approvals` page and the Console inline Approve/Deny card — both consume Cerveau's F-1 approval-turn resume) was being dropped from the module's exports by a Turbopack/SWC parse bug: a JSDoc comment above it containing an em-dash (`—`) caused SWC to swallow the following `export function describeTool`, failing the whole production build with "Export describeTool doesn't exist." Removed the comment; build is green again, with the TypeScript build gate re-enabled (`typescript.ignoreBuildErrors: false`).
+
+**Other fixes in the same deploy (dashboard-internal):** `currencyBands.ts` typed as `Partial<Record>` to match the USD-fallback accessor; `WorkflowCanvas.tsx` manual-trigger position annotated `[number, number]`; `app/diagnostics/deep/final-result/page.tsx` dead `locale==='id'` branch removed; `app/approvals/page.tsx` `setError` moved out of the effect body (lint `set-state-in-effect`); `blueprintPlanner.graphSemantics.test.ts` resolves the join node structurally after it was renamed `Merge N` (3 stale failures).
+
+**Build note.** The `describeTool` Turbopack false-positive had been permanently masked by `ignoreBuildErrors: true` in every prior production build; it only surfaced when the gate was re-enabled. Now genuinely resolved, so the production build type-checks for real.
 
 ## 2026-08-26 — Dashboard round: 3 PDF bugs, copilot latency (40s→0.4s greeting / ~2-4s real), and the "slow deepseek" that was actually slow provider routing
 
