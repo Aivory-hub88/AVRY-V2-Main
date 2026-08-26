@@ -2241,6 +2241,39 @@ function warmPingConsoleModel() {
 setInterval(warmPingConsoleModel, WARM_PING_INTERVAL_MS);
 warmPingConsoleModel();
 
+// KEEP-WARM PING — BLUEPRINT (2026-08-26) — same cold-start mechanism and the
+// same frugal shape as the CONSOLE_MODEL ping above (2-word prompt,
+// max_tokens=1, best-effort, failures swallowed). The blueprint worker
+// (lib/blueprintQueue.js) pays the provider spin-up on its tier-1 attempt
+// after an idle window, and each failover model pays it again on its first
+// call — so: primary BLUEPRINT_MODEL pings on the same 4-minute cadence as
+// the console ping, failover models on a 45-minute cadence (rarely needed,
+// just never stone-cold). Cost: ~3 tokens/ping — deepseek ≈ $0.00000024/ping
+// (360/day ≈ under $0.0001/day); qwen failovers 32 pings/day/model. Well
+// under $0.01/month combined. Model defaults mirror lib/blueprintQueue.js.
+const BLUEPRINT_MODEL_DEFAULT = process.env.BLUEPRINT_MODEL || 'deepseek/deepseek-v4-flash-0731';
+const BLUEPRINT_FAILOVER_DEFAULTS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3-235b-a22b,qwen/qwen3.6-plus')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const BLUEPRINT_WARM_INTERVAL_MS = 4 * 60 * 1000;
+const FAILOVER_WARM_INTERVAL_MS = 45 * 60 * 1000;
+function warmPingModel(model) {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey || !model) return;
+  fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1, stream: false }),
+    signal: AbortSignal.timeout(20000),
+  }).catch(() => {});
+}
+function warmPingBlueprintPrimary() { warmPingModel(BLUEPRINT_MODEL_DEFAULT); }
+function warmPingBlueprintFailovers() { for (const m of BLUEPRINT_FAILOVER_DEFAULTS) warmPingModel(m); }
+setInterval(warmPingBlueprintPrimary, BLUEPRINT_WARM_INTERVAL_MS);
+warmPingBlueprintPrimary();
+setInterval(warmPingBlueprintFailovers, FAILOVER_WARM_INTERVAL_MS);
+warmPingBlueprintFailovers();
+console.log(`[warm-ping] blueprint keep-warm armed: primary(${BLUEPRINT_MODEL_DEFAULT}) every 4m, failovers(${BLUEPRINT_FAILOVER_DEFAULTS.join(', ')}) every 45m`);
+
 // ============================================================================
 // GRACEFUL SHUTDOWN
 // ============================================================================
