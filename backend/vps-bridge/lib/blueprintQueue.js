@@ -171,6 +171,14 @@ async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model =
     // active and we can see TTFT instead of a silent black box.
     stream: true,
     max_tokens: 16000,
+    // 2026-08-26: prefer the fastest provider for this model. Measured live
+    // (same prompt, same day): OpenRouter's DEFAULT routing sent
+    // deepseek-v4-flash to slow endpoints (~12-25 tok/s decode — 51-57s
+    // generations and 60s timeouts); throughput sorting routes to fast
+    // providers (Wafer/AtlasCloud, ~280 tok/s — 2.0-2.1s for the identical
+    // call). OpenRouter still fails over automatically if the fast provider
+    // is unavailable, so this is a preference, not a pin.
+    provider: { sort: 'throughput' },
   };
   // Only send the param when disabling — omitting it preserves the model's
   // default (reasoning on) for the fallback attempt.
