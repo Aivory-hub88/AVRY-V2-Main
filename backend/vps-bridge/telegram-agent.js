@@ -516,7 +516,7 @@ const TIER_TTL_MS = 5 * 60 * 1000;
 async function getUserTier(userId) {
   const cached = _tierCache.get(userId);
   if (cached && Date.now() - cached.at < TIER_TTL_MS) return cached.tier;
-  let tier = 'foundation'; // base paid tier — Aivory has no free tier
+  let tier = 'operational'; // base paid tier (2026 rebrand of 'foundation')
   try {
     // Lazy require: resolves on the VPS next to server.js; fail closed to base tier.
     // lib/db is the local avry-postgres pool (lib/supabase is a legacy-name shim).
