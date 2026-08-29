@@ -2,7 +2,24 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (`lightpanda__search` was silently feeding CAPTCHA pages to four agents as "search results" — fixed with a real Tavily key. Earlier the same day: custom MCP server quota now scales with the plan. See the two entries directly below.)
+**Last updated:** 2026-08-30 (the "Autonomous Agent" renamed to **Generalist Agent** across dashboard, landing and the bridge prompt — id unchanged. Earlier the same day: `lightpanda__search` was silently feeding CAPTCHA pages to four agents, and the custom MCP server quota now scales with the plan. See the entries below.)
+
+## 2026-08-30 — "Autonomous Agent" renamed to "Generalist Agent" (display only, id unchanged)
+
+**The problem was a category error, not just redundancy.** The user pointed out that "Autonomous Agent" is ambiguous because Cerveau is autonomous by definition. Looking at the family confirmed something worse: four of the five names describe a *domain* — Ticket Ops, Leads Qualifier, Finance & Invoice Ops, Office Assistant — and one described *how it runs*. Since every agent on Cerveau is autonomous, the word carried no distinguishing information, and sitting next to its siblings it implied the other four are *not* autonomous. It was underselling four products to label one.
+
+**What actually distinguishes it is breadth.** It is the only agent carrying every toolkit (`AGENTS[0]` in the dashboard lists Web search, Leads & tickets, Invoices, Workflows, Integrations); the other four are deliberately scoped. "Generalist" states that on the same axis as its siblings, and the generalist/specialist contrast explains the whole family in one word — it is why the other four are narrow. Runner-up considered and rejected: "All-Round Agent" (warmer, very British, but reads as a quality claim rather than a classification); also rejected were "General Agent" (flat, reads as "ordinary"), "Core Agent" (says nothing about breadth) and "Chief of Staff" (overlaps Office Assistant).
+
+**Display copy only — the `autonomous` id is load-bearing and unchanged.** It is stored in `product.agent_profiles.agent_type` and `product.tenant_custom_mcp_servers.agent_type` rows, referenced by the Cerveau config's `mcp_bundles`, and is a member of the Telegram/Discord deploy union types (8 code sites). Renaming the id would be a data migration for a copy change — the same lesson the tier-vocabulary work already paid for once: canonical ids are permanent, labels are not.
+
+**Changed, in three repos, all deployed:**
+- `avry-user-dashboard` — `app/agents/page.tsx` (gallery card title + the `autonomous:` label map), `lib/agentChat.ts` (chat agent picker), `services/deepDiagnostic.ts` (3 recommended-agent titles plus the EN/ID sentences in the reporting/ERP opportunity copy). Card description reworded too: it opened with "Deploy autonomous agents", repeating the word just removed. Now "One agent carrying every toolkit, deployed inside your communication hubs."
+- `Frntend-nxt` (landing) — the product-page card `<h4>` and its description. Pushed from the VPS checkout, which is the deployed source and was exactly in sync with `origin/main`; the local `frontend/frontend-nextjs` submodule is 16 commits behind it, so a plain push from there would have been a non-fast-forward.
+- `vps-bridge/telegram-agent.js` — the `autonomous` system prompt now opens "You are an Aivory Generalist Agent". Restarted via pm2 (`vps-bridge`), health 200.
+
+**Left alone on purpose:** the landing page's SEO metadata still says "Autonomous AI Agents for Business" (title, og:title, twitter:title, keywords — 8 occurrences, verified live). The generic plural is accurate for the family and is a live keyword; only the singular product label was the problem. `StatsSection`'s "5 Autonomous Agents" stays for the same reason. `AutonomousAgentAnimation` stays as a code identifier.
+
+**Verified live:** dashboard rebuilt and recreated, and the *served* `.next` bundle greps clean — "Generalist Agent" present in three chunks, zero occurrences of "Autonomous Agent". Landing rebuilt and recreated, `avry-website` healthy, and `https://aivory.uk/product` returns the new card heading with the 8 remaining hits all confirmed to be the intended SEO plural. Typecheck (`tsc --noEmit`) clean on the dashboard.
 
 ## 2026-08-30 — `lightpanda__search` was returning a CAPTCHA page to four agents; real search backend wired
 
