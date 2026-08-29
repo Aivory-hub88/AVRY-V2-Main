@@ -1,6 +1,6 @@
 # Midtrans Core API Migration Plan — Aivory-owned checkout UI
 
-**Status:** approved 2026-08-29; Phase 0 passed, Phase 1 not started
+**Status:** Phase 0 passed; Phase 1 built + deployed (inert), awaiting a real test transaction per channel
 **Created:** 2026-08-29
 **Goal:** keep Midtrans as the payment processor, but stop it owning the checkout interface.
 **Related:** `services/avry-payments/app/services/payment_gateway.py`, `frontend/frontend-nextjs/src/components/payment/CheckoutForm.tsx`, `src/lib/payment.ts`
@@ -19,7 +19,8 @@ Honest split, because "full Aivory UI" is only true for part of it:
 
 | Channel | Achievable | Why |
 | --- | --- | --- |
-| GoPay, DANA | **100% Aivory UI** | Core API returns a deeplink / QR string; we render it |
+| GoPay, ShopeePay | **100% Aivory UI** | Core API returns a deeplink / QR string; we render it |
+| DANA | **Snap only** | Core API: `payment_type is not supported: dana`. Keep on Snap, or serve via QRIS (the DANA app scans it) |
 | QRIS | **100% Aivory UI** | Core API returns the QR string |
 | Bank transfer / VA | **100% Aivory UI** | Core API returns the VA number and bank |
 | Credit / debit card | **Form is 100% Aivory; two hand-offs remain** | See below |
@@ -58,7 +59,11 @@ Add a Core API charge path to `avry-payments` **without removing the Snap path**
 - Return the method-specific payload the frontend must render: `actions[]` (GoPay deeplink), `qr_string`, `va_numbers[]`, or the 3DS `redirect_url`.
 - Persist `transaction_status` / `fraud_status` on the order as the single source of truth.
 
-**Exit gate:** each enabled channel charges successfully against production with a small real amount, and the order row reflects the right status.
+**Built and deployed 2026-08-29** — `create_charge` + `CORE_API_CHANNELS` + `_render_payload` in `payment_gateway.py` (`04a0247`, merged with VPS-local channel-alias work as `c8e950c`). Nothing calls it yet; no route exposes it, so the deploy is inert.
+
+**Payload shape verified against production without creating a transaction.** Called `create_charge` for all five channels with `resolve_gross_amount_idr` patched to 0, which Midtrans must reject. The only validation message returned for any channel was about `gross_amount` — the field deliberately broken. The `callback_url is required` / `credit_card is required` complaints seen in the Phase 0 bare probes are gone, which is what proves each payload is structurally complete.
+
+**Exit gate — NOT met, and needs the account owner:** a small real transaction per channel, confirming the order row reflects the right status. This cannot be done from here; executing a real payment is the owner's call.
 
 ## Phase 2 — Webhook is the source of truth
 
