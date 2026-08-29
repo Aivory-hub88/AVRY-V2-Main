@@ -2,7 +2,28 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-27 (Odoo custom MCP server moved to a real HTTPS endpoint, and three more real bugs found and fixed along the way — the ADR-006 Part B "register a custom MCP server" feature has never actually been able to pass real verification against a real MCP server until today. See entry directly below.)
+**Last updated:** 2026-08-30 (custom MCP server registration quota now scales with the plan instead of a flat 1 for everyone; full regression pass over ADR-006 Part B found no other defects. See entry directly below.)
+
+## 2026-08-30 — Custom MCP server quota now scales with the plan; full Part B regression pass found nothing else
+
+**Context.** The user, looking at the MCP tab on their own dashboard, asked why an Odoo server appeared "connected by default", and connected to *Aivory's* self-hosted Odoo rather than a tenant's own. Answer: it is not a default. `product.tenant_custom_mcp_servers` is strictly per-tenant (`user_id` column; every dashboard route filters on it) and has no seeding of any kind — the single row in the whole table is the fixture registered under the user's own superadmin account on 2026-08-24, pointed at Aivory's own Odoo purely because ADR-006 Part B needed one real, spec-compliant MCP server to be provable against. The product design is unchanged and is what the user expected: the tenant runs an MCP server against *their* Odoo and registers its URL (`docs/CERVEAU-ODOO-INTEGRATION-PLAN.md`, which explicitly rejects Aivory hosting a shared multi-tenant Odoo MCP server).
+
+**Regression pass first, before changing anything** — every check against the live production endpoints, not raw probes:
+- `POST /{id}/reverify` through the real dashboard route: `verified`, **41 tools**, no error — the 2026-08-27 session-id and User-Agent fixes still hold.
+- SSRF guard, exercised against the running prod code: `127.0.0.1:3105`, `localhost:8081`, `169.254.169.254` (cloud metadata), `10.0.0.1` and any `http://` URL all rejected.
+- Internal Cerveau-facing route returns the decrypted auth header and `risk_tier: irreversible`; a wrong `X-Internal-Token` gets 403.
+- Cross-tenant isolation: another tenant sees `{"servers":[]}` and gets 404 reverifying this row's id.
+- Tier gate: a free account is refused before any network call.
+- `odoo-mcp.aivory.uk` returns 401 without Basic Auth — not open to the internet.
+- `MCP_SERVER_AUTH_ENCRYPTION_KEY` present in the container; Odoo Discuss notifier timer clean, no errors in its journal.
+
+**The one real defect found: the registration quota was a flat `_MAX_SERVERS_PER_AGENT = 1` for every caller.** Operational and Enterprise were identical on the one axis this feature actually scales along, and a superadmin — Enterprise-equivalent everywhere else in the codebase — could not register a second server at all. The schema always allowed more than one row per `(user_id, agent_type)`; only route logic capped it.
+
+**Fix (deployed).** `_MAX_SERVERS_BY_TIER = {operational: 1, business: 3, enterprise: 10}`. `_require_pro_or_above()` became `_require_paid_tier()` and now *returns* the resolved tier instead of `None` — the superadmin branch previously returned bare, so the tier was discarded and the flat cap applied anyway; it now resolves to `enterprise`, matching `auth_service._compute_tier()`. Legacy alias ids resolve through `tiers.account_tier()` before the quota lookup, so a pre-rebrand `pro` row lands on `business` rather than falling through to the defensive default of 1. The 400 now names the plan and its allowance. Enterprise is bounded at 10 rather than unlimited on purpose: every tool on a tenant-supplied server is a black box Aivory never reviewed (§B5), so one account's blast radius stays finite.
+
+**Live proof.** Rebuilt and recreated `avry-backend` (baked image, no volume mount); container healthy, 26/26 unit tests pass *inside the production image* (6 of them new: every canonical tier has a quota, the ladder is non-decreasing, superadmin → enterprise, paid tier returned verbatim, `pro` alias resolves, free still 403). Registering a second server on the superadmin account then got past the quota gate and reached real verification (422 `verification_failed` from the deliberate no-auth-header probe) where it would previously have been refused with the 400 quota error. Probe row removed through the real DELETE route; disabled rows do not count toward the quota and do not appear in the dashboard list. Free-tier rejection, SSRF guard and the notifier re-checked after the deploy — all still green, no errors in the backend log.
+
+**Note for whoever revisits the fixture row.** With the quota still 1 on Operational, a tenant on the entry plan who has Aivory's test row registered would have no slot left for their own server. That is not the case for anyone today — the row belongs to the user's own superadmin account, which now has 10.
 
 ## 2026-08-27 — Odoo MCP server cut over to real HTTPS; ADR-006 Part B verification was fundamentally broken
 
