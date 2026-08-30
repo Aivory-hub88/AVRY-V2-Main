@@ -105,11 +105,13 @@ Five real agent-type keys, consistent from the dashboard's UI down to Cerveau's 
 
 | Key | Dashboard label | Notes |
 |---|---|---|
-| `autonomous` | Autonomous Agent | Union of the other four types' toolkits |
+| `autonomous` | **Generalist Agent** | Union of the other four types' toolkits. Renamed from "Autonomous Agent" 2026-08-30: every Cerveau agent is autonomous, so the word distinguished nothing and implied the other four are not. The distinction is breadth — this is the only type carrying every toolkit |
 | `customer_service` | Ticket Ops Agent | Internal key kept for compatibility; renamed in the UI to avoid implying a direct end-customer chatbot |
 | `leads_qualifier` | Leads Qualifier Agent | |
 | `finance_invoice_ops` | Finance & Invoice Ops Agent | |
 | `office_assistant` | Office Assistant | **Enterprise plan only**, enforced server-side |
+
+**Agent-type keys are permanent; only labels change.** The keys above are stored in `product.agent_profiles.agent_type` and `product.tenant_custom_mcp_servers.agent_type` rows, referenced by Cerveau's `agent_type_mcp_bundles`, and are members of the Telegram/Discord deploy union types. A rename is a copy change; renaming a key would be a data migration.
 
 There is **no `workflow_builder` agent type** — the workflow builder is a separate dashboard feature (§9), not one of these five personas.
 
@@ -123,7 +125,7 @@ A separate, unrelated generic `Agent` CRUD entity shares the `/agents` URL prefi
 
 ### 5.1 Composio-backed toolkits (live)
 
-Nine toolkits, all via Composio-hosted MCP servers — zero new Aivory-run processes per toolkit:
+Ten toolkits, all via Composio-hosted MCP servers — zero new Aivory-run processes per toolkit:
 
 | Toolkit | Catalog → curated | Auth |
 |---|---|---|
@@ -136,10 +138,15 @@ Nine toolkits, all via Composio-hosted MCP servers — zero new Aivory-run proce
 | Google Calendar | 28 → 13 | OAuth |
 | Trello | 150 → 10 | OAuth |
 | Linear | 21 → 12 | OAuth |
+| Outlook (mail only) | 286 → 10 | OAuth (Microsoft) |
 
 **Connection flow**: tenant clicks a connector card → OAuth popup (or API-key entry for ERPNext) → Composio holds the token, Aivory stores only a `connectedAccountId` reference → `product.agent_toolkit_connections` gets an `ACTIVE` row per (tenant, toolkit) → `apply_toolkit_connection_gate` checks this table before exposing any tool for that toolkit, failing closed on zero rows → tools are further scoped per agent-type via `agent_type_mcp_bundles`.
 
 Every Composio tool call, whether from Cerveau's own MCP transport or from n8n (§10), hits `POST https://backend.composio.dev/api/v3/tools/execute/<SLUG>` with `user_id: <tenant_id>`, reusing the one connection the tenant made via the dashboard — n8n never holds its own OAuth credentials for a tenant integration.
+
+**Mail providers (2026-08-30).** Gmail and Outlook are both wired, and which one answers is settled at run time by the connection gate — an unconnected toolkit contributes no tools, so no dashboard setting chooses a provider. Outlook had been in the dashboard's connector catalogue with a live OAuth button since well before this, but no MCP server existed and no Cerveau config referenced it: connecting Outlook gave the agent zero Outlook tools. Reads and drafts are `reversible` and auto-approved on both providers; sending is `irreversible` and approval-gated. Gmail's `CREATE_EMAIL_DRAFT` was already `reversible` but not auto-approved, so drafting prompted while sending merely required approval — it is now auto-approved, since a draft is not sent and is deletable.
+
+**Zoho has no usable Composio path**: the `zoho_mail` toolkit exists and advertises OAuth2, but returns zero tools. Reaching Zoho requires the bring-your-own SMTP/IMAP route (§5.4), not this one.
 
 (2026-08-26: the dashboard OAuth callback's connection-status reconciliation was fixed — `connectedAccounts.get()` replaces a removed `composio.getEntity()` call — so `ACTIVE` rows now correctly reflect a completed OAuth flow; previously connections silently stayed `Not connected` and never reached this gate.)
 
@@ -151,9 +158,36 @@ Two profiles cover everything today:
 - **`erp-semi`** — reads auto-approved, every write prompts.
 - **`erp-auto`** — reads and draft-writes auto-approved as a standing grant; submit/cancel/delete/workflow-action actions stay `always_ask` in **both** modes. This is a hard floor no autonomy setting exempts.
 
-The agent always states write intent in its reply before executing, in both modes. A separate `auto_approve` bucket exists for tools with zero external side effect (writes only to Aivory's own internal Postgres — `create_lead`, `create_ticket`, `create_invoice`).
+The agent always states write intent in its reply before executing, in both modes. A separate `auto_approve` bucket exists for tools with zero external side effect (writes only to Aivory's own internal Postgres — `create_lead`, `create_ticket`, `create_invoice`, and as of 2026-08-30 `update_deal` and `pipeline_summary`).
+
+**A tool tiered in neither list is hard-denied by default** (patch 0013), so `[tool_risk_tiers]` is behaviour, not documentation. This is load-bearing in both directions: it is why Lightpanda's interactive tools are safely inert without an explicit deny, and it is the first thing to check when a wired tool mysteriously never runs.
 
 Two categories of tool are deliberately excluded rather than risk-tiered: raw/opaque passthroughs that a config can't meaningfully classify (Linear's `RUN_QUERY_OR_MUTATION`, Odoo's `ODOO_CALL_ODOO_JSONRPC`), and tools Composio itself rejects with no working alternative (Trello's card-update-by-id and member-assignment tools).
+
+---
+
+### 5.3 Non-Composio toolkits (Aivory-run)
+
+Not everything goes through Composio. Four toolkits are Aivory's own, and they matter because they are where the zero-signup experience lives — a tenant gets them without connecting anything.
+
+| Toolkit | Shape | Notes |
+|---|---|---|
+| **Native bridge** (`aivory-native-bridge`, `127.0.0.1:4100`) | HTTP MCP, one route per agent type | Leads, tickets, invoices, meeting summaries against Aivory's own `aivory_ops` Postgres. No tenant signup, no OAuth |
+| **Lightpanda** | stdio MCP, `--block-private-networks` | Headless browsing. 22 read tools auto-approved; `click`/`fill`/`evaluate`/`session_*` deliberately untiered, therefore hard-denied |
+| **pdf-oxide** | stdio MCP via a custom shim | `pdfoxide_read`/`_create`/`_fill_form` auto-approved; `pdfoxide_edit`'s nine mutating ops untiered, hard-denied |
+| **Tenant custom MCP** | HTTP MCP, tenant-supplied | §8 |
+
+**Lightpanda's `search` needed a real backend.** Without `BRAVE_API_KEY` or `TAVILY_API_KEY` the tool does not fail — it scrapes DuckDuckGo's HTML endpoint, which bot-blocks, and returns the anti-bot challenge page *as search results*. It is auto-approved on four agent types, so any turn reaching for web search was reasoning over a CAPTCHA page and pulling attacker-influenceable text into context on a path that looks like a search API. Fixed 2026-08-30 with a Tavily key in `/etc/zeroclaw-cerveau.env`; the `approval-slack-notify` timer now also watches the monthly credit balance and warns at 80% and 100%.
+
+**Why not RAGflow, or any other RAG engine.** `zeroclaw-memory` already is one, in Rust: `chunker.rs`, `embeddings.rs`, `retrieval.rs`, `vector.rs`, `dedup.rs`, `consolidation.rs`, `knowledge_graph{,_pg}.rs`. RAGflow needs 16 GB RAM, 50 GB disk and an Elasticsearch/MySQL/Redis/MinIO stack; this VPS runs with a few hundred MB free. Swiftide and Rig are the closest Rust analogues and would duplicate `zeroclaw-memory` outright. EdgeQuake is the best-matched candidate but needs Apache AGE, which is not available on the `avry-postgres` image — and its headline advantage over the existing pipeline, table/layout recovery, is a vision-model call per page rather than proprietary parsing, so it can be added to the existing extractor instead. See §13 for what genuinely is missing.
+
+### 5.4 Bring-your-own email (foundation only)
+
+`product.tenant_email_accounts` exists (created 2026-08-30) for tenants who want the agent to work from a mailbox they create *for it* — which is what makes storing a password acceptable: the blast radius is one purpose-made box, revoked by deleting it. **Nothing reads the table yet.**
+
+Design agreed but unbuilt: the connector lives in the Integrations tab; the form shows three fields (address, password, from-name) with SMTP/IMAP host and port auto-filled from the domain; a real SMTP *and* IMAP login must succeed before the row persists; hosts are checked against `guarded_fetch`'s DNS-pinning deny-list, or "SMTP host = 127.0.0.1:25" is an internal-relay SSRF. It will be implemented in the **native bridge**, not via n8n's IMAP/SMTP nodes, because those require a *stored* n8n credential — which would put the tenant's password in a second resting place. Which account sends is an explicit tenant choice ("Send as", shown only when 2+ are connected), and a partial unique index makes "at most one sending address per tenant" a database guarantee.
+
+**Never offer this for a primary Microsoft 365 mailbox**: Exchange Online has rejected 100% of Basic-auth SMTP AUTH since 30 April 2026. For Microsoft, OAuth (§5.1) is the only path.
 
 ---
 
@@ -224,6 +258,7 @@ A tenant on Pro or Enterprise can register any MCP server they control for their
 - **Verification**: a synchronous, SSRF-guarded MCP `initialize` + `tools/list` handshake through `guarded_fetch.py` (https-only, DNS-pinned, deny-listed, size-capped, no auto-redirect) — the single most dangerous surface in avry-backend, since a tenant-supplied URL that resolves to `127.0.0.1` would otherwise let "verification" probe Cerveau's own webhook from inside Aivory's trust boundary. Threads the server's `Mcp-Session-Id` from `initialize` into the `tools/list` call (fixed 2026-08-27) — streamable-http is stateful, and this verification could never actually pass against a real session-issuing MCP server before that fix.
 - **Encryption**: the auth header value is AES-256-GCM-encrypted at rest (`mcp_server_encryption.py`) and never returned by any dashboard-facing route — only avry-backend's internal endpoint (`X-Internal-Token` auth) hands back the decrypted value, and only to Cerveau-side or internal-tooling callers.
 - **Risk tier**: every tool on a custom server is hard-locked to `Irreversible` — no per-tool classification, no auto-approve, no exception.
+- **Quota**: per (tenant, agent type), scaled by plan — Operational 1, Business 3, Enterprise 10 (`_MAX_SERVERS_BY_TIER`, 2026-08-30). It was previously a flat 1 for everyone, which made the cheapest paid rung and Enterprise identical on the one axis this feature scales along, and left a superadmin — Enterprise-equivalent everywhere else — unable to register a second server at all. Enterprise is bounded rather than unlimited on purpose: every tool here is a black box Aivory never reviewed, so one account's blast radius stays finite.
 - **Gates**: Pro plan and above (widened down from Enterprise-only, 2026-08-15); hard-requires `agent_profiles.engine = 'cerveau'` — the legacy engine has no risk-tier/approval concept at all, so arbitrary tenant-supplied tool execution against it would have no safety net.
 
 Odoo's self-host path (§6.2) is a direct, unmodified reuse of this exact mechanism.
@@ -233,6 +268,7 @@ Odoo's self-host path (§6.2) is a direct, unmodified reuse of this exact mechan
 ## 9. Deployment channels and the API
 
 - **Generic API deploy** (ADR-006 Part A): tenant-scoped API key (`avk_live_...`), `POST /api/v1/agent-api/message`. Pro + Enterprise.
+- **`POST /api/memory`** is tenant-aware as of 2026-08-30. Send `X-Tenant-Id` + `X-Agent-Type` *and* a configured host alias as `agent`, and the write is scoped to `t_<user_id>.<agent_type>` via `create_memory_for_tenant` — the same structural jail (empty cross-agent allowlist) a tenant turn runs under. Fail-closed: malformed or half-specified tenant headers, or tenant headers with no `agent`, all return **400** rather than degrading to the install-wide `state.mem`. Before this it had no tenant path at all, and its no-`agent` fallback wrote to that shared store.
 - **Telegram**: real, live messaging channel via `vps-bridge`'s own bot/chat-mapping/callback infrastructure. QR-based binding.
 - **Slack**: native Slack App with Aivory's own credentials (distinct from the Composio-owned Slack *toolkit* in §5.1) — OAuth deploy flow exists; approval-awareness is not yet built into it (plain-text notifications only today, no Block Kit buttons).
 - **Discord**: shared bot, `/connect` code binding. Slash-command infrastructure exists but isn't wired to approvals yet.
@@ -249,6 +285,10 @@ n8n is used, but deliberately narrow — it is **not** the agent orchestrator, a
 An earlier "one n8n workflow per tool action" design was explicitly rejected — wrapping every individual action in its own workflow doesn't reduce LLM hallucination (the LLM still picks the tool and arguments upstream of n8n), it only adds latency and a new failure point.
 
 Four named scenarios were scoped (lead capture, support escalation, task handoff, invoice approval); only the invoice-approval **Slack notifier** is live. The original invoice-approval design had n8n call ERPNext directly via Composio, bypassing F-1 entirely — this was caught and rejected as a second, parallel approval mechanism before shipping; the corrected design keeps invoice creation as a normal F-1-gated Cerveau tool call, with n8n only polling Cerveau's admin approvals endpoint to notify Slack. The other three scenarios are not started (paused 2026-08-23).
+
+**Narrowed further, 2026-08-30.** Seven of the leads agent's eight tools were one SQL statement each and now run in the native bridge against Postgres directly (`db.mjs`, an optional per-tool `handler`); only `enrich_lead_contact` — wallet pre-check, provider call, conditional debit, merge — remains on the n8n path. The n8n CRUD branches are deliberately left in place but unused, so rolling back is reverting one file rather than restoring a workflow. Separately, the bridge shared secret left the workflow definitions: authentication is now the Webhook node's own `headerAuth` backed by a credential, so exports carry no secret and rejection happens before any node runs. `Native Customer Service Bridge` is archived and could not be migrated (the API refuses to update an archived workflow), so it still holds the old literal.
+
+**Credential placement, three categories:** tenant credentials never enter n8n (they live encrypted in Postgres and are used by the bridge); Aivory's own infrastructure credentials (the native-ops Postgres connection, provider API keys) belong in n8n's credential store, which is what it is for; nothing belongs in a node parameter — that was the actual defect.
 
 Operationally: n8n runs as a Docker container on the VPS; Cerveau runs as a native systemd process on the host — Docker's network isolation means loopback-bound Cerveau ports aren't reachable from inside an n8n container without an explicit bridge, which shaped several of the above design choices.
 
@@ -290,7 +330,11 @@ Per `docs/DEPLOYABLE_AGENT_RUNTIME_PLANNING.md`'s own phase markers:
 
 ## 13. Known gaps (honest list)
 
-- pgvector extension not installed on the `avry-postgres` image (only remaining vector-search blocker); `halfvec(768)` storage migration not done.
+- **Document knowledge does not reach the vector pipeline.** `agent_profiles.knowledge` is a flat 12 000-char field injected into every prompt, and the document-upload endpoint merges extracted text *into that field* — so a long PDF is truncated and every turn pays for the whole blob regardless of relevance. The Cerveau side of the fix shipped 2026-08-30 (§9, tenant-aware `/api/memory`); the backend side — routing uploads there instead, and giving them a category exempt from `purge_after_days = 30` — is not built. `retention_days_by_category` is empty, so ingested documents would silently vanish after a month.
+- No deep document parsing: scanned PDFs, tables and multi-column layouts degrade to whatever plain text extraction yields. The cheapest fix is a vision-model fallback in `attachment_extractor`, not a new RAG stack (§5.3).
+- `halfvec(768)` storage migration not done. (pgvector itself **is** installed — `vector 0.8.6`, with `cerveau.memories.embedding vector(768)` populated and in use. Earlier revisions of this doc listed it as the outstanding blocker; that is no longer true.)
+- **`.zeroclaw-cerveau-b`'s config has drifted** behind `:3100`'s and it is in the HAProxy round-robin, so it serves roughly half of all turns. It has no `enrich_lead_contact` entry at all. Individual toolkits have been patched into it one at a time; it has never been properly resynced.
+- `aivory-native-bridge`, the n8n workflows and Cerveau's `config.toml` were untracked until 2026-08-30 and now live in `services/aivory-native-bridge/`, the `avry-n8n` repo and `ops/cerveau-config/` (redacted). The VPS is still where all three execute — there is no deployment pipeline, only copy-and-restart.
 - Stripe toolkit fully retired in favor of the native n8n-backed bridge — a stale config entry may still be wired as dead weight pending cleanup; `frontend/frontend-nextjs`'s `blueprintPlanner.ts` still defaults Payment→Stripe though Stripe was retired from Composio 2026-08-08.
 - No proactive/scheduled task execution scoped to a channel — no dashboard channel-selection UX, and Cerveau's goal/cron primitives have zero producers wired for this.
 - No dedicated per-agent "manage" page in the dashboard (per-agent toolkit visibility, unified deployment view, channel-scoped automation config, per-agent activity/usage) beyond the identity-editing modal.
@@ -298,6 +342,7 @@ Per `docs/DEPLOYABLE_AGENT_RUNTIME_PLANNING.md`'s own phase markers:
 - SAP connector, generic ERP adapter, deterministic-replay eval harness — all draft-only, nothing executed (§6.3–6.4).
 - Telegram/Discord Tier-1 interactive approvals, Slack-native approval-awareness — designed, not built (§7.2–7.3).
 - Discord slash-command binding vs. the natural-language-only product constraint — unverified whether it conflicts (§9).
+- Bring-your-own SMTP/IMAP: table exists, nothing reads it (§5.4).
 - Outstanding credential rotations flagged in CERVEAU-STATUS.md's operational notes — check that section before assuming any previously-exposed secret has been rotated.
 
 ---
