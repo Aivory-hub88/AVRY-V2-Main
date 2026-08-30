@@ -2,7 +2,30 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (**Outlook mail wired** — its dashboard Connect button had been live for months with no agent tools behind it. Same day: Sales & Leads Agent Phase 1 shipped, "Autonomous Agent" renamed to **Generalist Agent**, and `lightpanda__search` was feeding CAPTCHA pages to four agents. See the entries below.)
+**Last updated:** 2026-08-30 (bring-your-own email accounts: table live, feature **not built yet** — design agreed, see entry below. Same day: Outlook mail wired, Sales & Leads Agent Phase 1 shipped, "Autonomous Agent" renamed to **Generalist Agent**, `lightpanda__search` fixed.)
+
+## 2026-08-30 — Bring-your-own email accounts: design agreed, table live, nothing built on it yet
+
+**Status: foundation only.** `product.tenant_email_accounts` exists in production and every constraint is live-tested, but no code reads or writes it. Recorded now so the table is not a mystery to whoever finds it next.
+
+**Design, agreed in conversation:**
+- Lives in the **Integrations tab** as a catalogue entry, not the agent page — consistent with ERPNext and the other credential-based integrations.
+- The form shows **three fields** (address, password, from-name). SMTP/IMAP host and port sit in a collapsed Advanced block, auto-filled by guessing from the domain (`mail.<domain>` on 587/993 covers most Indonesian hosting). Most tenants should never see the word "port" — that directly answers the support-burden objection raised against SMTP earlier.
+- **Verify before save**: a real SMTP *and* IMAP login must succeed before the row persists, same posture as ADR-006 §B2 for custom MCP servers. Failure returns the real reason.
+- **Implemented in the native bridge (`nodemailer` + `imapflow`), not via n8n's IMAP/SMTP nodes.** Confirmed against the live n8n instance: both `imap` and `smtp` credential schemas take user/password/host/port as a *stored credential*, so the nodes cannot be fed runtime parameters. Using them would put the tenant's password in a second resting place. The bridge decrypts at call time, uses it in memory, discards it. IMAP polling then becomes a systemd timer calling the bridge — the `approval-slack-notify` pattern, zero new processes.
+- **Which account sends is an explicit tenant choice**, not an implicit precedence rule: a "Send as" single-select, surfaced only when 2+ accounts are connected. This is a deliberate departure from `CERVEAU-N8N-ORCHESTRATION-PLAN.md` decision #3 ("no new settings field, resolve from connections") — that decision was made when every provider was equivalent and the choice arbitrary. It is no longer arbitrary: a purpose-made agent mailbox versus the owner's personal one is a distinction only the tenant can make. v1 **reads from the same account it sends from**, because reading mailbox A while replying from mailbox B breaks threading and the agent loses track of its own conversation.
+
+**Why storing a mail password is acceptable here at all**, given the 2026-08-23 decision deferred SMTP partly on this ground: the feature is explicitly for a mailbox the tenant creates *for the agent*. The blast radius is one purpose-made box, and revoking is deleting it. The original objection was to the credential's scope, not the mechanism.
+
+**Schema note worth keeping.** "At most one sending address per tenant" is a **partial unique index**, `(user_id) WHERE is_sender AND disabled_at IS NULL` — a database guarantee, not something the API layer has to remember. Live-tested: two senders for one tenant rejected; one sender plus one non-sender accepted; a malformed address rejected; `smtp_security = 'none'` rejected (only `starttls` and `tls` exist — plaintext is deliberately not an option).
+
+**SSRF guard is already reusable as-is.** `guarded_fetch._resolve_and_pin` and `_is_ip_denied` work at the hostname/IP level, not HTTP, so the raw SMTP/IMAP sockets can import them directly — no extraction needed. Their deny-list already covers loopback, RFC1918, link-local (including Tencent's own `169.254.0.23` metadata endpoint) and CGNAT. Without this, "SMTP host = 127.0.0.1:25" is an internal-relay SSRF.
+
+**Still to build:** the backend verify endpoint, the dashboard form, the bridge send/read tools, and the IMAP poller. The poller shares its scheduler with the follow-up-cadence phase — build them together.
+
+**Do not offer SMTP/IMAP for a primary Microsoft 365 mailbox.** Exchange Online has rejected 100% of Basic-auth SMTP AUTH since 30 April 2026 (`550 5.7.30`). For Microsoft, OAuth is the only path. Zoho has no usable Composio path either (`zoho_mail` returns zero tools), so this route is the *only* way to reach Zoho.
+
+**Both of today's migrations are now in `backend/avry-backend/migrations/`** (`2026-08-30-leads-deal-value.sql`, `2026-08-30-tenant-email-accounts.sql`), committed verbatim as run. They had been applied straight to production and existed nowhere in version control.
 
 ## 2026-08-30 — Outlook mail wired; the Connect button had been live with nothing behind it
 
