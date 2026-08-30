@@ -1,6 +1,6 @@
 # Aivory Cerveau — Technical Reference
 
-**This is a living reference, not a changelog.** It describes Cerveau as it stands today (last synthesized 2026-08-26). For the dated history of how it got here — every bug, patch, and decision — see `docs/CERVEAU-STATUS.md`. For the original design rationale behind any specific subsystem, the individual `ADR-00N-*.md` files remain the source of truth; this doc summarizes and cross-references them rather than replacing them.
+**This is a living reference, not a changelog.** It describes Cerveau as it stands today (last synthesized 2026-08-30). For the dated history of how it got here — every bug, patch, and decision — see `docs/CERVEAU-STATUS.md`. For the original design rationale behind any specific subsystem, the individual `ADR-00N-*.md` files remain the source of truth; this doc summarizes and cross-references them rather than replacing them.
 
 If something here conflicts with the code or with CERVEAU-STATUS.md's most recent entries, trust the code/STATUS.md and treat this doc as due for an update.
 
@@ -283,6 +283,8 @@ Per `docs/DEPLOYABLE_AGENT_RUNTIME_PLANNING.md`'s own phase markers:
 | 8 — scale validation + cutover | ⬜ not started |
 
 **Honest read**: this is a mature, continuously-shipping production *engine* with extensive internal/synthetic verification — real deploy discipline, a real production outage recovered, real bugs caught under real operational load — sitting right at the threshold of Phase 6's real-tenant cutover. As of the most recent entries, ERPNext and the Gmail/Calendar/Trello/Linear toolkits both carry the same open item: verification has been via synthetic/throwaway test tenants, and no confirmed paying customer has yet used these newest integrations end-to-end. Treat "live and verified" throughout this document as "live and verified against real external systems, pending real-tenant traffic" unless stated otherwise.
+
+**2026-08-30 CI update:** `cerveau-build` is now 4 parallel jobs (~12-14 min wall, was 29) with `concurrency` + `paths-ignore: docs/**`; `cerveau-quick` (tenant isolation only, ~3 min) runs on every PR. Branch protection requires all 4 jobs on `cerveau-main`. Dashboard (`avry-user-dashboard`) and backend (`avry-backend`) now have their own fast gates (`dashboard-ci`: `tsc` + `lint` + `vitest` + `next build`; `backend-ci`: `py_compile` + `unittest` 53 tests) — the `useChat.ts:109` type bug was caught there before reaching the VPS.
 
 ---
 

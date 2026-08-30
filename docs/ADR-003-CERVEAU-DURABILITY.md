@@ -42,3 +42,7 @@ Intended: at boot, an owned prior-boot task that has a persisted `TaskContinuati
 ## 2026-08-26 note
 
 No change to the durability mechanism (F-1/F-2) this round. The dashboard surfaces that consume F-1's approval-turn resume — the `/approvals` page and the Console inline Approve/Deny card, both via `lib/agentApprovals.ts` — got a production-build fix: the shared `describeTool` export was being dropped by a Turbopack JSDoc-parse bug (an em-dash in the comment above it) and the whole dashboard build failed with "Export describeTool doesn't exist." Resolved (comment removed); full account in `docs/CERVEAU-STATUS.md`'s 2026-08-26 deploy entry. Durability behavior itself is unchanged and still live on `:3100`/`:3101`.
+
+## 2026-08-30 note
+
+No change to durability this round. CI was parallelized (`cerveau-build` 1×29 min → 4 jobs ~12-14 min, `cerveau-quick` 3 min, `concurrency` + `paths-ignore: docs/**`), and branch protection now requires `tenant-isolation` + `postgres-tests` + `redis-tests` + `build-release` on `cerveau-main`. Durability tests (`tool_idem`, `pg_lifecycle`, etc.) are among those gates — no logic change, just faster feedback. See `docs/CERVEAU-STATUS.md` 2026-08-30 CI entry.
