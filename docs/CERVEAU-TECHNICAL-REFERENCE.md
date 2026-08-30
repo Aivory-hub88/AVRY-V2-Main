@@ -95,7 +95,7 @@ Two related but distinct things share the "F-1" name in Cerveau's history:
 
 Postgres-backed only (SQLite's `hygiene` module never touches Postgres). Retention is set-based SQL: age-based per category (`core` exempt), per-tenant budget via a `row_number() OVER (PARTITION BY agent_id ORDER BY importance, created_at)` window, per-tier quota table (`cerveau.tenant_quota`). Driven by `cerveau-lifecycle.timer`, daily at 03:30 with 15-minute jitter.
 
-Embeddings: 768 dimensions (locked — changing this means re-embedding everything), `text-embedding-3-small` via OpenRouter (confirmed working with the existing API key, no new key needed). Storage is `vector` (float32) today; a `halfvec(768)` migration exists as a queued, non-blocking follow-up. **`vector_enabled=false` as of the latest confirmed snapshot** — the pgvector extension still isn't installed on the `avry-postgres` image. A fix for a related bug (the embedding column was never actually read/written even when enabled) exists and is CI-green, but is not yet deployed to the VPS.
+Embeddings: 768 dimensions (locked — changing this means re-embedding everything), `text-embedding-3-small` via OpenRouter (confirmed working with the existing API key, no new key needed). Storage is `vector` (float32) today; a `halfvec(768)` migration exists as a queued, non-blocking follow-up. **pgvector `vector 0.8.6` is active** on `avry-postgres` — `cerveau.memories.embedding vector(768)` populated, 85 rows verified with `embedding IS NOT NULL` on `tencent-vps` (the prior `vector_enabled=false` / "not installed" state is no longer true; the column is now read/written through the tenant-aware pipeline).
 
 ---
 
