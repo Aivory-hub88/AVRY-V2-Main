@@ -2,7 +2,26 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (the bridge shared secret is **out of the n8n workflow definitions** — it was a literal in a node parameter, which is why yesterday's export needed redacting. Same day: three untracked artefacts brought into git, BYO-email table live, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+**Last updated:** 2026-08-30 (the seven single-query leads tools now run against Postgres **directly from the bridge** — n8n kept only for the genuinely multi-step `enrich_lead_contact`. A real timezone bug surfaced and was fixed on the way. Same day: bridge secret out of the workflow definitions, three untracked artefacts brought into git, BYO-email table, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+
+## 2026-08-30 — The single-query leads tools leave n8n
+
+**Step 2 of the credential conversation.** Seven of the leads agent's eight tools are one SQL statement each — `create_lead`, `list_leads`, `get_lead`, `update_lead_stage`, `update_bant`, `update_deal`, `pipeline_summary`. They were travelling bridge → HTTP → n8n → Postgres → back: a network hop, a shared secret and a second definition to keep in sync, to run `SELECT ... WHERE tenant_id = $1`. They now run in the bridge against Postgres directly.
+
+`enrich_lead_contact` **stays on the n8n path** and should. Wallet pre-check → provider call → conditional debit → merge is real orchestration, which is exactly what the orchestration plan scoped n8n for.
+
+**Mechanism.** A tool may now carry an optional `handler`; `server.mjs` runs it in-process instead of calling the webhook. A thrown error is mapped to a generic "Backend query failed" — a raw driver error carries column names, constraint bodies and sometimes row fragments, and this output goes straight into an LLM context. New `db.mjs` holds a small pool (max 6, 10s statement timeout) reading `NATIVE_OPS_DATABASE_URL`; the bridge is a systemd unit on the host, so it connects to the published `127.0.0.1:5432`, not the Docker service name the backend uses.
+
+**SQL and response shapes were copied verbatim from the nodes they replace** — including the exact wording of `"Not found, or not accessible to this tenant."`. That was deliberate: if the shapes had been "improved" in the same change, any difference afterwards would be impossible to attribute. Two oddities were therefore preserved rather than fixed, and are recorded here as separate findings to deal with on their own:
+
+1. **`update_bant` blanks what it is not given.** Every one of the five fields is overwritten, and the tool schema defaults each to `''` — so updating only `bant_budget` silently wipes authority, need, timeline and notes. `update_deal` uses `COALESCE` and does not have this problem; BANT should probably match it.
+2. **`update_bant` does not touch `updated_at`**, unlike every other write in the module.
+
+**A real bug found on the way, and fixed.** node-postgres turns a `DATE` column into a JS `Date` at **local** midnight, which then serialises to UTC — so `expected_close_date` of `2026-10-15` came back as `"2026-10-14T16:00:00.000Z"` on this box (Asia/Jakarta), a full day earlier as far as any reader is concerned. `db.mjs` now parses DATE (oid 1082) as a plain `YYYY-MM-DD` string. The n8n path was correct only because that container happens to run UTC — the same code would have shifted dates for anyone running it elsewhere.
+
+**Verified**: the eight-case deal probe re-run against the new path returns byte-identical results (comma in `owner` intact, partial update preserving untouched fields, lowercase currency rejected, mixed-currency subtotals, conversion with rates, unknown currency degrading); a second probe covering `get_lead`, `update_bant`, both `list_leads` filters, the not-found path and a cross-tenant id — all correct, both failure cases failing closed; an empty pipeline returning `rows: []` rather than an error. Then a real Cerveau turn asking for the pipeline and the lead list, which rendered both correctly and still volunteered that the two currencies are shown separately on purpose. No handler errors in the bridge log.
+
+**The n8n CRUD branches were deliberately left in place, unused.** Rolling back is reverting one file; deleting them in the same change would have made that a restore-from-backup instead. Clean them up once this has run for a while — until then the workflow export in `avry-n8n` still shows branches that nothing calls.
 
 ## 2026-08-30 — The bridge secret leaves the workflow definition; and what "credentials in the dashboard" should and should not mean
 
