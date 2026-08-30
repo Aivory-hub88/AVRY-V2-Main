@@ -2,7 +2,29 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (Sales & Leads Agent **Phase 1 shipped**: leads now carry a deal value with a per-deal currency, and `pipeline_summary` totals them. Same day: "Autonomous Agent" renamed to **Generalist Agent**, `lightpanda__search` was feeding CAPTCHA pages to four agents, and the custom MCP server quota now scales with the plan. See the entries below.)
+**Last updated:** 2026-08-30 (**Outlook mail wired** — its dashboard Connect button had been live for months with no agent tools behind it. Same day: Sales & Leads Agent Phase 1 shipped, "Autonomous Agent" renamed to **Generalist Agent**, and `lightpanda__search` was feeding CAPTCHA pages to four agents. See the entries below.)
+
+## 2026-08-30 — Outlook mail wired; the Connect button had been live with nothing behind it
+
+**Context.** Asked how tenants should connect email for the Sales & Leads Agent — OAuth, or an SMTP/IMAP form in the dashboard — the user chose *both*: Gmail, Outlook and Zoho over OAuth, **plus** bring-your-own IMAP/SMTP so a tenant can create a dedicated mailbox for the agent.
+
+**That reframing defeats the main objection to storing mail credentials**, and it is worth recording why. The 2026-08-23 decision deferred SMTP partly because holding a tenant's mailbox password means holding a key to their whole email life, with no per-app revocation. A *purpose-made* agent mailbox changes that: the blast radius is one box, and revoking is deleting it. The objection was to the credential's scope, not to the mechanism.
+
+**Found while scoping — two facts that reshape the plan:**
+1. **Outlook was half-built.** `outlook` has been in the dashboard's integrations catalogue (`lib/integrations/store.ts`) with a live OAuth Connect button and a `ac_AMQBXYWKj19e` auth config — but no Composio MCP server existed and no Cerveau config referenced it. A tenant could connect Outlook and the agent would still have zero Outlook tools. Fixed this session.
+2. **Zoho has no usable Composio path.** The `zoho_mail` toolkit exists and advertises OAUTH2 with real scopes, but `GET /tools?toolkit_slug=zoho_mail` returns **zero tools**. So Zoho is only reachable through the IMAP/SMTP route — which strengthens the case for building it rather than weakening it.
+
+**Outlook wiring.** New Composio MCP server `aivory-outlook-mail` (`25cb8782-…`) with 10 curated tools out of the toolkit's 286: reads (`LIST_MESSAGES`, `GET_MESSAGE`, `SEARCH_MESSAGES`, `LIST_MAIL_FOLDERS`, `GET_PROFILE`), drafts (`CREATE_DRAFT`, `CREATE_DRAFT_REPLY`) and sends (`SEND_EMAIL`, `SEND_DRAFT`, `REPLY_EMAIL`). Calendar, contacts, folder administration and mailbox settings deliberately excluded. Tiering mirrors Gmail: reads and drafts `reversible` and auto-approved, sends `irreversible` and approval-gated. Wired into `[mcp_bundles.mail-outlook]` and added alongside `mail-gmail` on every agent type that already carried it — which provider actually answers is settled at run time by `requires_composio_toolkit` and the connection gate, so an unconnected toolkit simply contributes no tools and no new setting is needed. That is decision #3 of the orchestration plan, applied as written.
+
+**Gotcha worth keeping: the tool slugs differ between two Composio endpoints.** `GET /tools?toolkit_slug=outlook` returns 43 double-prefixed names (`OUTLOOK_OUTLOOK_SEND_EMAIL`); the MCP-server API rejects those with `MCP_InvalidToolsProvided` and wants the single-prefixed form (`OUTLOOK_SEND_EMAIL`), of which there are 286. The reliable way to get the real list is to create a server with no `allowed_tools` (which enrols the whole toolkit), read its `allowed_tools`, then create the real curated server.
+
+**Correction to an earlier claim in this session.** It was stated that `GMAIL_CREATE_EMAIL_DRAFT` is "exposed but tiered nowhere, therefore hard-denied — the safe draft path blocked while the risky send path is open". **That was wrong.** It was already in the `reversible` tier (the list spans lines 997-1105 of the config, and it sat at 1022); it was simply not in `auto_approve`, so it prompted rather than being denied. It has now been added to `auto_approve` — a draft is not sent and is deletable, so it is treated like every other reversible tool. The duplicate entry the Outlook patch briefly introduced into `reversible` was removed.
+
+**State.** Both ADR-005 configs patched, both instances restarted clean (`:3100`, `:3101`, HAProxy `:3105` all 200), both TOMLs parse. **Not end-to-end verified**: `requires_composio_toolkit = "outlook"` gates the server, so with no tenant Outlook account connected the tools correctly contribute nothing and there is nothing live to observe. Proving it needs a real Outlook connection.
+
+**Leftover to clean by hand:** two empty probe MCP servers (`aivory-outlook-probe`, `aivory-outlook-probe2`, 0 tools each) exist in the Composio account. Composio's v3 API exposes no delete route I could find — every candidate path 404s — so they need removing from the Composio dashboard UI. They are inert: no config references them.
+
+**Still not built: IMAP/SMTP bring-your-own.** Design already specified in `CERVEAU-N8N-ORCHESTRATION-PLAN.md` §"SMTP bring-your-own". Two things to carry into it: IMAP is polling, so it needs the same scheduler the follow-up cadence phase needs — build them together, not separately. And it must never be offered for a primary Microsoft 365 mailbox: Exchange Online has rejected 100% of Basic-auth SMTP AUTH since 30 April 2026 (`550 5.7.30 Basic authentication is not supported for Client Submission`), so for Microsoft, OAuth is the only path.
 
 ## 2026-08-30 — Sales & Leads Agent, Phase 1: deals have a value, and a currency the agent must ask for
 
