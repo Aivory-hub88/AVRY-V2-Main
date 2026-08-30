@@ -2,7 +2,42 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (`/api/memory` is now **tenant-aware and fail-closed** — shipped through CI and deployed; it previously had no way to reach a tenant's memory, and its no-`agent` fallback wrote to the install-wide store. Also today: CI hygiene, single-query leads tools moved into the bridge, bridge secret out of the n8n definitions, three untracked artefacts into git, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+**Last updated:** 2026-08-30 (document ingestion now lands in tenant memory end-to-end, under its own `document` retention tier; earlier the same day `/api/memory` became **tenant-aware and fail-closed** — shipped through CI and deployed; it previously had no way to reach a tenant's memory, and its no-`agent` fallback wrote to the install-wide store. Also today: CI hygiene, single-query leads tools moved into the bridge, bridge secret out of the n8n definitions, three untracked artefacts into git, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+
+## 2026-08-30 — document ingestion lands on the backend, and the purge that could never have happened
+
+**What shipped.** `POST /api/v1/agent-profiles/{agent_type}/knowledge/document` no longer merges extracted text into `agent_profiles.knowledge` when the agent runs on Cerveau. It chunks the document and stores it through the tenant-aware `/api/memory` from this morning's entry, as embedded memories owned by `t_<user_id>.<agent_type>`. New module `app/services/cerveau_memory.py`; 14 unit tests; the dashboard reports it (`ingested: true`) instead of writing to the Knowledge field.
+
+The legacy path is untouched on purpose: that agent loop has no tenant memory to read from, so the flat field is the only mechanism it has. The engine flag decides, per agent.
+
+**Three properties of the endpoint shaped the implementation, none of them guessable from its name:**
+
+1. **It does not chunk.** `chunker.rs` has exactly one caller in the whole fork, an unrelated hardware-datasheet RAG. The memory store embeds whatever content it is handed, whole. So chunking is the backend's job — ~1 500 chars on paragraph seams, hard-split with overlap only when a single paragraph exceeds a chunk.
+2. **The store is an upsert on `(agent_id, key)`.** Deterministic `doc:<slug>:<nnn>` keys therefore make a re-upload update a document in place rather than duplicate it. Verified live: same key twice → one row, content replaced.
+3. **The extraction cap is a prompt-size cap, not a storage cap.** `MAX_EXTRACTED_CHARS = 12 000` exists so an attachment cannot blow up a Telegram/Slack prompt. On a path that chunks and embeds, that reason does not apply, so the cap became a parameter — 120 000 chars for ingestion, the old default everywhere else.
+
+**The retention half was a wrong premise, and the real risk was elsewhere.** This morning's entry said ingested documents would vanish after a month under `purge_after_days = 30` with an empty `retention_days_by_category`. Both settings belong to `hygiene.rs`, which reads `memory/brain.db` and the workspace archive directories — **the SQLite/filesystem path, which never touches Postgres.** Nothing in `cerveau.memories` was ever subject to them. Acting on that premise would have meant configuring a setting that does nothing and calling the gap closed.
+
+What does run is `/usr/local/bin/cerveau-lifecycle.sh` (daily, `cerveau-lifecycle.timer`), an interim psql driver mirroring `PostgresMemory::run_lifecycle` — which itself has **no caller in the daemon**; the Rust function is CI-tested and unused, the script is production. It age-prunes `conversation` (30d) and `daily` (180d), then budget-evicts `core`/`daily`/`conversation` to a per-tenant row cap ordered `importance DESC NULLS LAST, created_at DESC`.
+
+That ordering is the actual hazard. `store_with_agent` **ignores its `importance` argument on Postgres** — every row is `NULL` — so the tiebreaker collapses and the ordering is pure recency. Under `core`, an uploaded document would be evicted ahead of newer conversational memories once a tenant passed 2 000 core rows: silent loss of the one thing the operator put there deliberately. So documents got their own tier, `document` — age-pruned by nothing, outside the `core` budget, with its own 5 000-row runaway guard added to the lifecycle script. Recall is unaffected: `memory_inject` special-cases only `Conversation`, so a custom category is retrieved exactly like `core`. The script is now tracked at `ops/cerveau-config/cerveau-lifecycle.sh`; `document` has no counterpart in `PgLifecycleConfig` yet, so script and Rust have deliberately diverged until it does.
+
+**Verified live on production, at each layer rather than only at the end:**
+
+| Check | Result |
+|---|---|
+| Raw `/api/memory` write with tenant headers | 200, agent row `t_probe_docing.customer_service` created on demand |
+| Same key written twice | one row, `length(content)` 81 → 98 — upsert confirmed |
+| Upload endpoint, `engine = 'cerveau'` | `ingested: true`, 4 chunks, all `embedding IS NOT NULL`, `category = document`, `knowledge` returned unchanged |
+| Upload endpoint, `engine = 'legacy'` | `ingested: false`, merged text as before |
+| **Retrieval** — planted "refund window of exactly 47 days", code `ZP9-KX41`, then a real tenant webhook turn | both facts quoted back in the answer |
+| Lifecycle run with the new tier | `retention_pruned=0 budget_evicted=0`, clean |
+
+Every probe row, probe agent and probe profile deleted afterwards; `cerveau.memories`/`cerveau.agents` back to the exact **123 / 31** baseline each time.
+
+**Deployed:** `avry-backend` and `avry-user-dashboard` rebuilt and restarted from `/home/ubuntu/AVRY-V2-Main` (both healthy; the dashboard's new copy confirmed inside the built `.next` bundle, not just in source). Commits `878fb2f` + `72739d9` (`avry-backend`), `3e5fb91` (`avry-user-dashboard`).
+
+**Left open, deliberately:** there is no way to *remove* an ingested document. `GET`/`DELETE /api/memory` still call `resolve_memory_handle`, not the `_scoped` form, so they cannot see a tenant's rows at all — re-uploading a shorter version of the same filename upserts what it covers and leaves the trailing chunks behind. Scoping those two handlers is the natural next Cerveau-side patch, and the prerequisite for any "manage documents" UI.
 
 ## 2026-08-30 — `/api/memory` becomes tenant-aware; and a branch-protection rule that could never be satisfied
 
@@ -39,7 +74,7 @@ That mattered because it blocks document ingestion. `agent_profiles.knowledge` i
 
 Both successful writes came back embedded (`embedding IS NOT NULL`), so they genuinely went through the chunk/embed pipeline. Row counts went 123 → 125 across five requests, confirming the three rejections wrote **nothing**. Probe rows and the probe agent deleted afterwards; counts back to the exact baseline **123 memories / 31 agents**.
 
-**Still to build:** the backend side — routing uploaded documents to this endpoint instead of merging them into `agent_profiles.knowledge`, and giving them a category exempt from `purge_after_days = 30` (currently `retention_days_by_category` is empty, so ingested documents would silently vanish after a month).
+**Still to build:** the backend side — routing uploaded documents to this endpoint instead of merging them into `agent_profiles.knowledge`, and giving them a category exempt from purge. *(Both shipped later the same day — see the entry above; the purge half turned out to be a different mechanism than this paragraph assumed.)*
 
 ## 2026-08-30 — CI hygiene: parallel builds, fast gates, branch protection
 
