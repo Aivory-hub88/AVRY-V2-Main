@@ -2,7 +2,31 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (bring-your-own email accounts: table live, feature **not built yet** — design agreed, see entry below. Same day: Outlook mail wired, Sales & Leads Agent Phase 1 shipped, "Autonomous Agent" renamed to **Generalist Agent**, `lightpanda__search` fixed.)
+**Last updated:** 2026-08-30 (the native bridge, the n8n workflows and Cerveau's config.toml are **finally in version control** — all three had run from one place on the VPS with no history. Same day: BYO-email table live, Outlook wired, Sales & Leads Phase 1 shipped, Generalist Agent rename, `lightpanda__search` fixed.)
+
+## 2026-08-30 — The three untracked artefacts are now tracked
+
+**The problem, in the user's words: notes without the thing itself are worse than useless.** Three pieces of production ran from exactly one place on the VPS with no history, while this file described them in detail:
+
+| Artefact | Ran from | Now tracked at |
+|---|---|---|
+| Native bridge source | `/home/ubuntu/aivory-native-bridge` | `services/aivory-native-bridge/` |
+| n8n workflow (32 nodes, live) | inside the n8n instance | `avry-n8n` repo, `workflows/` |
+| Cerveau `config.toml` | `/home/ubuntu/.zeroclaw-cerveau/` | `ops/cerveau-config/` (redacted) |
+
+**Two of the three carried live secrets, so neither could be committed raw.**
+
+The n8n export was the sharper case: the "Check Bridge Secret" node compares the incoming header against a **literal copy of `N8N_SHARED_SECRET`**, so a plain export is a credential in a public repo. `workflows/export.py` replaces every value found in the bridge's own `.env` with a placeholder, then refuses to write if any unbroken 32+ character alphanumeric run survives. Node UUIDs are deliberately kept — they are structure. The committed export is a record, not directly importable: the secret must be substituted back first.
+
+Cerveau's config carried 30 secret values including Composio API keys, the bridge key, the Postgres password inline in a URL, and `paired_tokens` (encrypted channel-binding blobs — encrypted at rest, but still credential material). `ops/cerveau-config/redact.py` replaces values by key name and applies the same refuse-on-leftover sweep, so a *new* secret-bearing key that nobody added to its `SECRET_KEYS` list fails loudly instead of leaking quietly. Composio MCP server UUIDs are kept on purpose: without them the snapshot could not answer "which server is `composio-gmail-mail` actually pointed at?".
+
+**Why the config is worth tracking at all**, given it is not deployable: it is the entire map of what each agent can do — which MCP servers exist, which bundles each agent type carries, and `[tool_risk_tiers]`, where **a tool listed in neither tier is hard-denied by default** (patch 0013). That section decides whether a tool runs, so it is behaviour, not documentation.
+
+**Placement note.** The config snapshot went to `ops/` rather than `services/avry-zeroclaw/` because that submodule's only remote is `ClementHansel/avry-zeroclaw`, which this account cannot push to — a commit there would have been orphaned locally and looked tracked while being nowhere.
+
+**Excluded from the bridge commit:** `node_modules`, `.env` (a `.env.example` documents every variable instead) and the `.bak-*` files. Source was scanned clean; the only high-entropy strings in the whole commit are npm `integrity` hashes in `package-lock.json`.
+
+**Still true:** the VPS remains where all three execute. Deploying the bridge is still copying `.mjs` files and `systemctl restart aivory-native-bridge`; there is no pipeline. What changed is that the code now has a history and a second copy.
 
 ## 2026-08-30 — Bring-your-own email accounts: design agreed, table live, nothing built on it yet
 
