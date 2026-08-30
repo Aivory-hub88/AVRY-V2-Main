@@ -2,7 +2,45 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (the "Autonomous Agent" renamed to **Generalist Agent** across dashboard, landing and the bridge prompt — id unchanged. Earlier the same day: `lightpanda__search` was silently feeding CAPTCHA pages to four agents, and the custom MCP server quota now scales with the plan. See the entries below.)
+**Last updated:** 2026-08-30 (Sales & Leads Agent **Phase 1 shipped**: leads now carry a deal value with a per-deal currency, and `pipeline_summary` totals them. Same day: "Autonomous Agent" renamed to **Generalist Agent**, `lightpanda__search` was feeding CAPTCHA pages to four agents, and the custom MCP server quota now scales with the plan. See the entries below.)
+
+## 2026-08-30 — Sales & Leads Agent, Phase 1: deals have a value, and a currency the agent must ask for
+
+**Why this was the first phase.** `aivory_ops.leads` already had `won` and `lost` stages, but no amount, close date or owner — so `won` recorded that something was won without recording *what*. Everything between `qualified` and `won` is the sales job, and the agent had no tool for any of it. This phase adds the value; it needs no new integration, no new OAuth scope and no new approval surface, which is exactly why it went first: it produces the usage data that should decide whether the later phases (quotes, follow-up cadence, booking) are worth building at all.
+
+**Currency is per-deal, and the agent must ask for it.** The user chose per-deal over per-tenant because one business genuinely holds IDR and USD deals side by side, and asked that the agent "secara smart bertanya" rather than assume. That requirement is enforced in the *schema*, not only in the prompt:
+
+```sql
+CHECK ((amount IS NULL) = (currency IS NULL))   -- an amount cannot exist without a currency
+CHECK (currency IS NULL OR currency ~ '^[A-Z]{3}$')  -- ISO-4217 only; blocks 'Rp', 'Rupiah', 'usd'
+```
+
+`currency` deliberately has **no DEFAULT**, unlike `aivory_ops.invoices.currency` (`NOT NULL DEFAULT 'USD'`). A default would let the agent silently book USD deals for an IDR business — precisely the failure being guarded against. Per-*row* rather than per-tenant also matters for the handoff: this agent's quote eventually feeds `finance_invoice_ops.create_invoice`, whose table is already per-row, and a per-tenant currency here would have forced that handoff to invent one.
+
+New columns: `amount NUMERIC(14,2)`, `currency TEXT`, `expected_close_date DATE`, `owner TEXT`, `probability SMALLINT` (0-100), plus `idx_leads_tenant_stage`. All additive and nullable; no existing column or row touched.
+
+**Two new tools**, `aivory-native-leads-qualifier__update_deal` and `__pipeline_summary`, tiered `reversible` and auto-approved in **both** ADR-005 configs — a tool tiered nowhere is hard-denied by default (patch 0013), so the tier entry is load-bearing, not cosmetic.
+
+**Three implementation notes worth keeping:**
+1. **`queryReplacement` is an array expression, not the comma-joined string every other node in that workflow uses.** n8n splits that string on commas, so a value containing one corrupts the positional arguments — and `update_deal` takes a free-text `owner` ("Sales, EMEA"). Verified live with exactly that value.
+2. **`pipeline_summary` needed its own formatter.** The shared `Format Success Response` keeps only items where `i.json.id` is truthy and otherwise reports "Not found"; an aggregate `GROUP BY` returns rows with no id, so reusing it would have reported every summary as not found. `Format Pipeline Response` also treats an empty pipeline as a valid answer (`rows: []`), not an error.
+3. **FX lives in the bridge, not n8n.** The landing site's `/api/exchange-rate` was not reusable — it is hardcoded to USD→IDR (`data.rates?.IDR`) and a per-deal model needs arbitrary pairs. A single `open.er-api.com` USD-based response yields any pair via X→USD→Y. This required one small generic addition to `server.mjs`: an optional `postProcess` hook per tool, which falls back to the unshaped backend data if it throws. Conversion is all-or-nothing: if any currency present has no published rate, the untouched per-currency breakdown is returned with a reason, rather than a total that silently omits deals.
+
+**`pipeline_summary` never converts by default.** It returns per-currency subtotals, which are always true; `convert_to` is opt-in and the response carries `rates_used`, `rates_provider` and `rates_updated_at`, because a converted total moves when the rate moves. The tool description instructs the agent to ask before combining.
+
+**Live proof, in two layers.** Eight probes against the real MCP endpoint (comma in `owner` survived; partial update preserved untouched fields; lowercase `idr` rejected at the schema layer with a usable message; mixed-currency subtotals correct; conversion correct; unknown target currency degraded gracefully). Then four **real Cerveau turns** end to end:
+- "worth 250 million rupiah" → recorded IDR 250,000,000 with owner, probability and close date.
+- "the deal is worth 5000" (no currency) → the agent **asked** which currency and did not write the amount.
+- "It is 5000 US dollars" → recorded as USD.
+- "total value in my pipeline" with mixed currencies → refused to sum silently, listed IDR and USD separately, and **asked** whether to convert; on "ya, konversikan ke IDR" it returned Rp 338,746,666 and quoted the rate, source and timestamp with the caveat that it moves.
+
+Both instances restarted cleanly (`:3100`, `:3101`, HAProxy `:3105` all 200).
+
+**Two gaps left open, deliberately:**
+- **`.zeroclaw-cerveau-b`'s config is stale** and it is in the round-robin backend, so it serves ~half of all turns. It has no `enrich_lead_contact` at all (its config predates that work), which is why the config patch had to anchor on `update_bant` for that instance. The two new tools are now on both, but **-b remains behind on other things** and deserves a real resync.
+- **`aivory-native-bridge` is not in version control anywhere** — it exists only at `/home/ubuntu/aivory-native-bridge` on the VPS. Backups from this session: `agents/leads-qualifier.mjs.bak-pre-deal-20260830`, `server.mjs.bak-pre-deal-20260830`. The n8n workflow (`ebaq7yFRfYdrL3gT`) is likewise untracked; pre-change export at `/tmp/wf-backup-pre-deal-tools.json`.
+
+**Left in the user's own tenant:** two probe leads ("Probe Nusantara", "Ambiguous Corp") from the live turns. Not deleted — they are in a real tenant, not a throwaway one.
 
 ## 2026-08-30 — "Autonomous Agent" renamed to "Generalist Agent" (display only, id unchanged)
 
