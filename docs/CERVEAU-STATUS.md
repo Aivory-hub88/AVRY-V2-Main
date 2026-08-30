@@ -2,7 +2,23 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (the seven single-query leads tools now run against Postgres **directly from the bridge** — n8n kept only for the genuinely multi-step `enrich_lead_contact`. A real timezone bug surfaced and was fixed on the way. Same day: bridge secret out of the workflow definitions, three untracked artefacts brought into git, BYO-email table, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+**Last updated:** 2026-08-30 — two entries: the seven single-query leads tools now run against Postgres **directly from the bridge** (n8n kept only for `enrich_lead_contact`; timezone bug fixed, bridge secret out of workflows, BYO-email table, Outlook, Sales & Leads Phase 1, Generalist rename) **plus** CI hygiene (parallel Cerveau build, fast gates, branch protection, dashboard/backend CI) — details in the two entries below.
+
+## 2026-08-30 — CI hygiene: parallel builds, fast gates, branch protection
+
+**Scope.** CI was the bottleneck and the gap. Cerveau's `cerveau-build` was one 29-min sequential job; `avry-user-dashboard`/`avry-backend` had no CI at all (the `describeTool` Turbopack and `getEntity()` dashboard bugs only surfaced as `docker build` failures on the VPS). The 2026-08-18 `cargo test` OOM on `tencent-vps` (`7.5 GiB`, `free 490 MiB`, SSH dead, Tencent Console reboot required) is why full Rust CI stays off the VPS.
+
+**1. `AVRY-Cerveau` — `cerveau-build.yml` parallelized (commit `367319ca`).** One 29-min job → 4 parallel jobs: `tenant-isolation` (no DB, ~3 min), `postgres-tests` (pgvector: lifecycle + embedding + capability graph), `redis-tests` (rate-limit + admission queue), `build-release` (`needs: [3 test jobs]`, `cargo web build` + `cargo build --release` + package + rolling `cerveau-cd` release). Wall time **~12-14 min**. Added `concurrency: group: workflow-ref / cancel-in-progress: true` and `paths-ignore: docs/**, *.md` so doc-only pushes skip the release gate.
+
+**2. Fast gate `cerveau-quick.yml` (commit `147936e2`).** Tenant-isolation only (`zeroclaw-memory tenant_isolation` + `zeroclaw-runtime tenant` + `zeroclaw-gateway tenant::`), no Postgres/Redis, **~3 min**, runs on every `push` to `cerveau-main`/`fix/**`/`feature/**` + every PR + `workflow_dispatch`. Full `cerveau-build` remains the release gate.
+
+**3. `avry-user-dashboard` — `dashboard-ci.yml` (commit `1145f03`, fixed `d768d8e`).** `npm ci` → `tsc --noEmit` → `eslint` → `vitest --run` → `next build` (`NEXT_PUBLIC_*` dummy env, `ignoreBuildErrors: false`). Catches the 9 typecheck + lint + 5 test failures that previously only failed in `docker compose build` on the VPS. Immediately caught `hooks/useChat.ts:109` (`AgentChatResult` assigned to `string`; `sendAgentMessage` now returns `{reply, pendingApproval}`) — fixed same session by threading `pendingApproval` through `Message` and adding `resolveConsoleApproval`.
+
+**4. `avry-backend` — `backend-ci.yml` (commit `7ca07b2`).** `setup-python 3.11` → `pip install -r requirements.txt` → `py_compile` → `python -m unittest discover -s tests -v` (53 tests: `guarded_fetch` SSRF matrix + tier gating + tenant MCP servers), ~2 min.
+
+**5. Branch protection (enforce, not just warn).** `Aivory-hub88/avry-user-dashboard:main` require `check`, `avry-backend:main` require `check`, `AVRY-Cerveau:cerveau-main` require `tenant-isolation` + `postgres-tests` + `redis-tests` + `build-release` (`strict: true`, `enforce_admins: false`). PRs cannot merge while CI is red.
+
+**6. VPS `cerveau-health-check.timer`.** Lightweight 5-min timer on `tencent-vps` (`/usr/local/bin/cerveau-health-check.sh`, `cerveau-health-check.service/timer`) that curls `127.0.0.1:3100/health` + `3101/health` and logs to journal — no Rust, no build, no memory spike. Full `cargo test` stays on GitHub by design; the VPS has no toolchain (`which cargo` empty) and would OOM again.
 
 ## 2026-08-30 — The single-query leads tools leave n8n
 
