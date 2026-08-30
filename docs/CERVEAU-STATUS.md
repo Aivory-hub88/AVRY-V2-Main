@@ -2,7 +2,44 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 — two entries: the seven single-query leads tools now run against Postgres **directly from the bridge** (n8n kept only for `enrich_lead_contact`; timezone bug fixed, bridge secret out of workflows, BYO-email table, Outlook, Sales & Leads Phase 1, Generalist rename) **plus** CI hygiene (parallel Cerveau build, fast gates, branch protection, dashboard/backend CI) — details in the two entries below.
+**Last updated:** 2026-08-30 (`/api/memory` is now **tenant-aware and fail-closed** — shipped through CI and deployed; it previously had no way to reach a tenant's memory, and its no-`agent` fallback wrote to the install-wide store. Also today: CI hygiene, single-query leads tools moved into the bridge, bridge secret out of the n8n definitions, three untracked artefacts into git, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+
+## 2026-08-30 — `/api/memory` becomes tenant-aware; and a branch-protection rule that could never be satisfied
+
+**The gap.** `/api/memory` could not reach an Aivory tenant's memory at all. Tenant identities are provisioned dynamically (a platform-DB row, `user_id × agent_type`), never as `[agents.<alias>]` entries, so `resolve_memory_handle` rejected them — and with no `agent` at all it fell back to `state.mem`, the install-wide memory. A caller trying to write a tenant's data had two options: an error, or silently pooling that data into a store every other tenant can read.
+
+That mattered because it blocks document ingestion. `agent_profiles.knowledge` is a flat 12 000-char field injected into every prompt, and the upload endpoint merges extracted text into it — so uploaded documents never reach the chunk/embed/retrieve pipeline that already exists and is already in use.
+
+**Two earlier designs were wrong before this one held.** Worth recording, because both looked right:
+1. *Use `POST /api/memory` with the tenant's alias.* No — `resolve_memory_handle` requires a configured `[agents.<alias>]` entry and tenant aliases are created at run time.
+2. *Use `StoreOptions::with_tenant_id()`.* No — only the **sqlite** backend persists it. Production is postgres, whose INSERT writes `(id, key, content, category, created_at, updated_at, session_id, agent_id)`; `cerveau.memories` has **no `tenant_id` column** at all. The call would have been accepted and silently dropped.
+
+**How scoping actually works**, and what shipped: isolation is by `agent_id`, resolved from `cerveau.agents.alias` in the form `t_<user_id>.<agent_type>`. `create_memory_for_tenant` already builds exactly that — namespacing to `t_<tenant>` and wrapping in `AgentScopedMemory` with an **empty** cross-agent allowlist ("tenant isolation is structural, not configured"). The change threads the same `X-Tenant-Id`/`X-Agent-Type` headers the webhook uses through to it, as a new `resolve_memory_handle_scoped`; `resolve_memory_handle` keeps its signature for the list/delete handlers.
+
+**Fail-closed in two places, both deliberate:**
+- Malformed or half-specified tenant headers → **400**, never a degrade to the vanilla path. `TenantSelector::from_headers` already separates "no tenant headers" from "tenant headers, but wrong"; collapsing both to `None` would turn a typo in `X-Agent-Type` into a global write.
+- A tenant-scoped request with no `agent` → **400**, not a fallback to `state.mem`. The host alias supplies the memory backend the tenant overlay borrows; defaulting it would make which backend a tenant's data lands in an invisible decision.
+
+**A CI defect found in the process, and fixed.** Branch protection on `cerveau-main` required `tenant-isolation` + `postgres-tests` + `redis-tests` + `build-release`, but `cerveau-build.yml` triggers only on `push: [cerveau-main]` and `workflow_dispatch` — never on `pull_request`. Three of the four required checks could therefore never report on a PR, so **every PR to `cerveau-main` was permanently unmergeable** (PR #3 sat at `MERGEABLE / BLOCKED` with nothing failing). The required-checks list had been copied from job names without checking triggers. Resolved by relaxing protection to `["tenant-isolation"]` with `strict: true` — consistent with `367319ca`'s own design, where `cerveau-quick` is the PR gate and `cerveau-build` the release gate. The whole protection object has to be sent on `PUT`, so it was read first and re-sent intact; `allow_force_pushes`/`allow_deletions` verified still `false` afterwards. If `postgres-tests` starts breaking on `main`, add `pull_request` to `cerveau-build.yml` rather than changing protection again.
+
+**CI caught one real compile error**, and only in the new test module: `HeaderMap::insert` takes `impl IntoHeaderName`, which for a bare `&str` requires `&'static str`, so borrowed test data escaped (E0521). The handler change itself compiled clean on the first run. `cerveau-quick` does compile the gateway (`zeroclaw-gateway tenant::`), so the 7-minute gate is a genuine build check, not just a test filter.
+
+**Merged (`8b26b2de`) with all four `cerveau-build` jobs green** — `tenant-isolation`, `postgres-tests`, `redis-tests`, `build-release`. Deployed by the standard recipe: checksum verified against the release's own `.sha256` sidecar (`5fd6355c…`, matched), binary backed up (`.bak-pre-tenant-memory-20260830`), atomic `.new`+`mv` swap, rolling restart of `:3100` then `:3101`, HAProxy `:3105` 200 throughout, `NRestarts=0` on both, no panic/fatal/ERROR in either journal.
+
+**Live-verified, five cases, which closes the branch no unit test covers:**
+
+| Request | Result |
+|---|---|
+| No tenant headers | 200 — landed under `default` (backwards compatible) |
+| Lone `X-Tenant-Id` | 400 "must be sent together" |
+| Lone `X-Agent-Type` | 400 "must be sent together" |
+| Tenant headers, no `agent` | 400 "must name a host agent" |
+| `X-Tenant-Id: probe user` (space) | 400 "invalid tenant header value" |
+| Valid tenant + host agent | 200 — landed under a newly created `t_probe_user.autonomous` |
+
+Both successful writes came back embedded (`embedding IS NOT NULL`), so they genuinely went through the chunk/embed pipeline. Row counts went 123 → 125 across five requests, confirming the three rejections wrote **nothing**. Probe rows and the probe agent deleted afterwards; counts back to the exact baseline **123 memories / 31 agents**.
+
+**Still to build:** the backend side — routing uploaded documents to this endpoint instead of merging them into `agent_profiles.knowledge`, and giving them a category exempt from `purge_after_days = 30` (currently `retention_days_by_category` is empty, so ingested documents would silently vanish after a month).
 
 ## 2026-08-30 — CI hygiene: parallel builds, fast gates, branch protection
 
