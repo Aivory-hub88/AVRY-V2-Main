@@ -34,3 +34,17 @@ rather than leaking.
   neither is hard-denied by default** (patch 0013), so this section is
   load-bearing, not documentation.
 - `[risk_profiles.*].auto_approve` — which tools skip the approval gate.
+
+## `cerveau-lifecycle.sh`
+
+A copy of `/usr/local/bin/cerveau-lifecycle.sh`, the daily tenant-memory
+lifecycle driver (`cerveau-lifecycle.timer`, 03:30 with 15-minute jitter). Same
+status as the config snapshot: a record, not a deployable file — the VPS copy is
+what runs, and it holds no secrets (the Postgres password is read from
+`docker inspect` at run time).
+
+Tracked here because its category list is a policy decision, not an
+implementation detail: it is the only place that says an ingested `document` is
+never age-pruned and is capped at 5 000 rows per tenant. That category has no
+counterpart in `PgLifecycleConfig` yet, so this file and `postgres.rs::run_lifecycle`
+have deliberately diverged — see the note in the script.

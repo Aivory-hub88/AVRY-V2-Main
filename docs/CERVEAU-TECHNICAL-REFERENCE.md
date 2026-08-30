@@ -93,7 +93,20 @@ Two related but distinct things share the "F-1" name in Cerveau's history:
 
 ### 3.3 Memory lifecycle (ADR-004)
 
-Postgres-backed only (SQLite's `hygiene` module never touches Postgres). Retention is set-based SQL: age-based per category (`core` exempt), per-tenant budget via a `row_number() OVER (PARTITION BY agent_id ORDER BY importance, created_at)` window, per-tier quota table (`cerveau.tenant_quota`). Driven by `cerveau-lifecycle.timer`, daily at 03:30 with 15-minute jitter.
+Postgres-backed only (SQLite's `hygiene` module never touches Postgres). Retention is set-based SQL: age-based per category, per-tenant budget via a `row_number() OVER (PARTITION BY agent_id ORDER BY importance DESC NULLS LAST, created_at DESC)` window, per-tier quota table (`cerveau.cerveau_tenant_quota`). Driven by `cerveau-lifecycle.timer`, daily at 03:30 with 15-minute jitter.
+
+What actually executes is `/usr/local/bin/cerveau-lifecycle.sh` — an interim psql driver mirroring `PostgresMemory::run_lifecycle`, which has **no caller in the daemon** (the Rust function exists and is CI-tested; only the script runs in production). Copy tracked at `ops/cerveau-config/cerveau-lifecycle.sh`. The four tiers:
+
+| Category | Age prune | Per-tenant row cap |
+|---|---|---|
+| `conversation` | 30 days | 500 |
+| `daily` | 180 days | 1 000 |
+| `core` | never | 2 000 |
+| `document` | never | 5 000 |
+
+Two things about that budget ordering are easy to misread. `core` being "exempt from retention" is only half of its story — it is still evicted by the row cap, and since `store_with_agent` **ignores the `importance` argument on Postgres** (every row is `NULL`), `importance DESC NULLS LAST` collapses and the ordering is pure recency: the oldest rows go first. That is why operator-uploaded documents get their own `document` tier (added 2026-08-30) rather than living in `core`, where a long-running tenant would silently evict its own uploaded knowledge ahead of yesterday's chatter. `document` has no counterpart in `PgLifecycleConfig` yet, so the script and `postgres.rs` have deliberately diverged until it does.
+
+`[memory] purge_after_days`, `archive_after_days` and `[memory.policy.retention_days_by_category]` belong to the **SQLite/filesystem hygiene path only** (`hygiene.rs` reads `memory/brain.db` and the workspace archive directories). They have no effect whatsoever on the Postgres backend, so nothing ingested into `cerveau.memories` is subject to `purge_after_days = 30`.
 
 Embeddings: 768 dimensions (locked — changing this means re-embedding everything), `text-embedding-3-small` via OpenRouter (confirmed working with the existing API key, no new key needed). Storage is `vector` (float32) today; a `halfvec(768)` migration exists as a queued, non-blocking follow-up. **pgvector `vector 0.8.6` is active** on `avry-postgres` — `cerveau.memories.embedding vector(768)` populated, 85 rows verified with `embedding IS NOT NULL` on `tencent-vps` (the prior `vector_enabled=false` / "not installed" state is no longer true; the column is now read/written through the tenant-aware pipeline).
 
@@ -330,7 +343,7 @@ Per `docs/DEPLOYABLE_AGENT_RUNTIME_PLANNING.md`'s own phase markers:
 
 ## 13. Known gaps (honest list)
 
-- **Document knowledge does not reach the vector pipeline.** `agent_profiles.knowledge` is a flat 12 000-char field injected into every prompt, and the document-upload endpoint merges extracted text *into that field* — so a long PDF is truncated and every turn pays for the whole blob regardless of relevance. The Cerveau side of the fix shipped 2026-08-30 (§9, tenant-aware `/api/memory`); the backend side — routing uploads there instead, and giving them a category exempt from `purge_after_days = 30` — is not built. `retention_days_by_category` is empty, so ingested documents would silently vanish after a month.
+- ~~**Document knowledge does not reach the vector pipeline.**~~ **Closed 2026-08-30.** Both halves shipped: the tenant-aware `/api/memory` on the Cerveau side (§9), and on the backend side an upload path that chunks the document and stores it as embedded, tenant-scoped memories under the new `document` tier (§3.3). On `engine = 'cerveau'` a document is no longer truncated to 12 000 chars and no longer rides along in every prompt; on the legacy engine the flat-field merge is unchanged, because that agent loop has no tenant memory to read from. The feared 30-day purge turned out not to exist — `purge_after_days` never applied to the Postgres backend (§3.3). What documents were actually exposed to was `core`'s recency-ordered row cap, which the `document` tier avoids. Remaining: no way to *remove* an ingested document — `GET`/`DELETE /api/memory` are still un-scoped (`resolve_memory_handle`, not the `_scoped` form), so a re-upload of a shorter version of the same filename upserts what it covers and leaves the trailing chunks behind.
 - No deep document parsing: scanned PDFs, tables and multi-column layouts degrade to whatever plain text extraction yields. The cheapest fix is a vision-model fallback in `attachment_extractor`, not a new RAG stack (§5.3).
 - `halfvec(768)` storage migration not done. (pgvector itself **is** installed — `vector 0.8.6`, with `cerveau.memories.embedding vector(768)` populated and in use. Earlier revisions of this doc listed it as the outstanding blocker; that is no longer true.)
 - **`.zeroclaw-cerveau-b`'s config has drifted** behind `:3100`'s and it is in the HAProxy round-robin, so it serves roughly half of all turns. It has no `enrich_lead_contact` entry at all. Individual toolkits have been patched into it one at a time; it has never been properly resynced.
