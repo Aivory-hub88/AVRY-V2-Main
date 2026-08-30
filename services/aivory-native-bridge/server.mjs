@@ -81,13 +81,29 @@ function buildMcpServerForSession(agentModule, tenantId) {
         // tenantId comes ONLY from the closure (bound at session-init time from
         // the connection URL), never from `args` — the tool's own inputSchema
         // never even declares a tenant_id field, so there is nothing for the
-        // calling model to override.
-        const result = await callN8nWebhook(
-          webhookUrl,
-          { action: t.action, tenant_id: tenantId, ...args },
-          tenantId,
-          t.name
-        );
+        // calling model to override. That holds for both paths below.
+        let result;
+        if (typeof t.handler === 'function') {
+          // Single-query tools run here, against Postgres directly. n8n is
+          // reserved for genuinely multi-step flows; for one SELECT it was
+          // only a network hop and a second definition to keep in sync.
+          try {
+            result = { ok: true, data: await t.handler(args, { tenantId }) };
+          } catch (e) {
+            log('error', 'local tool handler failed', { tenantId, toolName: t.name, error: String(e) });
+            // Deliberately generic: a raw driver error can carry column names,
+            // constraint text and fragments of other tenants' data straight
+            // into an LLM context.
+            result = { ok: false, error: 'Backend query failed' };
+          }
+        } else {
+          result = await callN8nWebhook(
+            webhookUrl,
+            { action: t.action, tenant_id: tenantId, ...args },
+            tenantId,
+            t.name
+          );
+        }
         if (!result.ok) {
           return { content: [{ type: 'text', text: `Error: ${result.error}` }], isError: true };
         }

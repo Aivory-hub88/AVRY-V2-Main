@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { listResponse, query, rowsOrNotFound } from '../db.mjs';
+
 // Native, zero-signup CRM/lead-pipeline backend for the leads_qualifier agent
 // type. Mirrors customer-service.mjs's structure: tenant_id is injected by the
 // bridge from the MCP session, never accepted from tool arguments.
@@ -9,6 +11,120 @@ export const mcpPath = 'leads-qualifier';
 export const webhookEnvVar = 'N8N_WEBHOOK_LEADS_QUALIFIER';
 
 const stageEnum = z.enum(['new', 'qualifying', 'qualified', 'disqualified', 'won', 'lost']);
+
+// ── Local handlers ─────────────────────────────────────────────────────
+//
+// Every tool below is a single query, so it runs here rather than travelling
+// bridge -> n8n -> Postgres -> back. `enrich_lead_contact` deliberately stays
+// on the n8n path: it is a real multi-step flow (wallet pre-check, provider
+// call, conditional debit, merge) and that is what n8n is for.
+//
+// The SQL and the response shapes are copied from the n8n nodes they replace,
+// deliberately unchanged -- this migration moves where a query runs, not what
+// the agent sees. Two behaviours were preserved even though they look wrong,
+// so that any difference after this change is a real regression rather than a
+// smuggled-in fix; both are flagged in docs/CERVEAU-STATUS.md:
+//   * update_bant overwrites all five fields, so a partial update blanks the
+//     ones not supplied (the tool schema defaults them to '');
+//   * update_bant does not touch updated_at, unlike every other write here.
+
+const LIST_COLUMNS = 'id, name, company, email, stage, created_at';
+const DETAIL_COLUMNS =
+  'id, name, company, email, stage, bant_budget, bant_authority, bant_need, ' +
+  'bant_timeline, notes, created_at, updated_at';
+
+async function createLead({ name, company, email }, { tenantId }) {
+  const rows = await query(
+    'INSERT INTO aivory_ops.leads (tenant_id, name, company, email) ' +
+    'VALUES ($1, $2, $3, $4) RETURNING *',
+    [tenantId, name, company ?? '', email ?? ''],
+  );
+  return rowsOrNotFound(rows);
+}
+
+async function listLeads({ stage }, { tenantId }) {
+  const rows = await query(
+    `SELECT ${LIST_COLUMNS} FROM aivory_ops.leads ` +
+    "WHERE tenant_id = $1 AND ($2 = 'all' OR stage = $2) " +
+    'ORDER BY created_at DESC LIMIT 50',
+    [tenantId, stage || 'all'],
+  );
+  return listResponse(rows);
+}
+
+async function getLead({ lead_id }, { tenantId }) {
+  const rows = await query(
+    `SELECT ${DETAIL_COLUMNS} FROM aivory_ops.leads WHERE id = $1 AND tenant_id = $2`,
+    [lead_id, tenantId],
+  );
+  return rowsOrNotFound(rows);
+}
+
+async function updateLeadStage({ lead_id, stage }, { tenantId }) {
+  const rows = await query(
+    'UPDATE aivory_ops.leads SET stage = $3, updated_at = now() ' +
+    'WHERE id = $1 AND tenant_id = $2 RETURNING id, stage',
+    [lead_id, tenantId, stage],
+  );
+  return rowsOrNotFound(rows);
+}
+
+async function updateBant(args, { tenantId }) {
+  const rows = await query(
+    'UPDATE aivory_ops.leads SET bant_budget = $3, bant_authority = $4, ' +
+    'bant_need = $5, bant_timeline = $6, notes = $7 ' +
+    'WHERE id = $1 AND tenant_id = $2 RETURNING *',
+    [
+      args.lead_id, tenantId,
+      args.bant_budget ?? '', args.bant_authority ?? '',
+      args.bant_need ?? '', args.bant_timeline ?? '', args.notes ?? '',
+    ],
+  );
+  return rowsOrNotFound(rows);
+}
+
+async function updateDeal(args, { tenantId }) {
+  const rows = await query(
+    'UPDATE aivory_ops.leads SET ' +
+    'amount = COALESCE($3::numeric, amount), ' +
+    'currency = COALESCE($4::text, currency), ' +
+    'expected_close_date = COALESCE($5::date, expected_close_date), ' +
+    'owner = COALESCE($6::text, owner), ' +
+    'probability = COALESCE($7::int, probability), ' +
+    'updated_at = now() ' +
+    'WHERE id = $1 AND tenant_id = $2 ' +
+    'RETURNING id, name, company, stage, amount, currency, expected_close_date, owner, probability',
+    [
+      args.lead_id, tenantId,
+      args.amount ?? null, args.currency ?? null,
+      args.expected_close_date ?? null, args.owner ?? null,
+      args.probability ?? null,
+    ],
+  );
+  return rowsOrNotFound(rows);
+}
+
+async function pipelineSummary({ stage }, { tenantId }) {
+  const rows = await query(
+    'SELECT stage, currency, SUM(amount)::numeric(18,2) AS total_amount, ' +
+    'COUNT(*)::int AS deal_count FROM aivory_ops.leads ' +
+    'WHERE tenant_id = $1 AND amount IS NOT NULL AND currency IS NOT NULL ' +
+    "AND ($2::text = 'all' " +
+    "     OR ($2::text = 'open' AND stage IN ('new','qualifying','qualified')) " +
+    '     OR stage = $2::text) ' +
+    'GROUP BY stage, currency ORDER BY stage, currency',
+    [tenantId, stage || 'open'],
+  );
+  return {
+    success: true,
+    rows: rows.map((r) => ({
+      stage: r.stage,
+      currency: r.currency,
+      total_amount: Number(r.total_amount),
+      deal_count: Number(r.deal_count),
+    })),
+  };
+}
 
 // ── FX for pipeline_summary ─────────────────────────────────────────────
 //
@@ -113,6 +229,7 @@ export const tools = [
       email: z.string().max(300).default(''),
     },
     action: 'create_lead',
+    handler: createLead,
   },
   {
     name: 'list_leads',
@@ -121,6 +238,7 @@ export const tools = [
       stage: z.union([stageEnum, z.literal('all')]).default('all'),
     },
     action: 'list_leads',
+    handler: listLeads,
   },
   {
     name: 'get_lead',
@@ -129,6 +247,7 @@ export const tools = [
       lead_id: z.string().uuid(),
     },
     action: 'get_lead',
+    handler: getLead,
   },
   {
     name: 'update_lead_stage',
@@ -138,6 +257,7 @@ export const tools = [
       stage: stageEnum,
     },
     action: 'update_lead_stage',
+    handler: updateLeadStage,
   },
   {
     name: 'update_bant',
@@ -151,6 +271,7 @@ export const tools = [
       notes: z.string().max(2000).default(''),
     },
     action: 'update_bant',
+    handler: updateBant,
   },
   {
     name: 'enrich_lead_contact',
@@ -194,6 +315,7 @@ export const tools = [
       probability: z.number().int().min(0).max(100).optional(),
     },
     action: 'update_deal',
+    handler: updateDeal,
   },
   {
     name: 'pipeline_summary',
@@ -213,6 +335,7 @@ export const tools = [
         .optional(),
     },
     action: 'pipeline_summary',
+    handler: pipelineSummary,
     postProcess: convertPipelineSummary,
   },
 ];
