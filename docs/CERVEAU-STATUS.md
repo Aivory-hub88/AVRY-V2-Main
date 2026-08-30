@@ -2,7 +2,39 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-08-30 (the native bridge, the n8n workflows and Cerveau's config.toml are **finally in version control** — all three had run from one place on the VPS with no history. Same day: BYO-email table live, Outlook wired, Sales & Leads Phase 1 shipped, Generalist Agent rename, `lightpanda__search` fixed.)
+**Last updated:** 2026-08-30 (the bridge shared secret is **out of the n8n workflow definitions** — it was a literal in a node parameter, which is why yesterday's export needed redacting. Same day: three untracked artefacts brought into git, BYO-email table live, Outlook wired, Sales & Leads Phase 1, Generalist Agent rename.)
+
+## 2026-08-30 — The bridge secret leaves the workflow definition; and what "credentials in the dashboard" should and should not mean
+
+**Prompted by a good question:** could n8n stop holding credentials in its nodes, with everything configured in the Cerveau dashboard and the workflow reduced to a relay? Analysing the workflows to answer it produced three separate findings.
+
+### The actual defect: a secret in a node parameter
+
+Every native-bridge workflow authenticated by comparing the inbound header against a **literal copy of `N8N_SHARED_SECRET`** in a "Check Bridge Secret" IF node. That is neither a credential store nor an environment variable — it is a live secret in the workflow definition, which is exactly why the export committed earlier today had to be redacted and could not be re-imported.
+
+Fixed by moving authentication to the **Webhook node's own `headerAuth`**, backed by one shared `httpHeaderAuth` credential ("Aivory Bridge Secret"). Two gains rather than one: the secret is out of the definition, and rejection now happens *at the webhook, before any node executes*, instead of one node into the flow. The `Check Bridge Secret` and `Respond Unauthorized` nodes were removed — leaving them would have left the literal, which was the entire point.
+
+**Verified live**: no header → 403, wrong secret → 403, correct secret → 200, and a real `list_leads` call through the bridge's MCP endpoint still returns data. Exports now need **no redaction at all**; `export.py` keeps the redaction pass as a safety net that should never fire again, and its own docstring says so.
+
+**One workflow could not be migrated.** `Native Customer Service Bridge` is *archived*, and the public API answers `Cannot update an archived workflow`. It still carries the old literal. It cannot run, so this is disclosure rather than a live auth path — resolve by unarchiving to patch, or deleting it if genuinely retired. Not done unasked: archiving was a deliberate act.
+
+### The distinction that matters more than the fix
+
+"Credentials in the dashboard" is right for one of three categories and wrong for the other two:
+
+| Kind | Where it belongs | Why |
+|---|---|---|
+| **Tenant credentials** | Dashboard → encrypted in Postgres → used by the bridge | Already decided; the BYO-email design honours it (SMTP/IMAP in the bridge, not n8n's nodes, because those need a *stored* credential) |
+| **Aivory's own infra credentials** (the native-ops Postgres connection, provider API keys) | n8n's credential store | There is no tenant to show them to. This is what a credential store is for |
+| **Anything in a node parameter** | Nowhere | This was the real bug |
+
+### The sharper finding: most of these workflows do not need to exist
+
+Counting what the leads workflow actually does — 10 Postgres nodes, 6 IF, 5 Code, 2 HTTP — splits cleanly. **Seven of its eight tools are a single SQL query each** (`create_lead`, `list_leads`, `get_lead`, `update_lead_stage`, `update_bant`, `update_deal`, `pipeline_summary`); for those, n8n is already just a hop: bridge → HTTP → n8n → Postgres → back. Only `enrich_lead_contact` is genuine orchestration (wallet pre-check → Hunter → conditional debit → Lusha → conditional debit → merge).
+
+So the answer to "make it a relay" is the opposite of the question: **move the CRUD out of n8n into the bridge entirely, and keep n8n for the multi-step flows it was scoped for.** That removes the credential problem on the CRUD path by removing the path, rather than relaying secrets through it, and it drops a network hop and a failure point. It is also what `CERVEAU-N8N-ORCHESTRATION-PLAN.md` already argued when it rejected "one workflow per single tool action".
+
+**Not done.** The user chose to take the secret fix first. The CRUD migration touches a path that only became stable today, so it is a deliberate next step, not a drive-by.
 
 ## 2026-08-30 — The three untracked artefacts are now tracked
 
