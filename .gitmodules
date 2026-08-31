@@ -43,3 +43,6 @@
 [submodule "services/avry-shared-libs"]
 	path = services/avry-shared-libs
 	url = https://github.com/ClementHansel/avry-shared-libs.git
+[submodule "services/avry-mail"]
+	path = services/avry-mail
+	url = https://github.com/Aivory-hub88/AVRY-Mail.git
