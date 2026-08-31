@@ -1,7 +1,7 @@
 # ADR-007 — Aivory Cerveau: Long-Term Memory via cognee-rs (Postgres-only)
 
 **Date:** 2026-08-31
-**Status:** All 6 phases done and live-verified as of 2026-08-31 — see §6. Tenant isolation is real (proven via a same-name-dataset collision test, §9) and a real agent tool path is deployed and enforced (§10, proven via two independent session-less webhook turns). One deliberate gap remains: `graph_remember`/`graph_recall` are not yet added to the `MEMORY_TOOL_NAMES`-style exclusion lists that keep memory tools out of subagent/cron/delegate contexts (§10) — treat those contexts as unverified with graph tools present until that audit happens.
+**Status:** All 6 core Cerveau phases done and live-verified — see §6. Tenant isolation is real (proven via a same-name-dataset collision test, §9) and a real agent tool path is deployed and enforced (§10, proven via two independent session-less webhook turns). Extended to vanilla zeroclaw (§12, shared graph, live-verified on `:3010`) and Workflow Copilot (§13, connected directly from the dashboard, bypassing zeroclaw entirely — live-verified). Two deliberate gaps remain: `graph_remember`/`graph_recall` are not yet added to the `MEMORY_TOOL_NAMES`-style exclusion lists that keep memory tools out of subagent/cron/delegate contexts (§10); skill self-improvement's graph logging (§11) is deployed but has never been observed actually firing.
 **Context:** [[cerveau-memory-scoping-and-rag]] (the earlier "don't add RAGflow" decision this one updates), [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (the retention/lifecycle system this sits next to, not inside).
 
 ---
@@ -175,7 +175,17 @@ Because the two calls share no history, the second call could only answer correc
 - `all_tools_with_runtime` wiring: gated on `[cognee].enabled` alone (no tenant-context check, since none exists).
 - CI: `aivory-build.yml` replaces ~20 unrelated upstream workflows (same convention as the Cerveau fork's `cerveau-build.yml`), mirrors upstream's own `release-stable-manual.yml` x86_64-linux leg (`ubuntu-22.04`/glibc 2.35, `cargo web build`, xtask feature resolution) — the exact recipe vanilla's real release binary was built with, so the resulting binary's other behavior is provably unchanged.
 
-**Not yet deployed as of this entry** — CI in progress; §13 below is where the deploy/verification account goes once it's done.
+**Deployed and live-verified, same session.** CI green (all 3 jobs: `check`, `web`, `build-release`), binary checksum-verified and swapped on `:3010` (standard backup-then-atomic-swap), `doctor` clean (0 errors) immediately after the swap — confirming the new binary is backward-compatible with vanilla's existing config even before `[cognee]` is turned on.
+
+**Hit the same approval-gate wall as every other tool wired in this project, and — because vanilla serves real production traffic (not pre-tenant testing like the Cerveau instances) — asked again rather than assuming the earlier answer still applied.** `agent_analyst_brain` (confirmed the profile serving `/webhook` here too, same convention as Cerveau) allow-lists n8n-native tools but deliberately does NOT auto-approve the destructive/credential-touching ones. Asked directly; chose full auto-approve for `graph_remember`/`graph_recall` anyway, since — unlike n8n's go-live/credential tools — a graph read/write on the agent's own memory isn't the same risk class. Applied to both `allowed_tools` and `auto_approve`.
+
+**Live-verified through two independent, session-less `POST /webhook` calls** — the same discipline as every other proof in this ADR: stored a fact ("Northstar Analytics acquired Cedarline Software's reporting module in 2024, lead engineer Priya Ramanathan") via `graph_remember` in one call, asked *"who was the lead engineer when Northstar Analytics acquired the reporting module from Cedarline Software?"* in a completely separate call with no shared history, got the correct name back. Since the two calls share no conversation, the second could only answer correctly if `graph_recall` genuinely round-tripped to the shared sidecar.
+
+**One credential-hygiene repeat, caught and fixed the same way as before.** Adding `[cognee]` to vanilla's `config.toml` needed the shared secret; a `sed`-based redaction while displaying the result again printed most of it (the third time this exact mistake happened this session). Rather than treat it as low-priority again, rotated the secret **everywhere it's used** — `/etc/cognee-cerveau.env`, both Cerveau instances' `config.toml`, vanilla's `config.toml`, and the dashboard's `.env` — and restarted all four consumers, confirmed all healthy on the new value.
+
+Probe data dropped afterward (`DROP SCHEMA cognee CASCADE` + recreate), `cognee-cerveau.service` restarted immediately per the standing rule in §13, confirmed healthy.
+
+Deployed: `AVRY-Cerveau`-independent — this is `Aivory-hub88/zeroclaw:cerveau-cognee-vanilla` commit `3e93d96`, running as `zeroclaw.service` on `:3010`.
 
 ## 13. Workflow Copilot → cognee, directly (not through zeroclaw at all)
 
