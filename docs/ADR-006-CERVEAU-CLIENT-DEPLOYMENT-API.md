@@ -200,6 +200,14 @@ Every existing `[tool_risk_tiers]` assignment is for a tool Aivory wrote or cura
 
 **`engine='cerveau'` only, hard requirement.** The legacy Node loop has no risk-tier/approval-gate concept at all (`ApprovalRequirement::Pending` is entirely a Cerveau-side mechanism). Shipping arbitrary tenant-supplied tool execution against legacy would mean zero safety net — indefensible given §B5.
 
+### B8. Per-tool allow/deny (2026-09-02)
+
+**Gap.** B4's dashboard tab only ever let a tenant remove a *whole* registered server — a server exposing 15 tools but only 2 the tenant actually wants meant living with all 15 exposed to the model (and to `[tool_risk_tiers]`'s Irreversible default, meaning approval prompts for tools nobody meant to use) or removing the server outright. This mirrors the same allow/deny granularity Anthropic's own MCP connector (`mcp_toolset.configs.<tool>.enabled`) added for the identical reason.
+
+**Design.** One new denylist column, `product.tenant_custom_mcp_servers.disabled_tools TEXT[]`, alongside a `tools_json JSONB` column that now persists the last-verified `{name, description}` list (previously only `tool_count` survived a page reload — the dashboard had no way to render a per-tool checklist without this). `PATCH /api/v1/tenant-mcp-servers/{id}/tools` validates the submitted list against the row's own `tools_json` (never a live re-verification round trip) and replaces `disabled_tools` wholesale. The internal endpoint hands `disabled_tools` to Cerveau alongside the rest of the server's connection details; `TenantCustomMcpServer::disabled_tools` threads it into a new `McpServerConfig::disabled_tools` field, which `McpConnection::connect` (`zeroclaw-tools::mcp_client`) applies by filtering the server's own `tools/list` response *before* a single `McpToolDef` is stored — so a disabled tool never reaches eager registration, `mcp_deferred`'s stubs, or `tool_search`, not merely refused if the model calls it anyway. `McpServerConfig::disabled_tools` is a normal (non-tenant-only) field, so a curated `[[mcp.servers]]` entry can use the same knob to hide one noisy tool from an otherwise-useful server.
+
+**Status:** ✅ **Deployed 2026-09-02** across all three repos — avry-backend (`a79f501`, route + migration, 30 unit tests green), Cerveau (`24851f87`, `McpServerConfig::disabled_tools` + connect-time filter, CI green, binary swapped and both instances restarted healthy), dashboard (`deb5732`, per-tool toggles). Route registration and auth confirmed live (`PATCH …/tools` returns 401 unauthenticated rather than 404). Not yet exercised end-to-end against a real tenant-registered MCP server with a tool actually disabled — that needs a live tenant server to point at.
+
 ---
 
 ## Phasing and exit gates
