@@ -98,6 +98,8 @@ All four proofs passed against the live `:3100` instance via the real `/webhook`
 
 Happy path (a real tenant connecting a real Gmail/Calendar/Trello/Linear account) remains unverified until real usage exists — same disclosed-gap stance as every prior toolkit round.
 
+**Addendum, 2026-09-02:** the Lightpanda permission-denied bug flagged above is still open — not fixed here. Obscura was added alongside Lightpanda in the same `lightpanda-browsing` bundle as a working fallback (a `browser-tool-priority` skill routes to it automatically when a Lightpanda call fails), so the practical impact of this bug is now mitigated for the 4 agent types that use browsing. See `CERVEAU-STATUS.md`'s 2026-09-02 entry and `CERVEAU-TECHNICAL-REFERENCE.md` §5.3 for the full change; the underlying `officecli`/`lightpanda`/`pdf-oxide` exec permission issue itself remains unaddressed.
+
 ---
 
 ## All open decisions closed (2026-08-23)
