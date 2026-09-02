@@ -592,6 +592,89 @@ services:
       - "traefik.http.routers.avry-grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-grafana.loadbalancer.server.port=3000"
 
+  # ── Aivory Mail ──────────────────────────────────────────────────────────
+  avry-mail:
+    build:
+      context: ./services/avry-mail
+      dockerfile: Dockerfile
+    container_name: avry-mail
+    <<: *python-defaults
+    ports:
+      - "8095:8095"
+    environment:
+      <<: *common-env
+      PORT: 8095
+      DATABASE_URL: ${DATABASE_URL}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      STORAGE_PATH: /app/data/mail-storage
+      MAIL_MODE: ${MAIL_MODE:-vps}
+      COGNEE_URL: ${COGNEE_URL:-http://cognee-cerveau:3200}
+      COGNEE_INTERNAL_SECRET: ${COGNEE_INTERNAL_SECRET:-}
+      COGNEE_AGENT_TYPE: ${COGNEE_AGENT_TYPE:-mail_ops}
+      MAIL_INTELLIGENCE_MODEL: ${MAIL_INTELLIGENCE_MODEL:-deepseek/deepseek-v4-flash-0731}
+      DIAGNOSTIC_MODEL: ${DIAGNOSTIC_MODEL:-qwen/qwen3-235b-a22b}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      CF_API_TOKEN: ${CF_API_TOKEN:-}
+      CF_ZONE_ID: ${CF_ZONE_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      AI_GATEWAY_URL: http://avry-zeroclaw-daemon:3010
+      WORKFLOW_URL: http://avry-n8n-as-code:3500
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      MAIL_MX_HOST: ${MAIL_MX_HOST:-mail.aivory.uk}
+      SPF_INCLUDE_HOST: ${SPF_INCLUDE_HOST:-_spf.aivory.uk}
+      DMARC_REPORT_ADDRESS: ${DMARC_REPORT_ADDRESS:-dmarc@aivory.uk}
+    volumes:
+      - mail_storage:/app/data/mail-storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8095/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - aivory-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-mail.rule=Host(`mail.aivory.uk`) && PathPrefix(`/v1/`) || Host(`mail.aivory.uk`) && PathPrefix(`/health`)"
+      - "traefik.http.routers.avry-mail.entrypoints=websecure"
+      - "traefik.http.routers.avry-mail.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-mail.loadbalancer.server.port=8095"
+
+  avry-mail-web:
+    build:
+      context: ./services/avry-mail/web
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_MAIL_API=https://mail.aivory.uk
+        - NEXT_PUBLIC_BOOK_URL=https://book.aivory.uk/book/aivory-call
+        - NEXT_PUBLIC_MAIL_MX_HOST=mail.aivory.uk
+    container_name: avry-mail-web
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - NEXT_PUBLIC_MAIL_API=https://mail.aivory.uk
+      - NEXT_PUBLIC_BOOK_URL=https://book.aivory.uk/book/aivory-call
+      - NEXT_PUBLIC_MAIL_MX_HOST=mail.aivory.uk
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - aivory-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.avry-mail-web.rule=Host(`mail.aivory.uk`)"
+      - "traefik.http.routers.avry-mail-web.entrypoints=websecure"
+      - "traefik.http.routers.avry-mail-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-mail-web.loadbalancer.server.port=3005"
+      - "traefik.http.routers.avry-mail-web.priority=10"
+
 volumes:
   avry-backend-data:
   n8n_data:
@@ -599,6 +682,7 @@ volumes:
   careers_cv_data:
   prometheus_data:
   grafana_data:
+  mail_storage:
 
 networks:
   aivory-network:
