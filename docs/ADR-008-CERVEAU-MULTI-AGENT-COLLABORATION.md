@@ -157,7 +157,7 @@ Total spend for the whole exercise: **five short model calls.**
 
 **Revised assessment:** a dedicated synthesis agent (LobeHub's literal design) would earn its cost mainly at a fan-out size where raw concatenation would overwhelm the caller's own context — meaningfully more than the 2-5 delegates realistic at Aivory's current agent count. At this scale, "the caller synthesizes in its own next turn" is not a missing feature; it is the feature, and it already works. No Rust change is needed for Phase 2. Revisit only if a future fan-out width makes raw concatenation itself the bottleneck.
 
-### Phase 3a — `verifier_brain` second-opinion sweep — 🟡 **code complete 2026-09-03, pushed to `cerveau-main` (`2325e1f9`), CI running, prod binary swap pending**
+### Phase 3a — `verifier_brain` second-opinion sweep — ✅ **DEPLOYED + live-verified on both instances, 2026-09-03**
 
 Rejected the originally-planned inline hook in `approval_gate.rs`: that function runs inside `TurnCtx`, which has no `Config` in scope (only a resolved `ApprovalManager` and borrowed turn state) — threading one through would touch every turn in the system for a feature that only matters on the rare `Pending` path. Built as a decoupled periodic sweep instead, modelled on `control_plane::reaper`'s own spawn/interval shape and spawned from `daemon::boot` (where a live `Config` already exists, same as the reaper and the F-1 goal-resume drive):
 
@@ -170,7 +170,13 @@ Rejected the originally-planned inline hook in `approval_gate.rs`: that function
 
 **Not yet started (split out of the original Phase 3 scope):** the `BackgroundTaskStatus` → A2A 7-state extension and `InputRequired` surfacing. Bundling it into this change would have coupled an orthogonal dashboard-facing vocabulary change to the verifier's storage/sweep plumbing; tracked as Phase 3b below.
 
-**Exit gate (Phase 3a):** a real `Irreversible`-tier call produces a pending approval that gets a `verifier_finding` attached within one 20s sweep interval, visible through the existing tenant-scoped route; verifier structurally cannot resolve any approval (zero tools, not tested-and-hoped — provable by inspection of its risk profile). Pending: prod binary swap + one live-fired Irreversible call observed end-to-end on both instances.
+**Exit gate — met on both instances:** CI (`cerveau-build`/`cerveau-quick`, both green on `2325e1f9`) built and published the rolling `cerveau-cd` release; binary swapped on both `zeroclaw-cerveau` (`:3100`) and `zeroclaw-cerveau-b` (`:3101`) after a sha256-verified download (both old binaries backed up first — they share one `/usr/local/bin/zeroclaw-cerveau` path, so the swap needed a brief coordinated stop/start of both, not a rolling one). Both came back healthy (`/health` on `:3100`, `:3101`, and the `:3105` HAProxy front all report every component `ok`), zero warnings/errors in the journal post-restart.
+
+Live-verified per instance with a synthetic Irreversible-tier row inserted directly into each instance's own `pending_approvals` table (a real Gmail-send / Slack-notify approval, never actually executed — inserted, observed, then deleted, so no fake approval was left sitting where a human could mistakenly act on it):
+- **Instance A:** `GMAIL_SEND_EMAIL` row → finding attached in 22s: `{"verdict":"ok","confidence":0.85,"reasoning":"Legitimate email sending operation via Gmail integration..."}`.
+- **Instance B:** `SLACK_SEND_MESSAGE` row → finding attached in 18s: `{"verdict":"ok","confidence":0.95,"reasoning":"Standard deployment notification to an operations Slack channel..."}`.
+
+Both well inside the 20s sweep interval's first tick, both coherent and correctly scoped to the tool actually being reviewed. The "cannot resolve its own approval" property was not re-tested live (there is nothing to click — approval resolution is an HTTP route with no matching `Tool`, and `verifier_brain`'s `allowed_tools` is `[]` in both live configs, confirmed by parsing both TOML files after the edit); that is a structural guarantee, not a behavioral one, so static confirmation is the correct proof, not a second LLM call to watch it fail to do something it has no way to attempt.
 
 ### Phase 3b — A2A task vocabulary (Rust) — not started
 
