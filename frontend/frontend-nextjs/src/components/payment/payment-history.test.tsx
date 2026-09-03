@@ -82,8 +82,9 @@ describe('Payment History Component', () => {
       
       expect(screen.getByText('No payment history yet')).toBeInTheDocument();
       
-      const icon = screen.getByRole('img');
-      expect(icon).toBeInTheDocument();
+      // The icon is decorative and aria-hidden, so it must NOT appear as an
+      // image to assistive tech -- the sentence above carries the meaning.
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
     });
 
     it('should show refresh button in empty state when onRefresh is provided', () => {
@@ -98,9 +99,9 @@ describe('Payment History Component', () => {
     it('should render all payments in the list', () => {
       render(<PaymentHistory payments={mockPayments} />);
       
-      expect(screen.getByText('AI Snapshot')).toBeInTheDocument();
-      expect(screen.getByText('Foundation Plan')).toBeInTheDocument();
-      expect(screen.getByText('AI Blueprint')).toBeInTheDocument();
+      expect(screen.getByText('Business Operations Assessment')).toBeInTheDocument();
+      expect(screen.getByText('Operational Plan')).toBeInTheDocument();
+      expect(screen.getByText('Transformation Blueprint')).toBeInTheDocument();
     });
 
     it('should display correct payment amounts', () => {
@@ -138,15 +139,15 @@ describe('Payment History Component', () => {
     it('should display dates in readable format', () => {
       render(<PaymentHistory payments={mockPayments} />);
       
-      expect(screen.getByText('January 15, 2024')).toBeInTheDocument();
-      expect(screen.getByText('January 16, 2024')).toBeInTheDocument();
-      expect(screen.getByText('January 17, 2024')).toBeInTheDocument();
+      expect(screen.getByText(/January 15, 2024/)).toBeInTheDocument();
+      expect(screen.getByText(/January 16, 2024/)).toBeInTheDocument();
+      expect(screen.getByText(/January 17, 2024/)).toBeInTheDocument();
     });
 
     it('should display verification date when available', () => {
       render(<PaymentHistory payments={mockPayments} />);
       
-      expect(screen.getByText('January 18, 2024')).toBeInTheDocument();
+      expect(screen.getByText(/January 18, 2024/)).toBeInTheDocument();
     });
   });
 
@@ -252,33 +253,33 @@ describe('Payment History Component', () => {
       render(<PaymentHistory payments={mockPayments} loading={true} />);
       
       expect(screen.getByText('Payment History')).toBeInTheDocument();
-      expect(screen.getByText('AI Snapshot')).toBeInTheDocument();
+      expect(screen.getByText('Business Operations Assessment')).toBeInTheDocument();
     });
   });
 
   describe('Product Name Mapping', () => {
-    it('should map ai_snapshot to AI Snapshot', () => {
+    it('should map ai_snapshot to Business Operations Assessment', () => {
       render(<PaymentHistory payments={mockPayments} />);
-      expect(screen.getByText('AI Snapshot')).toBeInTheDocument();
+      expect(screen.getByText('Business Operations Assessment')).toBeInTheDocument();
     });
 
-    it('should map ai_blueprint to AI Blueprint', () => {
+    it('should map ai_blueprint to Transformation Blueprint', () => {
       render(<PaymentHistory payments={mockPayments} />);
-      expect(screen.getByText('AI Blueprint')).toBeInTheDocument();
+      expect(screen.getByText('Transformation Blueprint')).toBeInTheDocument();
     });
 
-    it('should map foundation to Foundation Plan', () => {
+    it('should map foundation to Operational Plan', () => {
       render(<PaymentHistory payments={mockPayments} />);
-      expect(screen.getByText('Foundation Plan')).toBeInTheDocument();
+      expect(screen.getByText('Operational Plan')).toBeInTheDocument();
     });
 
-    it('should map pro to Pro Plan', () => {
+    it('should map pro to Business Plan', () => {
       const proPayment = {
         ...mockPayments[0],
         product: 'pro' as const,
       };
       render(<PaymentHistory payments={[proPayment]} />);
-      expect(screen.getByText('Pro Plan')).toBeInTheDocument();
+      expect(screen.getByText('Business Plan')).toBeInTheDocument();
     });
 
     it('should map enterprise to Enterprise Plan', () => {
@@ -311,7 +312,7 @@ describe('Payment History Component', () => {
     it('should have proper semantic structure for payment items', () => {
       render(<PaymentHistory payments={mockPayments} />);
       
-      const paymentItem = screen.getByText('AI Snapshot').closest('div');
+      const paymentItem = screen.getByText('Business Operations Assessment').closest('div');
       expect(paymentItem).toBeInTheDocument();
     });
   });

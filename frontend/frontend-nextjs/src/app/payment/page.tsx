@@ -7,7 +7,6 @@ export const metadata: Metadata = {
     "Select from our range of AI services and subscription plans. Secure payment powered by Midtrans.",
   alternates: {
     canonical: "/payment",
-    languages: { en: "/payment", id: "/payment" },
   },
   robots: { index: false, follow: false },
 };

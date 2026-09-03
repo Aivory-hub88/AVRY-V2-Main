@@ -44,7 +44,8 @@
  */
 
 import React from 'react';
-import { render, within } from '@testing-library/react';
+import { within } from '@testing-library/react';
+import { renderPage } from '@/test/render-page';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import fc from 'fast-check';
@@ -245,7 +246,7 @@ describe('Property 6: Responsive single-column collapse', () => {
   // for ALL regions, not just a hand-picked few.
   // -------------------------------------------------------------------------
   it('holds for every responsive region spec (Req 6.1-6.7)', () => {
-    const { container } = render(<Home />);
+    const { container } = renderPage(<Home />);
 
     fc.assert(
       fc.property(
@@ -274,7 +275,7 @@ describe('Property 6: Responsive single-column collapse', () => {
   it.each(RESPONSIVE_SPECS)(
     '$name carries [$classes] [Req $requirement]',
     ({ locate, classes }) => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const el = locate(container);
       expect(el).not.toBeNull();
       expect(el as HTMLElement).toHaveClass(...classes);
@@ -286,7 +287,7 @@ describe('Property 6: Responsive single-column collapse', () => {
   // -------------------------------------------------------------------------
   describe('Pricing Full Stack banner stacks at <=768px (Req 6.2)', () => {
     it('renders the banner flex-col on mobile and md:flex-row on desktop', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const banner = findByClassTokens(region(container, '#pricing-section'), [
         'flex-col',
         'md:flex-row',
@@ -304,7 +305,7 @@ describe('Property 6: Responsive single-column collapse', () => {
 
   describe('Privacy trust badges wrap at <=768px (Req 6.4)', () => {
     it('renders the badges container with flex-wrap', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const badges = findByClassTokens(region(container, '#privacy-section'), [
         'flex-wrap',
       ]);
@@ -315,7 +316,7 @@ describe('Property 6: Responsive single-column collapse', () => {
 
   describe('Credit marketplace starter vs scale collapse (Req 6.5)', () => {
     it('renders starter packs at grid-cols-2 and scale packs at grid-cols-1 on mobile', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const credit = region(container, '#credit-marketplace-section');
 
       const starterGrid = within(credit)
@@ -337,7 +338,7 @@ describe('Property 6: Responsive single-column collapse', () => {
 
   describe('Navbar mobile rules (Req 6.7)', () => {
     it('centers the nav container at <=768px and restores the spread row at md:', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const navContainer = findByClassTokens(region(container, 'nav'), [
         'flex-col',
         'items-center',
@@ -356,7 +357,7 @@ describe('Property 6: Responsive single-column collapse', () => {
     });
 
     it('shrinks the Dashboard control to 13px / 0 16px on mobile and restores 15px / 0 28px at md:', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const dashboard = within(region(container, 'nav')).getByRole('button', {
         name: /dashboard/i,
       });

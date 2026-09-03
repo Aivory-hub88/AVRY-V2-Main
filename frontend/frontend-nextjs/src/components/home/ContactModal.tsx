@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SpotlightButton } from '@/components/ui/SpotlightButton';
+import { TechnicalFrameButton } from '@/components/ui/TechnicalFrameButton';
 
 interface ContactModalProps {
   isOpen: boolean;
@@ -117,28 +117,25 @@ export default function ContactModal({ isOpen, onClose }: ContactModalProps) {
                 />
               </div>
 
-              <SpotlightButton
+              <TechnicalFrameButton
                 type="submit"
-                roundedClass="rounded-[8px]"
                 className="w-full mt-4"
-                icon={
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="shrink-0 text-white/50"
-                  >
-                    <path d="M7 7l10 10M17 7v10H7" />
-                  </svg>
-                }
               >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0 text-white/50"
+                >
+                  <path d="M7 7l10 10M17 7v10H7" />
+                </svg>
                 Send Message
-              </SpotlightButton>
+              </TechnicalFrameButton>
             </form>
           </>
         ) : (

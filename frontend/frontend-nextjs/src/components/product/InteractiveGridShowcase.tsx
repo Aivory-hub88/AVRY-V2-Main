@@ -61,7 +61,15 @@ function SpotlightCard({ children, className = '' }: { children: React.ReactNode
     <div
       ref={cardRef}
       onMouseMove={handleMouseMove}
-      className={`spotlight-card rounded-2xl border border-white/5 bg-zinc-950/65 shadow-lg flex flex-col p-4 md:p-6 min-w-0 w-full ${className}`}
+      className={`spotlight-card rounded-2xl flex flex-col p-4 md:p-6 min-w-0 w-full ${className}`}
+      style={{
+        background:
+          'linear-gradient(160deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.025) 55%, rgba(255,255,255,0.015) 100%)',
+        backdropFilter: 'blur(22px)',
+        WebkitBackdropFilter: 'blur(22px)',
+        border: '1px solid rgba(255,255,255,0.13)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), 0 24px 60px -12px rgba(0,0,0,0.45)',
+      }}
     >
       {children}
     </div>
@@ -72,11 +80,11 @@ function SpotlightCard({ children, className = '' }: { children: React.ReactNode
 // ── Main Layout ──
 const renderTitle = (title: string) => {
   const words = title.split(' ');
-  if (words.length <= 1) return <span className="italic" style={{ color: '#e4effd' }}>{title}</span>;
+  if (words.length <= 1) return <span style={{ color: '#e4effd' }}>{title}</span>;
   const lastWord = words.pop();
   return (
     <>
-      {words.join(' ')} <span className="italic" style={{ color: '#e4effd' }}>{lastWord}</span>
+      {words.join(' ')} <span style={{ color: '#e4effd' }}>{lastWord}</span>
     </>
   );
 };
@@ -103,11 +111,11 @@ export function InteractiveGridShowcase() {
           >
             Operational Framework
           </SpotlightButton>
-          <h3 className="text-4xl md:text-5xl font-light tracking-normal mb-6 leading-tight" style={{ zoom: 0.7 }}>
-            From Operational Clarity <br className="hidden md:block" />to <span className="italic" style={{ color: '#e4effd' }}>Intelligent Operations</span>
+          <h3 className="text-[37px] md:text-[46px] font-light tracking-tight mb-6 leading-tight" style={{ zoom: 0.7 }}>
+            From Operational Clarity <br className="hidden md:block" />to <span style={{ color: '#e4effd' }}>Intelligent Operations</span>
           </h3>
           <p className="text-white/75 font-light leading-relaxed">
-            We guide organisations through every stage of transformation. From understanding how the business operates today to redesigning workflows and deploying governed AI that delivers measurable business outcomes.
+            A self-guided path through every stage of transformation. From understanding how the business operates today to redesigning workflows and deploying governed AI that delivers measurable business outcomes.
           </p>
         </div>
 
@@ -117,8 +125,8 @@ export function InteractiveGridShowcase() {
           {/* Card 1: Diagnostic */}
           <SpotlightCard className="col-span-1 md:col-span-1 lg:col-span-2">
             <div className="relative z-10 mb-4 flex-shrink-0">
-              <span className="text-[#bbe2ef] text-[13px] font-medium tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[0].step}</span>
-              <h4 className="text-xl font-medium mb-2">{renderTitle(showcaseProducts[0].title)}</h4>
+              <span className="text-[#bbe2ef] text-[13px] font-light tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[0].step}</span>
+              <h4 className="text-xl font-light mb-2">{renderTitle(showcaseProducts[0].title)}</h4>
               <p className="text-white/70 text-[13px] font-light leading-relaxed">{showcaseProducts[0].description}</p>
             </div>
             <div className="relative z-10 flex-1 min-h-[260px] bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-xl mt-auto overflow-hidden backdrop-blur-sm min-w-0 w-full" style={{ zoom: 0.72 }}>
@@ -129,8 +137,8 @@ export function InteractiveGridShowcase() {
           {/* Card 2: Blueprint */}
           <SpotlightCard className="col-span-1 md:col-span-1 lg:col-span-2">
             <div className="relative z-10 mb-4 flex-shrink-0">
-              <span className="text-[#bbe2ef] text-[13px] font-medium tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[1].step}</span>
-              <h4 className="text-xl font-medium mb-2">{renderTitle(showcaseProducts[1].title)}</h4>
+              <span className="text-[#bbe2ef] text-[13px] font-light tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[1].step}</span>
+              <h4 className="text-xl font-light mb-2">{renderTitle(showcaseProducts[1].title)}</h4>
               <p className="text-white/70 text-[13px] font-light leading-relaxed">{showcaseProducts[1].description}</p>
             </div>
             <div className="relative z-10 flex-1 min-h-[260px] bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-xl mt-auto overflow-hidden backdrop-blur-sm min-w-0 w-full" style={{ zoom: 0.72 }}>
@@ -141,8 +149,8 @@ export function InteractiveGridShowcase() {
           {/* Card 3: Roadmap */}
           <SpotlightCard className="col-span-1 md:col-span-2 lg:col-span-2">
             <div className="relative z-10 mb-4 flex-shrink-0">
-              <span className="text-[#bbe2ef] text-[13px] font-medium tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[2].step}</span>
-              <h4 className="text-xl font-medium mb-2">{renderTitle(showcaseProducts[2].title)}</h4>
+              <span className="text-[#bbe2ef] text-[13px] font-light tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[2].step}</span>
+              <h4 className="text-xl font-light mb-2">{renderTitle(showcaseProducts[2].title)}</h4>
               <p className="text-white/70 text-[13px] font-light leading-relaxed">{showcaseProducts[2].description}</p>
             </div>
             <div className="relative z-10 flex-1 min-h-[260px] bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-xl mt-auto overflow-hidden backdrop-blur-sm min-w-0 w-full" style={{ zoom: 0.72 }}>
@@ -153,8 +161,8 @@ export function InteractiveGridShowcase() {
           {/* Card 4: Console */}
           <SpotlightCard className="col-span-1 md:col-span-1 lg:col-span-3">
             <div className="relative z-10 mb-4 flex-shrink-0">
-              <span className="text-[#bbe2ef] text-[13px] font-medium tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[3].step}</span>
-              <h4 className="text-xl font-medium mb-2">{renderTitle(showcaseProducts[3].title)}</h4>
+              <span className="text-[#bbe2ef] text-[13px] font-light tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[3].step}</span>
+              <h4 className="text-xl font-light mb-2">{renderTitle(showcaseProducts[3].title)}</h4>
               <p className="text-white/70 text-[13px] font-light leading-relaxed max-w-md">{showcaseProducts[3].description}</p>
             </div>
             <div className="relative z-10 flex-1 min-h-[280px] bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-xl mt-auto overflow-hidden backdrop-blur-sm min-w-0 w-full" style={{ zoom: 0.82 }}>
@@ -165,8 +173,8 @@ export function InteractiveGridShowcase() {
           {/* Card 5: Workflow */}
           <SpotlightCard className="col-span-1 md:col-span-1 lg:col-span-3">
             <div className="relative z-10 mb-4 flex-shrink-0">
-              <span className="text-[#bbe2ef] text-[13px] font-medium tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[4].step}</span>
-              <h4 className="text-xl font-medium mb-2">{renderTitle(showcaseProducts[4].title)}</h4>
+              <span className="text-[#bbe2ef] text-[13px] font-light tracking-[0.2em] mb-2 block uppercase" style={{ fontFamily: "'Doto', 'Courier New', monospace" }}>{showcaseProducts[4].step}</span>
+              <h4 className="text-xl font-light mb-2">{renderTitle(showcaseProducts[4].title)}</h4>
               <p className="text-white/70 text-[13px] font-light leading-relaxed max-w-md">{showcaseProducts[4].description}</p>
             </div>
             <div className="relative z-10 flex-1 min-h-[280px] bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-xl mt-auto overflow-hidden backdrop-blur-sm min-w-0 w-full" style={{ zoom: 0.82 }}>

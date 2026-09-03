@@ -111,7 +111,7 @@ body,
   text-transform: uppercase;
   color: #afafaf;
   margin-bottom: 20px;
-  font-family: 'Doto', 'Courier New', monospace;
+  font-family: var(--font-doto), 'Doto', 'Courier New', monospace;
 }
 
 .gsap-card .fc-title-v {
@@ -119,7 +119,7 @@ body,
   font-weight: 400;
   color: #fff;
   margin-bottom: 24px;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   line-height: 1.15;
   text-align: left;
   width: 100%;
@@ -130,7 +130,7 @@ body,
   font-weight: 400;
   color: rgba(255, 255, 255, 0.65);
   line-height: 1.7;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   text-align: left;
   width: 100%;
 }
@@ -459,7 +459,7 @@ body,
   padding: 8px 12px;
   border-radius: 12px;
   font-size: 10px;
-  font-family: 'Manrope', sans-serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-weight: 300;
   max-width: 85%;
   line-height: 1.4;
@@ -806,6 +806,19 @@ body,
   animation-delay: 0.8s;
 }
 
+/* The hero's staggered entrance is pure movement — under reduced motion the
+   rows must simply be there, not slide. Opacity is kept at 1 rather than
+   faded, since the fade only exists to carry the translate. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up-1,
+  .animate-slide-up-2,
+  .animate-slide-up-3 {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes gentle-bounce {
   0%, 100% {
     transform: translateY(0);
@@ -952,4 +965,51 @@ body,
   -webkit-background-clip: text;
   background-clip: text;
   animation: silver-swipe 5s linear infinite;
+  /* Own compositing layer, decoupled from the parent's opacity/transform
+     entrance animation (animate-slide-up-1/2) — without this, some
+     browsers fail to paint the animated gradient-clipped text on first
+     load (renders fully invisible until a later repaint, e.g. scroll or
+     reload), since both animations start compositing at the same time. */
+  will-change: background-position;
+  transform: translateZ(0);
+}
+
+/* ─── Pricing payment acceptance marks ─── */
+@keyframes payment-mark-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.payment-mark {
+  opacity: 0;
+  transform: translateY(6px);
+  animation: payment-mark-in 320ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-mark {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* ─── Checkout card brand mark ─── */
+@keyframes card-brand-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.92);
+  }
+}
+
+.card-brand-mark {
+  animation: card-brand-in 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-brand-mark {
+    animation: none;
+  }
 }

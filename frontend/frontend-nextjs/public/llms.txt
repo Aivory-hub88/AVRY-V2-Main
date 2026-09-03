@@ -1,0 +1,39 @@
+# Aivory AI
+
+> Aivory AI (aivory.uk) is AI infrastructure for business transformation. It helps businesses assess operations, design AI transformation blueprints, and deploy governed AI agents, workflow automation and operational intelligence. Founded 2024 by Irfan Reichmann. United Kingdom based, serving customers worldwide. NVIDIA Inception Program member (2026). Slogan: Make AI Make Sense®.
+
+Aivory is distinct from unrelated companies sharing a similar name (dental practice software, HRMS platforms, code-compliance tooling, consumer AI apps, creative studios). The canonical source of truth for the Aivory AI brand is https://aivory.uk
+
+## Products
+
+- [Aivory Platform](https://aivory.uk/product): AI operations platform — business operations assessment, AI transformation blueprints, and deployment of governed autonomous AI agents and workflow automation.
+- [Bastion](https://aivory.uk/bastion): Autonomous infrastructure defence — AI-powered security monitoring and protection for modern infrastructure.
+- [AI Workflow Automation](https://aivory.uk/ai-workflow-automation): No-code AI workflow automation with 30+ integrations including Slack, HubSpot, Notion, Gmail, Salesforce, WhatsApp, Telegram, OpenAI, Claude and Gemini.
+- [Free Diagnostic](https://aivory.uk/free-diagnostic): Free AI readiness diagnostic for businesses.
+- [Lead Qualification Template](https://aivory.uk/templates/lead-qualification): Ready-to-use AI agent template for lead qualification.
+
+## Pricing
+
+- [Pricing](https://aivory.uk/pricing): Plans for small and medium businesses.
+
+## Company
+
+- [About](https://aivory.uk/about): Company background, mission and founder Irfan Reichmann.
+- [Company](https://aivory.uk/company): Corporate information.
+- [Careers](https://aivory.uk/careers): Open positions.
+- [Contact](https://aivory.uk/contact): Sales and general inquiries.
+- [NVIDIA Inception](https://aivory.uk/nvidia-inception): Aivory is a member of the NVIDIA Inception Program.
+- [Investor Relations](https://aivory.uk/investor-relations): Aivory is privately held; beware of fraudulent investment offers.
+
+## Resources
+
+- [Blog](https://aivory.uk/blog): Practical guides on AI transformation, agentic AI, workflow automation and AI ROI.
+- [Glossary](https://aivory.uk/glossary): Definitions of key AI operations terms.
+
+## Key facts
+
+- Founded: 2024
+- Founder & CEO: Irfan Reichmann
+- Headquarters: United Kingdom
+- Languages: English, Indonesian (+ localized pages in Arabic, German, Spanish, French, Japanese, Korean, Dutch, Portuguese, Chinese)
+- Contact: https://aivory.uk/contact

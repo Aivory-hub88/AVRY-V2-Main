@@ -6,7 +6,6 @@ export const metadata: Metadata = {
   description: "Sign in to your Aivory workspace.",
   alternates: {
     canonical: "/login",
-    languages: { en: "/login", id: "/login" },
   },
   robots: { index: false, follow: false },
 };

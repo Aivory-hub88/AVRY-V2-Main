@@ -17,6 +17,27 @@ import { getServiceUrl } from "./services";
 const STORAGE_KEY = "aivory_auth";
 
 /**
+ * A tier as stored against a user.
+ *
+ * Three things are conflated in this one field by the backend and are kept
+ * together for that reason: the no-plan value (`free`), the one-time products
+ * that grant a feature flag (`snapshot`, `blueprint`), and the subscription
+ * tiers (`operational`, `business`, `enterprise`). The subscription names are
+ * the 2026 rebrand ids; `foundation` and `pro` are their pre-rebrand aliases
+ * and may still appear on rows written before the rename.
+ */
+export type UserTier =
+  | "free"
+  | "snapshot"
+  | "blueprint"
+  | "operational"
+  | "business"
+  | "enterprise"
+  // Pre-rebrand aliases, still present on older rows.
+  | "foundation"
+  | "pro";
+
+/**
  * User interface — derived from the Supabase user. `account_type`/`tier` live
  * in Supabase user_metadata; completion flags default to false until the user
  * profile endpoint provides them.
@@ -27,7 +48,7 @@ export interface User {
   account_type: "free" | "demo" | "superadmin" | "admin";
   company_name?: string;
   created_at: string;
-  tier: "free" | "snapshot" | "blueprint" | "enterprise";
+  tier: UserTier;
   is_subscribed: boolean;
   has_diagnostic: boolean;
   has_snapshot: boolean;
@@ -97,10 +118,43 @@ function mapUser(
   };
 }
 
-/** Check if a user session is present (synchronous). */
+/**
+ * Whether a JWT's `exp` has passed.
+ *
+ * Read without a library: a JWT payload is base64url JSON, and this only needs
+ * the expiry claim. Signature verification is the server's job — the point here
+ * is not to trust the token, it is to stop presenting an expired one as a live
+ * session. A token we cannot parse is treated as live so a malformed-but-
+ * accepted token is never silently discarded on the client.
+ *
+ * The 30-second grace absorbs clock skew between the browser and the issuer.
+ */
+function isTokenExpired(token: string | undefined | null): boolean {
+  if (!token) return true;
+  const segment = token.split('.')[1];
+  if (!segment) return false;
+  try {
+    const json = atob(segment.replace(/-/g, '+').replace(/_/g, '/'));
+    const exp = (JSON.parse(json) as { exp?: number }).exp;
+    if (typeof exp !== 'number') return false;
+    return Date.now() / 1000 > exp + 30;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a live user session is present (synchronous).
+ *
+ * This used to return true whenever a token merely existed, so an expired
+ * session still looked signed in: the navbar showed the user's name while every
+ * authenticated call came back 401. Checkout was where that surfaced worst — a
+ * customer solved the bot challenge, pressed pay, and got "Invalid or expired
+ * token" from the gateway with no way to tell what had gone wrong.
+ */
 export function isAuthenticated(): boolean {
   const session = readPersistedSession();
-  return Boolean(session?.access_token);
+  return Boolean(session?.access_token) && !isTokenExpired(session?.access_token);
 }
 
 /** Get the current user from the persisted session (synchronous). */
@@ -219,6 +273,15 @@ function clearAuthCookies(): void {
 }
 
 /** Login with email + password — uses the backend auth service (works locally without Supabase). */
+/** Thrown by login() when the account is inside its 32h no-purchase window. */
+export class PaymentRequiredError extends Error {
+  deadlineAt: string;
+  constructor(deadlineAt: string) {
+    super("payment_required");
+    this.deadlineAt = deadlineAt;
+  }
+}
+
 export async function login(email: string, password: string): Promise<User> {
   const backendUrl = getServiceUrl("backend");
   const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
@@ -229,7 +292,11 @@ export async function login(email: string, password: string): Promise<User> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Login failed");
+    const detail = err.detail;
+    if (res.status === 402 && detail && typeof detail === "object" && detail.error === "payment_required") {
+      throw new PaymentRequiredError(detail.deadline_at);
+    }
+    throw new Error(typeof detail === "string" ? detail : "Login failed");
   }
 
   const data = await res.json();
@@ -254,6 +321,77 @@ export async function login(email: string, password: string): Promise<User> {
     window.dispatchEvent(new Event("authManager:login"));
   }
   return mapUser(session.user!, session.access_token);
+}
+
+/**
+ * Ask the backend to email a password reset link.
+ *
+ * Resolves for any address. The backend deliberately answers identically
+ * whether or not the email is registered — surfacing a difference here would
+ * hand anyone an account-enumeration oracle from an unauthenticated page — so
+ * the caller must show the same "check your inbox" message either way.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const backendUrl = getServiceUrl("backend");
+  const res = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, audience: "user" }),
+  });
+
+  // Only a transport/server failure is worth reporting; a 200 says nothing
+  // about whether the address exists, by design.
+  if (!res.ok) {
+    throw new Error("Could not start the reset. Please try again.");
+  }
+}
+
+/**
+ * Check whether a reset link is still usable, without consuming it, so the
+ * page can say "this link has expired" before the user types a new password.
+ */
+export async function checkResetToken(
+  token: string
+): Promise<{ valid: boolean; email?: string }> {
+  const backendUrl = getServiceUrl("backend");
+  try {
+    const res = await fetch(
+      `${backendUrl}/api/v1/auth/reset-password/check?token=${encodeURIComponent(token)}`
+    );
+    if (!res.ok) return { valid: false };
+    const data = await res.json();
+    return { valid: Boolean(data?.valid), email: data?.email };
+  } catch {
+    return { valid: false };
+  }
+}
+
+/**
+ * Redeem a reset link and set the new password.
+ *
+ * The backend drops every session for the account on success, so any persisted
+ * session in this browser is stale afterwards and is cleared here.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string
+): Promise<void> {
+  const backendUrl = getServiceUrl("backend");
+  const res = await fetch(`${backendUrl}/api/v1/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Could not reset the password");
+  }
+
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(STORAGE_KEY);
+    clearAuthCookies();
+  }
 }
 
 /** Logout — clears localStorage and optionally redirects home. */

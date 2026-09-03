@@ -4,6 +4,7 @@
  */
 
 import { User } from "./auth";
+import type { UserTier } from "./auth";
 
 /**
  * User state interface
@@ -28,10 +29,8 @@ export interface UserState {
  */
 export type Language = "en" | "id";
 
-/**
- * User tier type
- */
-export type UserTier = "free" | "snapshot" | "blueprint" | "enterprise";
+/** Re-exported so existing `@/lib/user-state` importers keep working. */
+export type { UserTier };
 
 /**
  * Default user state

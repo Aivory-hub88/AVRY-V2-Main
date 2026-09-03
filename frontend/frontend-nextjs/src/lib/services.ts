@@ -60,3 +60,25 @@ export function getServiceUrl(name: ServiceName): string {
   }
   return SERVICE_URLS[name];
 }
+
+/**
+ * Like `getServiceUrl`, but returns `null` when the base is not usable by
+ * `fetch` in the current environment.
+ *
+ * The public URLs are deliberately relative in production (`/api/careers`), so
+ * the browser goes through Traefik on whatever host it is already on. A
+ * relative base is fine there and unusable on the server, where `fetch`
+ * demands an origin.
+ *
+ * That gap is exactly what happens during `docker build`: the NEXT_PUBLIC_*
+ * args are set for the builder stage but the *_SERVICE_URL ones are only set
+ * on the runner, so prerendering fell through to the relative URL and threw
+ * ERR_INVALID_URL. Returning null lets callers skip the fetch and serve their
+ * empty state, which is the correct build-time answer anyway — the service
+ * containers are not on the network during a build.
+ */
+export function resolveFetchBase(name: ServiceName): string | null {
+  const base = getServiceUrl(name);
+  if (!isServer) return base;
+  return /^https?:\/\//i.test(base) ? base : null;
+}

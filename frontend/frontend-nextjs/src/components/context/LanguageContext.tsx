@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { FX_MARGIN_MULTIPLIER } from '@/lib/checkout-format';
 
 type Language = 'en' | 'id';
 
@@ -49,8 +50,10 @@ export function LanguageProvider({
     if (language === 'en') {
       return `$${usdPrice}`;
     } else {
-      // Convert to IDR with 5% margin
-      const idrValue = usdPrice * (exchangeRate * 1.05);
+      // Margin lives in one place now — see FX_MARGIN_MULTIPLIER. It has to
+      // track FX_MARGIN_PERCENT on the payments service, which decides what
+      // is actually charged.
+      const idrValue = usdPrice * (exchangeRate * FX_MARGIN_MULTIPLIER);
       
       // Format IDR nicely
       if (idrValue >= 1000000) {

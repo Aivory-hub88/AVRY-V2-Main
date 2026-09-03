@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 
 import { trackEvent } from '@/lib/analytics';
+import { recordFunnelEvent } from '@/lib/assessmentFunnel';
 import { useLanguage } from '@/components/context/LanguageContext';
 import { getAssessmentCopy, type AssessmentStrings, type Locale } from '@/lib/assessmentCopy';
 
@@ -369,6 +370,55 @@ function generateDiagnosticId(): string {
 // ============================================================================
 // COMPONENT
 // ============================================================================
+/**
+ * Nudge obvious address typos before they cost a lead.
+ *
+ * A mistyped domain passes every syntax check and then bounces silently, so the
+ * visitor believes the report is coming and it never arrives. This only ever
+ * SUGGESTS — the visitor can ignore it and submit the same address again — so a
+ * wrong guess costs nothing, while `gmial.com` costs a lead.
+ */
+const COMMON_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.id', 'ymail.com',
+  'hotmail.com', 'outlook.com', 'live.com', 'msn.com', 'aol.com',
+  'icloud.com', 'me.com', 'proton.me', 'protonmail.com',
+];
+
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(
+        prev[j] + 1,
+        cur[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+function suggestEmailFix(address: string): string | null {
+  const at = address.lastIndexOf('@');
+  if (at < 1) return null;
+  const local = address.slice(0, at);
+  const domain = address.slice(at + 1).toLowerCase();
+  if (!domain || COMMON_EMAIL_DOMAINS.includes(domain)) return null;
+
+  let best: string | null = null;
+  let bestDistance = Infinity;
+  for (const candidate of COMMON_EMAIL_DOMAINS) {
+    const d = editDistance(domain, candidate);
+    if (d < bestDistance) { bestDistance = d; best = candidate; }
+  }
+  // Distance 2 catches gmial/gmai.com; beyond that a real company domain
+  // starts looking like a near miss, and suggesting one would be noise.
+  return best && bestDistance > 0 && bestDistance <= 2 ? `${local}@${best}` : null;
+}
+
 export default function FreeDiagnosticClient() {
   const [step, setStep] = useState<Step>('profile');
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -377,6 +427,7 @@ export default function FreeDiagnosticClient() {
   const [industry, setIndustry] = useState('');
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [downloading, setDownloading] = useState(false);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [unlocked, setUnlocked] = useState(false);
   const [submittingLead, setSubmittingLead] = useState(false);
@@ -401,6 +452,12 @@ export default function FreeDiagnosticClient() {
   const handleProfileContinue = () => {
     if (!isProfileValid) return;
     trackEvent('assessment_start', { industry, company_size: companySize });
+    recordFunnelEvent('start', {
+      locale: language,
+      industry,
+      companySize,
+      questionSetVersion: QUESTION_SET_VERSION,
+    });
     setStep('question');
     setQuestionIndex(0);
   };
@@ -436,6 +493,14 @@ export default function FreeDiagnosticClient() {
       step_number: questionIndex + 1,
       question_id: QUESTION_SPEC[questionIndex].id,
     });
+    recordFunnelEvent('step', {
+      step: questionIndex + 1,
+      locale: language,
+      questionSetVersion: QUESTION_SET_VERSION,
+    });
+    // language is intentionally omitted: switching language mid-assessment
+    // should not re-fire the step, it is the same person on the same question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, questionIndex]);
 
   /**
@@ -543,6 +608,12 @@ export default function FreeDiagnosticClient() {
   useEffect(() => {
     if (step !== 'results') return;
     trackEvent('assessment_complete', { score, maturity, industry, company_size: companySize });
+    recordFunnelEvent('complete', {
+      locale: language,
+      industry,
+      companySize,
+      questionSetVersion: QUESTION_SET_VERSION,
+    });
     // Fire once on arrival at the results screen, not on every score recompute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
@@ -561,8 +632,23 @@ export default function FreeDiagnosticClient() {
       setEmailError(copy.ui.emailInvalid);
       return;
     }
+    // Offer a correction once. Submitting the same address again clears the
+    // suggestion and goes through, so this can never trap a real domain.
+    const suggestion = suggestEmailFix(trimmed);
+    if (suggestion && suggestion !== emailSuggestion) {
+      setEmailSuggestion(suggestion);
+      setEmailError('');
+      return;
+    }
+
     setEmailError('');
+    setEmailSuggestion(null);
     setSubmittingLead(true);
+
+    // The one failure the visitor can act on: the domain refuses mail, so the
+    // report would be generated and sent nowhere. Everything else still
+    // unlocks — a backend problem is ours to see in the logs, not theirs.
+    let undeliverable = false;
 
     try {
       const res = await fetch('/api/assessment-lead', {
@@ -584,14 +670,30 @@ export default function FreeDiagnosticClient() {
         }),
         signal: AbortSignal.timeout(10000),
       });
+      if (res.status === 400) {
+        const detail = await res.json().catch(() => null);
+        if (detail?.error === 'undeliverable_domain') {
+          undeliverable = true;
+          setEmailError(copy.ui.emailUndeliverable);
+          trackEvent('assessment_lead_undeliverable', { score, maturity, industry });
+        }
+      }
       if (!res.ok) throw new Error(`lead capture responded ${res.status}`);
       trackEvent('assessment_lead_submitted', { score, maturity, industry });
+      recordFunnelEvent('lead', {
+        locale: language,
+        industry,
+        companySize,
+        questionSetVersion: QUESTION_SET_VERSION,
+      });
     } catch (err) {
       console.error('Lead capture failed:', err);
       trackEvent('assessment_lead_error', { score, maturity, industry });
     } finally {
       setSubmittingLead(false);
     }
+
+    if (undeliverable) return;
 
     setSubmittedEmail(trimmed);
     setUnlocked(true);
@@ -904,7 +1006,7 @@ export default function FreeDiagnosticClient() {
                       aria-label="Work email"
                       aria-invalid={emailError ? true : undefined}
                       value={email}
-                      onChange={e => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+                      onChange={e => { setEmail(e.target.value); if (emailError) setEmailError(''); if (emailSuggestion) setEmailSuggestion(null); }}
                       onKeyDown={e => { if (e.key === 'Enter' && !submittingLead) handleUnlock(); }}
                       disabled={submittingLead || downloading}
                     />
@@ -918,6 +1020,18 @@ export default function FreeDiagnosticClient() {
                     </button>
                   </div>
                   {emailError && <div className="email-gate-error" role="alert">{emailError}</div>}
+                  {emailSuggestion && (
+                    <div className="email-gate-suggestion" role="status">
+                      {copy.ui.emailDidYouMean(emailSuggestion)}{' '}
+                      <button
+                        type="button"
+                        className="email-gate-suggestion-apply"
+                        onClick={() => { setEmail(emailSuggestion); setEmailSuggestion(null); }}
+                      >
+                        {copy.ui.emailUseSuggestion}
+                      </button>
+                    </div>
+                  )}
                   <div className="email-gate-note">
                     {copy.ui.emailNote}
                   </div>
@@ -936,7 +1050,7 @@ export default function FreeDiagnosticClient() {
                       {/* Header — logo left, title right, matching the report spec */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '46px', width: 'auto', display: 'block', flexShrink: 0 }} />
+                        <img src="/Aivory_Signature_Grey.svg" alt="Aivory" width={448} height={56} style={{ height: '46px', width: 'auto', display: 'block', flexShrink: 0 }} />
                         <div style={{ fontSize: 28, fontWeight: 400, lineHeight: 1.35, color: '#111', textAlign: 'right', textTransform: 'uppercase' }}>{copy.card.quickAssessment}<br />{copy.card.ofBusinessOperations}</div>
                       </div>
                       <div style={{ borderBottom: '1px solid #111', marginBottom: 32 }} />
@@ -1089,7 +1203,7 @@ export default function FreeDiagnosticClient() {
                     <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #dcdcd7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: 20, fontWeight: 500, color: '#111' }}>© 2026 Aivory. All rights reserved.</div>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/Aivory_Signature_Grey.svg" alt="Aivory" style={{ height: '24px', width: 'auto', display: 'block' }} />
+                      <img src="/Aivory_Signature_Grey.svg" alt="Aivory" width={448} height={56} style={{ height: '24px', width: 'auto', display: 'block' }} />
                     </div>
                   </div>
                 </div>
@@ -1864,6 +1978,31 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--red);
+}
+
+.email-gate-suggestion {
+  margin-top: 0.625rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* A suggestion, not a warning: it reads as a quiet offer the visitor can
+   ignore, so a wrong guess never looks like a rejection. */
+.email-gate-suggestion-apply {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.email-gate-suggestion-apply:hover {
+  opacity: 0.7;
 }
 
 .email-gate-note {
