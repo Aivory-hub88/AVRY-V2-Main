@@ -1,7 +1,7 @@
 # ADR-009 — Scheduled Runs: a capable scheduler that cannot see a tenant
 
 **Status:** Proposed (engine audited and proven live; the product gap is scoped, nothing built yet)
-**Date:** 2026-09-03
+**Date:** 2026-09-03 (§6 revised 2026-09-03 late — see correction below; the "does not execute jobs" finding did not survive a fresh re-test)
 
 **Context:** "Scheduled Runs" was the remaining LobeHub-inspired candidate — let a customer say "every Monday, summarise last week's tickets" and have their agent do it unattended. This ADR reports what Cerveau already has, the one thing it lacks, and what it would actually take.
 
@@ -78,7 +78,32 @@ That last point matters more than the rest of this ADR: **there is no point scop
 
 **Phase 4 (optional) — Let agents schedule their own follow-ups.** The `cron_add`/`schedule` tools already exist; adding them to `allowed_tools` would let an agent say "I'll check back in a week." Deliberately last: it multiplies scheduled load and is the easiest way to create runaway cost.
 
-## 6. The blocker: the scheduler does not execute jobs (7 probes, reproducible)
+## 6a. Correction (2026-09-03, later same day): re-tested fresh, the scheduler fires correctly — 3 for 3
+
+Both production instances got a full stop/start that day (unrelated reason — a binary swap for ADR-008 Phase 3a's `verifier_brain`). That gave an opportunity to re-run §6's probes against a freshly-started daemon, this time deliberately controlling for a variable §6 never isolated: **timezone**.
+
+**What was different this time:**
+
+- Two shell jobs (one with an explicit `tz: "UTC"`, one relying on the documented default-to-runtime-local-timezone behavior, with the local-time math for that default done correctly by hand) and one **agent**-type job (`prompt: "Reply with exactly the single word: PONG"`) were created via the raw HTTP API, each scheduled ~3–4 minutes out.
+- All three were independently confirmed via direct `sqlite3` queries against `data/cron/jobs.db` (never trusting the API response or any tool's own claim) at both `cron_jobs.last_run`/`last_status`/`last_output` and the corresponding `cron_runs` row.
+
+**Result — all three fired, on time, with correct output:**
+
+| Job | Schedule | Fired at | Latency | Status |
+|---|---|---|---|---|
+| shell, explicit `tz: "UTC"` | 16:09:00Z | 16:09:04.225Z | 4s | `ok`, stdout matched exactly |
+| shell, default tz (server-local `Asia/Shanghai`) | 16:13:00Z (=00:13 CST) | 16:13:04.219Z | 4s | `ok`, stdout matched exactly |
+| **agent**, `security_brain` | 16:17:00Z | 16:17:20.174Z | 20s (real LLM call) | `ok`, output contained `PONG` |
+
+This directly contradicts §6 below: the scheduler is not silently discarding due jobs. `run_agent_job` (agent path) and the shell path both correctly claim, execute, and persist a run.
+
+**A real, separate footgun this surfaced, worth keeping regardless of the bug's fate:** the very first attempt (not in the table — a mis-scheduled probe, deleted before it could confuse anything) used a 5-field expression with no `tz`, written assuming UTC. The server's actual OS timezone is `Asia/Shanghai` (UTC+8), and at the moment of that request the *local* calendar day had already rolled to the 4th while UTC was still on the 3rd — so the day+month the expression named had already passed for the current year in local terms, and the scheduler correctly (per its own, documented semantics) rolled the schedule forward a **full year**. `next_run` was computed correctly the whole time; a tester reasoning in UTC without doing that conversion would watch nothing happen and reasonably conclude the job "vanished." The `cron_add` tool's own parameter schema already tells the calling LLM this in plain language (`CRON_TZ_DESCRIPTION`: *"If omitted, the schedule uses the runtime local timezone... For user-facing schedules, pass an explicit IANA timezone"*), and Cerveau's own web console auto-fills the browser's IANA timezone on every human-created job — so the guard rails exist. They just don't help a human tester reasoning about the API directly, which is exactly what §6's probes were.
+
+**What most likely explains §6's seven failed probes, honestly — not fully provable after the fact:** the daemon that ran those probes is gone (replaced by the restart), so the exact mechanism can't be re-inspected. Two candidates, not mutually exclusive: (1) the timezone footgun above, applied to probes whose expected fire time was reasoned in UTC; (2) some form of long-uptime scheduler state (the `locked_at` claim column on `cron_jobs` implies an optimistic-lock pattern — a job stuck mid-claim from an earlier fault could plausibly explain "disappears with no run row" for *that* job, though not obviously why every fresh probe afterward also failed) that a restart incidentally cleared. Given the fresh instance now fires reliably and §7's observability fix means a future recurrence would actually be traceable, this is being closed as **not currently reproducible** rather than chased further into a debug build — that instrument is for a bug that reproduces, and this one, right now, does not.
+
+**Consequence for the rest of this ADR:** §2's tenant-blindness finding is untouched by this correction — it was read directly from `run_agent_job`'s source (`grep` for `TENANT_CONTEXT.scope` across `crates/zeroclaw-runtime/src/cron/` returns nothing, confirmed again tonight), not inferred from the execution behavior this section is about. Phase 1 (Decisions 1–2) is no longer blocked on "prove the scheduler fires" — that is now done — and can proceed on its own merits whenever tenant-scoped scheduling is prioritized. One inexpensive, unrelated hardening worth doing independently of that: a staleness check (alert or self-heal if an `enabled=1` job's `next_run` sits more than a few minutes in the past) would catch a future silent-stall recurrence immediately instead of waiting for a customer to notice — cheap, and directly targets the failure mode this section could never fully rule out.
+
+## 6. The blocker: the scheduler does not execute jobs (7 probes, reproducible) — superseded, see §6a
 
 **Symptom.** A job is accepted and stored correctly. At its fire time the row disappears from `cron_jobs`. `cron_runs` stays empty. Nothing observable executes. `scheduler.status` reports `ok` throughout, and `restart_count` stays 0.
 
