@@ -1,5 +1,16 @@
-.env
+node_modules/
 *.log
+
+# Never commit secrets. `.env.*` covers the timestamped .env.bak-* copies that
+# accumulate on the VPS during key rotations — those hold live credentials.
+.env
+.env.*
+!.env.example
+
+# Operational snapshots taken by hand on the VPS before an in-place edit
+# (server.js.bak-pre-*, lib/*.bak-*, endpoints.*.backup.js). They are what git
+# history is for; keeping 70+ near-identical copies in the tree helps nobody.
+# They stay on the VPS — this only keeps them out of the repo.
 *.bak*
 *.backup*
-node_modules/
+backups-*/
