@@ -157,13 +157,25 @@ Total spend for the whole exercise: **five short model calls.**
 
 **Revised assessment:** a dedicated synthesis agent (LobeHub's literal design) would earn its cost mainly at a fan-out size where raw concatenation would overwhelm the caller's own context — meaningfully more than the 2-5 delegates realistic at Aivory's current agent count. At this scale, "the caller synthesizes in its own next turn" is not a missing feature; it is the feature, and it already works. No Rust change is needed for Phase 2. Revisit only if a future fan-out width makes raw concatenation itself the bottleneck.
 
-### Phase 3 — `verifier_brain` + A2A task vocabulary (Rust)
+### Phase 3a — `verifier_brain` second-opinion sweep — 🟡 **code complete 2026-09-03, pushed to `cerveau-main` (`2325e1f9`), CI running, prod binary swap pending**
 
-- New agent whose only job is to review a *pending* `Irreversible` action and attach a structured finding (`verdict`, `reasoning`, `confidence`) to the approval row.
+Rejected the originally-planned inline hook in `approval_gate.rs`: that function runs inside `TurnCtx`, which has no `Config` in scope (only a resolved `ApprovalManager` and borrowed turn state) — threading one through would touch every turn in the system for a feature that only matters on the rare `Pending` path. Built as a decoupled periodic sweep instead, modelled on `control_plane::reaper`'s own spawn/interval shape and spawned from `daemon::boot` (where a live `Config` already exists, same as the reaper and the F-1 goal-resume drive):
+
+- `pending_approvals.rs`: new nullable `verifier_finding` column; `list_unverified_pending()` / `attach_verifier_finding()`.
+- `verifier_sweep.rs` (new): every 20s, loads unverified pending rows, runs `verifier_brain` per row through the same `agent::loop_::run` entry point cron jobs already use, with `allowed_tools: Some(vec![])` — structurally zero tools, not a policy convention — and writes back a `{"verdict","reasoning","confidence"}` finding. Fails open: a spawn/LLM/parse failure becomes a visible `"error"`-verdict finding, never a silent gap.
+- `api_approvals.rs` / `api_tenant_approvals.rs`: `verifier_finding` now surfaces in the approval JSON on both the operator and tenant-scoped routes (they share one serializer).
+- VPS config (`~/.zeroclaw-cerveau{,-b}/config.toml`, both backed up first): `[agents.verifier_brain]` with `risk_profiles.agent_verifier_brain.allowed_tools = []` and `delegation_policy.mode = "forbidden"`. Deliberately **not** added to any other agent's `delegates` list — unreachable via the `delegate` tool, invocable only by the sweep.
+
+**Why it can't approve its own finding:** approval resolution is an HTTP-only surface (`api_approvals`/`api_tenant_approvals`) with no corresponding runtime `Tool` — a model with zero tools cannot reach an HTTP route no matter what it decides to do. This is the same non-negotiable property as decision 6, just enforced by the agent having no tools at all rather than by a narrower allow-list.
+
+**Not yet started (split out of the original Phase 3 scope):** the `BackgroundTaskStatus` → A2A 7-state extension and `InputRequired` surfacing. Bundling it into this change would have coupled an orthogonal dashboard-facing vocabulary change to the verifier's storage/sweep plumbing; tracked as Phase 3b below.
+
+**Exit gate (Phase 3a):** a real `Irreversible`-tier call produces a pending approval that gets a `verifier_finding` attached within one 20s sweep interval, visible through the existing tenant-scoped route; verifier structurally cannot resolve any approval (zero tools, not tested-and-hoped — provable by inspection of its risk profile). Pending: prod binary swap + one live-fired Irreversible call observed end-to-end on both instances.
+
+### Phase 3b — A2A task vocabulary (Rust) — not started
+
 - Extend `BackgroundTaskStatus` to the A2A 7-state set; surface `InputRequired` through the existing tenant-scoped approval/notification path (it is the same UX as an approval prompt).
 - Cheap layer unchanged: the risk gate still fires on 100% of traffic.
-
-**Exit gate:** a real `finance_invoice_ops` money-touching call produces a pending approval *with* a verifier finding attached, resolvable through the existing tenant-scoped route; verifier cannot resolve it itself (proved by test); measured added latency and cost on flagged actions only; a sampled `Reversible` action also gets a finding, proving the sampling path.
 
 ### Phase 4 — Mission Control as a real multi-agent surface (dashboard)
 
