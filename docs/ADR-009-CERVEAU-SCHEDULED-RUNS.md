@@ -50,9 +50,9 @@ This is not a criticism of the design: vanilla zeroclaw is single-operator, and 
 
 - Tenant blindness read directly from `run_agent_job`'s body, not inferred from behaviour. This is solid.
 - The `current_tenant()` gate on graph tools was confirmed empirically hours earlier in ADR-007 §14.
-- **The scheduler did not demonstrably execute a job.** A zero-cost shell job (`echo`, no model call) scheduled via `cron once --agent analyst_brain 2m` was accepted and stored, but had not run ~5 minutes past its fire time with the daemon up the whole while (`last=never`). After a daemon restart the job vanished from `cron_jobs` with **no row in `cron_runs`** and no journal line — consistent with being dropped, not executed. `scheduler.status` reported `ok` throughout. See §7.
+- **The scheduler did not demonstrably execute a job.** A zero-cost shell job (`echo`, no model call) scheduled via `cron once --agent analyst_brain 2m` was accepted and stored, but had not run ~5 minutes past its fire time with the daemon up the whole while (`last=never`). After a daemon restart the job vanished from `cron_jobs` with **no row in `cron_runs`** and no journal line — consistent with being dropped, not executed. `scheduler.status` reported `ok` throughout. See §6.
 
-That last point matters more than the rest of this ADR: **there is no point scoping tenants onto a scheduler that may not fire.** §7 is now the first thing to settle.
+That last point matters more than the rest of this ADR: **there is no point scoping tenants onto a scheduler that may not fire.** §6 is now the first thing to settle.
 
 ## 4. Design
 
@@ -78,7 +78,7 @@ That last point matters more than the rest of this ADR: **there is no point scop
 
 **Phase 4 (optional) — Let agents schedule their own follow-ups.** The `cron_add`/`schedule` tools already exist; adding them to `allowed_tools` would let an agent say "I'll check back in a week." Deliberately last: it multiplies scheduled load and is the easiest way to create runaway cost.
 
-## 7. The blocker: the scheduler does not execute jobs (5 probes, reproducible)
+## 6. The blocker: the scheduler does not execute jobs (5 probes, reproducible)
 
 **Symptom.** A job is accepted and stored correctly. At its fire time the row disappears from `cron_jobs`. `cron_runs` stays empty. Nothing observable executes. `scheduler.status` reports `ok` throughout, and `restart_count` stays 0.
 
@@ -102,7 +102,7 @@ Probe 3 is the important one: it rules out "shell commands are blocked by the se
 
 **Consequence for this ADR: Phase 1 does not start until this is fixed.** Scoping tenants onto a scheduler that discards its jobs would produce a feature that appears to work in the UI and silently never runs — the worst possible failure mode for something a customer relies on to happen at 3am.
 
-## 8. Found on the way: observability config had been silently dead
+## 7. Found on the way: observability config had been silently dead
 
 `[observability]` carried three keys from an older Cerveau schema — `runtime_trace_mode`, `runtime_trace_path`, `runtime_trace_max_entries` — which the current binary does not know. The whole section therefore failed to parse and was "reset to defaults for this run" **on every start, on both instances**, for however long the binary has been ahead of the config.
 
@@ -110,7 +110,7 @@ Practical effect: `backend` and `log_persistence` were inert, so nothing configu
 
 Predates this work (confirmed against the pre-change backup). Stale keys removed on both config directories; the section now parses and the warning is gone. Enabling `log_persistence` still did not produce a trace file, so there is a second, separate gap in that path worth its own look.
 
-## 9. Cost and risk notes
+## 8. Cost and risk notes
 
 - Scheduler probing cost **zero model calls** for four of five probes — shell jobs need no LLM. Any future scheduler-plumbing verification should use shell jobs for the same reason; only tenant-capability checks need a real agent turn. — shell jobs need no LLM. Any future scheduler-plumbing verification should use shell jobs for the same reason; only tenant-capability checks need a real agent turn.
 - `max_concurrent = 4` bounds the blast radius of a bad schedule, but with per-tenant jobs the natural failure mode is N tenants × recurring jobs. Per-tenant quota (Decision 4) is the control, and it should exist *before* Phase 3 makes scheduling self-serve.
