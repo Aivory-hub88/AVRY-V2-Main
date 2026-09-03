@@ -8,6 +8,7 @@ import {
   buildSiteGraph,
 } from '@/lib/seo';
 import { LanguageProvider } from '@/components/context/LanguageContext';
+import { HtmlLangSync } from '@/components/locale/HtmlLangSync';
 import AiTrap from '@/components/security/AiTrap';
 import CanaryLink from '@/components/security/CanaryLink';
 
@@ -25,9 +26,9 @@ const doto = Doto({
 });
 
 const SITE_NAME = 'Aivory AI';
-const SITE_TITLE = 'Aivory AI: AI Infrastructure for Business Transformation';
+const SITE_TITLE = 'Aivory AI - Infrastructure for Business Transformation';
 const SITE_DESCRIPTION =
-  'Aivory helps businesses assess operations, design AI transformation blueprints, and deploy governed AI agents, workflow automation and operational intelligence.';
+  'Aivory AI helps businesses assess operations, deploy governed AI agents, and automate workflows with operational intelligence.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(AIVORY_UK_URL),
@@ -52,9 +53,14 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: AIVORY_UK_URL,
+    // en/id share one URL (client-side toggle, not separate pages), so per
+    // Google's own hreflang guidance a self-referencing en/id pair adds no
+    // real signal; `x-default` alone is the correct annotation for "one URL
+    // serves every language/region". Pages that define their own
+    // `alternates` (about/company + locale variants) replace this map with
+    // their full hreflang set, avoiding duplicate conflicting x-defaults.
     languages: {
-      en: AIVORY_UK_URL,
-      id: AIVORY_UK_URL,
+      "x-default": AIVORY_UK_URL,
     },
   },
   robots: {
@@ -94,11 +100,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${manrope.variable} ${doto.variable} antialiased scroll-smooth`}>
       <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&family=Doto:wght@400;700;900&display=swap"
-          rel="stylesheet"
-        />
-        <link rel="alternate" hrefLang="x-default" href={AIVORY_UK_URL} />
+        <link rel="preload" as="image" href="/Aivory_logo_2_2026.svg" fetchPriority="high" />
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-XYJ0EDEYS8" />
         <script
           dangerouslySetInnerHTML={{
@@ -113,6 +115,7 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-white font-manrope antialiased overflow-x-hidden w-full" style={{ fontFamily: 'var(--font-manrope), Manrope, sans-serif' }}>
         <JsonLd data={buildSiteGraph(AIVORY_UK_URL)} />
+        <HtmlLangSync />
         <LanguageProvider initialLanguage="en">
           <AiTrap />
           <CanaryLink />

@@ -9,26 +9,25 @@ import { CTAFooter } from '@/components/product/CTAFooter';
 import { DarkSectionSpotlight } from '@/components/ui/DarkSectionSpotlight';
 
 export const metadata: Metadata = {
-  title: 'Products',
+  title: 'AI Operations Platform — Autonomous AI Agents for Business',
   description:
-    'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+    'The agentic AI operations platform: diagnostics, blueprints, no-code automation and governed AI agents for your business.',
   alternates: {
     canonical: '/product',
-    languages: { en: '/product', id: '/product' },
   },
   openGraph: {
     type: 'website',
-    title: 'Products — Aivory',
+    title: 'AI Operations Platform — Autonomous AI Agents for Business | Aivory',
     description:
-      'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+      'Aivory is the agentic AI operations platform for business transformation: diagnostics, blueprints, no-code workflow automation, and autonomous AI agents deployed to Slack, HubSpot, and your CRM.',
     url: '/product',
     images: ['/hero-video-poster.jpg'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Products — Aivory',
+    title: 'AI Operations Platform — Autonomous AI Agents for Business | Aivory',
     description:
-      'Discover AI-powered tools for business transformation: diagnostics, blueprints, workflow automation, and intelligent agents.',
+      'Aivory is the agentic AI operations platform for business transformation: diagnostics, blueprints, no-code workflow automation, and autonomous AI agents deployed to Slack, HubSpot, and your CRM.',
     images: ['/hero-video-poster.jpg'],
   },
 };
@@ -42,7 +41,7 @@ export default function ProductPage() {
 
       {/* Hero Header */}
       <HeroSection
-        title="AI Infrastructure for Business Transformation"
+        title="AI Operations & Automation Platform"
         subtitle="From diagnostic to deployment — everything you need to integrate AI into your business operations."
       />
 

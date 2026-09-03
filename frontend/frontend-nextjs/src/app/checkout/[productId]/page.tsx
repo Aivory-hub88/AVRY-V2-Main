@@ -6,7 +6,6 @@ export const metadata: Metadata = {
   description: "Complete your Aivory product purchase.",
   alternates: {
     canonical: "/checkout/:productId",
-    languages: { en: "/checkout/:productId", id: "/checkout/:productId" },
   },
   robots: { index: false, follow: false },
 };

@@ -7,7 +7,6 @@ export const metadata: Metadata = {
     "Get in touch with Aivory. Contact the team about AI readiness, transformation blueprints, platform enquiries, or partnership opportunities.",
   alternates: {
     canonical: "/contact",
-    languages: { en: "/contact", id: "/contact" },
   },
   openGraph: {
     type: "website",

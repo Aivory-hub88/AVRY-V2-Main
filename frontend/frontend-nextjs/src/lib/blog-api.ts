@@ -71,7 +71,11 @@ export async function getBlogPosts(
   const baseUrl = getServiceUrl("blog");
   const url = `${baseUrl}/api/posts?page=${page}&limit=${limit}`;
 
-  const response = await fetch(url);
+  // A short timeout keeps this from hanging the whole request (or, worse,
+  // the Next.js build's static-generation step) when the internal service
+  // URL isn't reachable from wherever this runs — e.g. during `docker build`,
+  // which has no network route to the other containers.
+  const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
 
   if (!response.ok) {
     throw new Error(`Failed to fetch blog posts: ${response.statusText}`);

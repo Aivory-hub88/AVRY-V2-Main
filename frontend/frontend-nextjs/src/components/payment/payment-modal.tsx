@@ -73,15 +73,14 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
     }
   }, [isOpen, initialProduct]);
 
-  // Check authentication when modal opens
-  useEffect(() => {
-    if (isOpen && !isAuthenticated()) {
-      setStatus({
-        message: 'Please log in to access payment options',
-        type: 'info',
-      });
-    }
-  }, [isOpen]);
+  // Deliberately no status is set for a signed-out visitor. The top-level
+  // render prefers `status` over every other branch, and an `info` status
+  // falls through renderStatus() to renderPending() -- so setting one here
+  // showed "Payment Pending / Your payment is being processed." to someone
+  // who is not logged in and has no payment in flight, and made the
+  // "Authentication Required" branch of renderPaymentOptions() unreachable.
+  // That branch already carries this exact prompt, so leaving status null
+  // lets it render.
 
   // Handle payment success
   const handlePaymentSuccess = (result: PaymentTransactionResult) => {
@@ -212,7 +211,8 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
       );
 
       setStatus({
-        message: 'Payment recorded successfully!',
+        message: `Payment submitted for verification (order ${result.order_id}). ` +
+          `Access is granted once our team confirms the transfer.`,
         type: 'success',
       });
       setPaymentMethod('manual');
@@ -238,9 +238,9 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
 
   // Get user email for display
   const getUserEmail = (): string => {
-    if (!isAuthenticated()) return 'user@aivory.uk';
+    if (!isAuthenticated()) return 'user@aivory.id';
     const user = getUser();
-    return user?.email || 'user@aivory.uk';
+    return user?.email || 'user@aivory.id';
   };
 
   // Render payment options
@@ -335,9 +335,15 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/20 text-4xl">
           ✓
         </div>
-        <h3 className="mb-2 text-xl font-semibold text-text-primary">Payment Successful!</h3>
+        <h3 className="mb-2 text-xl font-semibold text-text-primary">
+          {paymentMethod === 'manual' ? 'Payment Submitted' : 'Payment Successful!'}
+        </h3>
+        {/* The manual flow writes an accurate "submitted for verification"
+            message that used to be discarded here, which left a bank
+            transfer still awaiting confirmation reading as a completed
+            payment. Show what the handler actually said. */}
         <p className="mb-4 text-text-secondary">
-          Your payment has been processed successfully.
+          {status?.message || 'Your payment has been processed successfully.'}
         </p>
         {paymentMethod === 'midtrans' && (
           <div className="w-full rounded-lg bg-bg-tertiary p-4">
@@ -444,13 +450,6 @@ export function PaymentModal({ isOpen, onClose, product: initialProduct }: Payme
       case 'loading':
         return renderLoading();
       case 'info':
-        // Not-logged-in also sets type 'info' (see the auth-check effect above),
-        // which otherwise fell through to renderPending()'s "payment being
-        // processed" hourglass — confusing for a visitor who hasn't paid
-        // anything yet. Route it to the actual auth-required view instead.
-        if (!isAuthenticated()) {
-          return renderPaymentOptions();
-        }
         if (redirectUrl) {
           return renderRedirect();
         }

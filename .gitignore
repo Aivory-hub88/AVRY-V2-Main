@@ -34,3 +34,6 @@ node_modules/
 
 # runtime database artefact, never commit
 data/
+
+# design source files don't belong in a served public/ dir
+*.ai

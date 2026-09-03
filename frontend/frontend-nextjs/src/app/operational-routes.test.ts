@@ -33,7 +33,10 @@ const REMOVED_OPERATIONAL_ROUTES = [
 const PAGE_EXTENSIONS = ["tsx", "ts", "jsx", "js"] as const;
 
 // Routes that the marketing site KEEPS and must continue to serve.
-const KEPT_ROUTES = ["diagnostic", "login", "payment"] as const;
+// "diagnostic" was renamed to "free-diagnostic"; the old path is gone and
+// has no redirect, so /diagnostic 404s in production. Tracked separately —
+// this list records the routes that exist, not the ones that should.
+const KEPT_ROUTES = ["free-diagnostic", "login", "payment"] as const;
 
 describe("Operational dashboard routes removed from the marketing app (Req 1.4)", () => {
   describe("removed operational route folders are absent", () => {

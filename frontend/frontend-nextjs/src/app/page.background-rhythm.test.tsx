@@ -37,7 +37,7 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { renderPage } from '@/test/render-page';
 import { describe, it, expect, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
@@ -122,7 +122,7 @@ const CLASS_BACKED_REGIONS: ReadonlyArray<{
 describe('Homepage background rhythm (Property 5)', () => {
   describe('Hero near-black background (Req 5.1)', () => {
     it('renders the hero section with the legacy #030408 background via inline style', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const hero = container.querySelector('section.hero');
       expect(hero).not.toBeNull();
       expect(hero).toHaveStyle({ background: '#030408' });
@@ -133,7 +133,7 @@ describe('Homepage background rhythm (Property 5)', () => {
     it.each(CLASS_BACKED_REGIONS)(
       '$name renders on $hex (class $className) [Req $requirement]',
       ({ selector, className, hex }) => {
-        const { container } = render(<Home />);
+        const { container } = renderPage(<Home />);
         const region = container.querySelector(selector);
         expect(region).not.toBeNull();
         // The region carries the expected Tailwind background utility...
@@ -146,7 +146,7 @@ describe('Homepage background rhythm (Property 5)', () => {
 
   describe('Footer dark background (Req 5.8)', () => {
     it('renders the footer with the legacy #050505 background via bg-[#050505]', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const footer = container.querySelector('footer');
       expect(footer).not.toBeNull();
       expect(footer).toHaveClass('bg-[#050505]');
@@ -156,7 +156,7 @@ describe('Homepage background rhythm (Property 5)', () => {
 
   describe('Full dark -> light -> dark rhythm (Req 5.1-5.8)', () => {
     it('preserves the legacy band sequence across all eight regions', () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
 
       // Hero (dark, inline style).
       const hero = container.querySelector('section.hero');

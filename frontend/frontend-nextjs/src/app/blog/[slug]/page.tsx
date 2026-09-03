@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 import { getBlogPost, type BlogPostDetail, type BlogContentBlock } from "@/lib/blog-api"
@@ -11,6 +12,7 @@ import {
   absoluteUrl,
   richContentToPlainText,
   clampDescription,
+  createFaqPageFromEntries,
   JsonLd,
 } from "@/lib/seo"
 
@@ -20,11 +22,10 @@ function postDescription(post: BlogPostDetail): string {
 }
 
 export async function generateMetadata(
-  props: { params: Promise<{ slug: string }> },
+  props: { params: Promise<{ slug: string }> }
 ): Promise<Metadata> {
   const { slug } = await props.params
   let post: BlogPostDetail | null = null
-
   try {
     post = await getBlogPost(slug)
   } catch {
@@ -32,7 +33,7 @@ export async function generateMetadata(
   }
 
   if (!post) {
-    return { title: "Article not found", robots: { index: false, follow: false } }
+    return { title: "Post not found", robots: { index: false, follow: false } }
   }
 
   const description = postDescription(post)
@@ -44,7 +45,6 @@ export async function generateMetadata(
     description,
     alternates: {
       canonical: url,
-      languages: { en: url, id: url },
     },
     openGraph: {
       type: "article",
@@ -88,35 +88,16 @@ function ArticleArrow() {
   )
 }
 
-function InlineLink({ block }: { block: BlogContentBlock }) {
-  const href = block.href || "#"
-  const className =
-    "inline-flex items-center gap-2 border-b border-black/55 pb-0.5 text-[#11110f] transition-opacity hover:opacity-55"
-
-  if (href.startsWith("/")) {
-    return (
-      <Link href={href} className={className}>
-        {block.text || href}
-        <ArticleArrow />
-      </Link>
-    )
-  }
-
-  return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
-      {block.text || href}
-      <ArticleArrow />
-    </a>
-  )
-}
-
 function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedacted: boolean }) {
   if (isRedacted) {
     return (
-      <div className="my-8 border-y border-black/15 py-6" role="note" aria-label="Content redacted">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-black/45">
-          Content redacted
-        </span>
+      <div
+        className="my-4 rounded-lg border border-black/10 bg-black/[0.03] px-5 py-4 flex items-center gap-3"
+        role="note"
+        aria-label="Content redacted"
+      >
+        <div className="w-1 h-8 bg-black/20 rounded-full" />
+        <span className="text-black/40 text-sm italic">Content redacted</span>
       </div>
     )
   }
@@ -124,45 +105,52 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
   switch (block.type) {
     case "heading": {
       const level = block.level || 2
-      const className =
-        "mb-5 mt-16 font-light leading-[1.08] tracking-[-0.03em] text-[#11110f]"
-      if (level === 1) return <h2 className={`${className} text-[36px] md:text-[48px]`}>{block.text}</h2>
-      if (level === 3) return <h3 className={`${className} text-[28px] md:text-[34px]`}>{block.text}</h3>
-      if (level === 4) return <h4 className={`${className} text-[23px] md:text-[28px]`}>{block.text}</h4>
-      if (level === 5) return <h5 className={`${className} text-[20px] md:text-[23px]`}>{block.text}</h5>
-      if (level === 6) return <h6 className={`${className} font-mono text-[12px] uppercase tracking-[0.14em]`}>{block.text}</h6>
-      return <h2 className={`${className} text-[32px] md:text-[42px]`}>{block.text}</h2>
+      const sizeClasses: Record<number, string> = {
+        1: "text-3xl font-light tracking-[-0.02em]",
+        2: "text-2xl font-light tracking-[-0.015em]",
+        3: "text-xl font-normal",
+        4: "text-lg font-normal",
+        5: "text-base font-medium",
+        6: "text-sm font-medium",
+      }
+      const className = `${sizeClasses[level] || sizeClasses[2]} text-[#11110f] mt-8 mb-3`
+      if (level === 1) return <h1 className={className}>{block.text}</h1>
+      if (level === 3) return <h3 className={className}>{block.text}</h3>
+      if (level === 4) return <h4 className={className}>{block.text}</h4>
+      if (level === 5) return <h5 className={className}>{block.text}</h5>
+      if (level === 6) return <h6 className={className}>{block.text}</h6>
+      return <h2 className={className}>{block.text}</h2>
     }
 
     case "paragraph":
       return (
         <p
-          className="mb-7 text-[17px] font-light leading-[1.85] text-[#272722] md:text-[19px]"
+          className="text-black/70 leading-relaxed mb-4 text-[16px] font-light"
           dangerouslySetInnerHTML={{ __html: formatInlineMarkup(block.text || "") }}
         />
       )
 
-    case "code":
+    case "code": {
       return (
-        <pre className="my-8 overflow-x-auto border border-black/15 bg-[#11110f] p-6">
-          <code className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-[#efeee8]">
+        <pre className="my-4 rounded-lg bg-black/[0.04] border border-black/10 p-4 overflow-x-auto">
+          <code className="text-sm text-black/70 font-mono whitespace-pre-wrap">
             {block.text}
           </code>
         </pre>
       )
+    }
 
     case "list": {
       const items = block.items || []
-      const ordered = block.style === "ordered"
-      const ListTag = ordered ? "ol" : "ul"
+      const isOrdered = block.style === "ordered"
+      const ListTag = isOrdered ? "ol" : "ul"
+      const listClass = isOrdered
+        ? "list-decimal list-inside mb-4 space-y-1"
+        : "list-disc list-inside mb-4 space-y-1"
       return (
-        <ListTag
-          className={`mb-8 space-y-3 pl-6 text-[17px] font-light leading-[1.75] text-[#272722] md:text-[18px] ${
-            ordered ? "list-decimal" : "list-disc"
-          }`}
-        >
-          {items.map((item, index) => (
-            <li key={index} dangerouslySetInnerHTML={{ __html: formatInlineMarkup(item) }} />
+        <ListTag className={`${listClass} text-black/70 text-[16px] font-light`}>
+          {items.map((item, idx) => (
+            <li key={idx} dangerouslySetInnerHTML={{ __html: formatInlineMarkup(item) }} />
           ))}
         </ListTag>
       )
@@ -170,10 +158,15 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
 
     case "image":
       return (
-        <figure className="my-12">
-          <img src={block.url || ""} alt={block.alt || ""} className="w-full border border-black/10" />
+        <figure className="my-6">
+          <img
+            src={block.url || ""}
+            alt={block.alt || ""}
+            loading="lazy"
+            className="w-full rounded-lg border border-black/10"
+          />
           {block.alt && (
-            <figcaption className="mt-3 font-mono text-[10px] leading-relaxed tracking-[0.08em] text-black/50">
+            <figcaption className="text-center text-xs text-black/40 mt-2">
               {block.alt}
             </figcaption>
           )}
@@ -182,49 +175,109 @@ function ContentBlock({ block, isRedacted }: { block: BlogContentBlock; isRedact
 
     case "link":
       return (
-        <p className="mb-8 text-[15px] font-light">
-          <InlineLink block={block} />
+        <p className="mb-4">
+          <a
+            href={block.href || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#11110f] underline underline-offset-2 hover:opacity-60 transition-opacity"
+          >
+            {block.text || block.href}
+          </a>
         </p>
       )
 
     default:
-      if (!block.text) return null
-      return (
-        <p
-          className="mb-7 text-[17px] font-light leading-[1.85] text-[#272722] md:text-[19px]"
-          dangerouslySetInnerHTML={{ __html: formatInlineMarkup(block.text) }}
-        />
-      )
+      if (block.text) {
+        return (
+          <p
+            className="text-black/70 leading-relaxed mb-4 text-[16px] font-light"
+            dangerouslySetInnerHTML={{ __html: formatInlineMarkup(block.text) }}
+          />
+        )
+      }
+      return null
   }
 }
 
 function formatInlineMarkup(text: string): string {
   let html = text
   html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="font-medium text-[#11110f]">$1</strong>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="text-[#11110f] font-medium">$1</strong>')
   html = html.replace(/\*(.+?)\*/g, "<em>$1</em>")
   html = html.replace(/_(.+?)_/g, "<em>$1</em>")
   html = html.replace(
     /`(.+?)`/g,
-    '<code class="border border-black/15 bg-black/[0.04] px-1.5 py-0.5 font-mono text-[0.85em]">$1</code>',
+    '<code class="px-1.5 py-0.5 bg-black/[0.06] border border-black/10 rounded text-sm font-mono text-black/60">$1</code>'
   )
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]*)\)/g, (_match, linkText, href) => {
+    const isExternal = /^https?:\/\//.test(href)
+    const relAttr = isExternal ? ' target="_blank" rel="noopener noreferrer"' : ""
+    return `<a href="${href}" class="text-[#11110f] underline underline-offset-2 hover:opacity-60 transition-opacity"${relAttr}>${linkText}</a>`
+  })
   return html
+}
+
+/** Strips markdown emphasis/link syntax down to plain text, for JSON-LD fields that must not contain markup. */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/[*_`]/g, "")
+    .trim()
+}
+
+/**
+ * Finds a "Frequently Asked Questions" heading and pairs each following
+ * higher-level heading with its paragraph(s) into Q&A entries, stopping at
+ * the next heading of equal or shallower depth (or the end of the post).
+ */
+function extractFaqEntries(blocks: BlogContentBlock[]): { question: string; answer: string }[] {
+  const faqIndex = blocks.findIndex(
+    (b) => b.type === "heading" && /frequently asked questions|\bfaq\b/i.test(b.text || "")
+  )
+  if (faqIndex === -1) return []
+
+  const faqLevel = blocks[faqIndex].level ?? 2
+  const entries: { question: string; answer: string }[] = []
+  let current: { question: string; answer: string[] } | null = null
+
+  for (let i = faqIndex + 1; i < blocks.length; i++) {
+    const block = blocks[i]
+    if (block.type === "heading") {
+      if ((block.level ?? 2) <= faqLevel) break
+      if (current) entries.push({ question: current.question, answer: stripMarkdown(current.answer.join(" ")) })
+      current = { question: stripMarkdown(block.text || ""), answer: [] }
+      continue
+    }
+    if (current && block.type === "paragraph" && block.text) {
+      current.answer.push(block.text)
+    }
+  }
+  if (current) entries.push({ question: current.question, answer: stripMarkdown(current.answer.join(" ")) })
+
+  return entries.filter((entry) => entry.question && entry.answer)
 }
 
 export const revalidate = 60
 
 export default async function BlogPostPage(props: { params: Promise<{ slug: string }> }) {
-  const { slug } = await props.params
+  const params = await props.params
+  const slug = params.slug
+
   let post: BlogPostDetail | null = null
   let error: string | null = null
 
   try {
-    post = await getBlogPost(slug)
+    const data = await getBlogPost(slug)
+    if (data === null) {
+      notFound()
+    } else {
+      post = data
+    }
   } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to load article"
+    error = err instanceof Error ? err.message : "Failed to load blog post"
   }
-
-  if (!error && post === null) notFound()
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505] font-manrope">
@@ -233,20 +286,30 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
       <main
         className="flex-1 bg-[#efeee8] text-[#11110f]"
         style={{
-          fontFamily: "'Manrope', sans-serif",
+          fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
           fontWeight: 300,
           background: "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)",
         }}
       >
         {error ? (
-          <section className="mx-auto max-w-[1480px] px-6 pb-28 pt-44 md:px-12 md:pt-56">
-            <p className="text-[24px] font-light">{error}</p>
-            <Link href="/blog" className="mt-10 inline-flex items-center gap-3 border-b border-black pb-1 text-[13px] font-light">
-              Back to newsroom <ArticleArrow />
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <p className="text-black/50 mb-6 text-[17px] font-light">{error}</p>
+            <Link
+              href="/blog"
+              className="inline-flex items-center gap-2 border-b border-black pb-1 text-[13px] font-light text-black transition-opacity hover:opacity-55"
+            >
+              Back to Blog
+              <ArticleArrow />
             </Link>
-          </section>
+          </div>
         ) : post ? (
-          <article>
+          <article className="max-w-3xl mx-auto px-6 py-24 md:py-32">
+            {(() => {
+              const faqEntries = extractFaqEntries(post.body?.blocks || [])
+              return faqEntries.length > 0 ? (
+                <JsonLd data={createFaqPageFromEntries(absoluteUrl(`/blog/${post.slug}`), faqEntries)} />
+              ) : null
+            })()}
             <JsonLd
               data={{
                 "@context": "https://schema.org",
@@ -256,11 +319,7 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
                 image: post.thumbnail_url || undefined,
                 datePublished: post.published_at,
                 dateModified: post.published_at,
-                author: {
-                  "@type": "Organization",
-                  name: post.author_name,
-                  url: `${SITE_URL}/company`,
-                },
+                author: { "@type": "Organization", name: post.author_name },
                 publisher: ORGANIZATION,
                 mainEntityOfPage: {
                   "@type": "WebPage",
@@ -282,62 +341,59 @@ export default async function BlogPostPage(props: { params: Promise<{ slug: stri
               }}
             />
 
-            <header className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 md:pb-24 md:pt-52">
-              <Link
-                href="/blog"
-                className="inline-flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-black/55 transition-opacity hover:opacity-55"
-              >
-                Newsroom
-              </Link>
-              <h1 className="mt-10 max-w-6xl text-[44px] font-light leading-[0.98] tracking-[-0.05em] md:text-[72px] lg:text-[92px]">
-                {post.title}
-              </h1>
-              {post.excerpt && (
-                <p className="mt-10 max-w-3xl text-[19px] font-light leading-[1.65] text-black/65 md:text-[23px]">
-                  {post.excerpt}
-                </p>
-              )}
-              <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-black/25 pt-5 font-mono text-[10px] uppercase tracking-[0.13em] text-black/55">
-                <span>{post.author_name}</span>
-                <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
-              </div>
-            </header>
+            <Link
+              href="/blog"
+              className="inline-flex items-center gap-2 text-sm text-black/50 hover:text-black transition-colors mb-10 font-light"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+              </svg>
+              News &amp; Insights
+            </Link>
+
+            <h1 className="text-[32px] md:text-[46px] font-light leading-[1.05] tracking-[-0.035em] text-[#11110f] mb-6">
+              {post.title}
+            </h1>
+
+            <div className="flex items-center gap-3 text-sm text-black/50 mb-10 pb-8 border-b border-black/15 font-light">
+              <span className="text-black/70">{post.author_name}</span>
+              <span className="text-black/25">·</span>
+              <time dateTime={post.published_at}>{formatDate(post.published_at)}</time>
+            </div>
 
             {post.thumbnail_url && (
-              <figure className="mx-auto max-w-[1480px] px-6 md:px-12">
-                <div className="aspect-[16/8.5] overflow-hidden bg-[#11110f]">
-                  <img src={post.thumbnail_url} alt={post.title} className="h-full w-full object-cover" />
-                </div>
+              <figure className="mb-10">
+                <Image
+                  src={post.thumbnail_url}
+                  alt={post.title}
+                  width={1600}
+                  height={893}
+                  priority
+                  className="w-full h-auto rounded-lg border border-black/10"
+                />
               </figure>
             )}
 
-            <div className="mx-auto grid max-w-[1180px] gap-12 px-6 pb-28 pt-20 md:px-12 md:pb-40 md:pt-28 lg:grid-cols-[180px_minmax(0,760px)]">
-              <aside className="hidden lg:block">
-                <div className="sticky top-28 border-t border-black/25 pt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-black/50">
-                  Aivory Editorial
-                </div>
-              </aside>
-              <div>
-                {post.body?.blocks?.map((block, index) => (
-                  <ContentBlock
-                    key={index}
-                    block={block}
-                    isRedacted={post.redacted_sections?.includes(index) ?? false}
-                  />
-                ))}
+            <div>
+              {post.body?.blocks?.map((block, index) => (
+                <ContentBlock
+                  key={index}
+                  block={block}
+                  isRedacted={post.redacted_sections?.includes(index) ?? false}
+                />
+              ))}
+            </div>
 
-                <div className="mt-20 border-t border-black/25 pt-10">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-black/50">
-                    Continue reading
-                  </p>
-                  <Link
-                    href="/blog"
-                    className="mt-5 inline-flex items-center gap-3 text-[22px] font-light transition-opacity hover:opacity-55"
-                  >
-                    Explore News &amp; Insights <ArticleArrow />
-                  </Link>
-                </div>
-              </div>
+            <div className="mt-16 pt-8 border-t border-black/15">
+              <Link
+                href="/blog"
+                className="inline-flex items-center gap-2 text-sm text-black/50 hover:text-black transition-colors font-light"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to News &amp; Insights
+              </Link>
             </div>
           </article>
         ) : null}

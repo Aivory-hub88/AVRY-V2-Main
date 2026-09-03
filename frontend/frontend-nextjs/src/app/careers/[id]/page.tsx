@@ -99,10 +99,7 @@ export async function generateMetadata(
   return {
     title: titleParts || vacancy.title,
     description,
-    alternates: {
-      canonical: url,
-      languages: { en: url, id: url },
-    },
+    alternates: { canonical: url },
     openGraph: {
       type: "website",
       title: `${vacancy.title} — Careers at ${SITE_NAME}`,
@@ -353,7 +350,7 @@ function NotFoundState() {
             className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
             style={{
               padding: '0.75rem 1.5rem',
-              fontFamily: "'Manrope', sans-serif",
+              fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
               fontWeight: 400,
               fontSize: '0.75rem',
               letterSpacing: '0.1em',
@@ -490,7 +487,7 @@ export default async function VacancyDetailPage(props: { params: Promise<{ id: s
                 className="inline-flex items-center justify-center gap-3 text-white no-underline uppercase cursor-pointer transition-all duration-[250ms] border border-white/20 bg-black/60 hover:border-[#a3aa96] hover:bg-white/5 min-h-[44px]"
                 style={{
                   padding: '0.75rem 1.5rem',
-                  fontFamily: "'Manrope', sans-serif",
+                  fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
                   fontWeight: 400,
                   fontSize: '0.75rem',
                   letterSpacing: '0.1em',

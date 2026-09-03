@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import Image from "next/image"
 import Navbar from "@/components/home/Navbar"
 import Footer from "@/components/Footer"
 import { getBlogPosts, type BlogPost, type BlogPostsResponse } from "@/lib/blog-api"
@@ -17,7 +18,6 @@ export const metadata: Metadata = {
     "Reporting and practical analysis on business operations, governed AI, and operational transformation from Aivory.",
   alternates: {
     canonical: "/blog",
-    languages: { en: "/blog", id: "/blog" },
   },
   openGraph: {
     type: "website",
@@ -92,14 +92,17 @@ function FeaturedStory({ post }: { post: BlogPost }) {
 
       <Link
         href={`/blog/${post.slug}`}
-        className="group block aspect-[16/10] overflow-hidden bg-[#11110f] lg:col-span-7"
+        className="group relative block aspect-[16/10] overflow-hidden bg-[#11110f] lg:col-span-7"
         aria-label={`Read ${post.title}`}
       >
         {post.thumbnail_url ? (
-          <img
+          <Image
             src={post.thumbnail_url}
             alt={post.title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
+            fill
+            sizes="(min-width: 1024px) 58vw, 100vw"
+            priority
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
           />
         ) : (
           <ImageFallback title={post.title} />
@@ -115,12 +118,14 @@ function FeaturedRow({ post, index }: { post: BlogPost; index: number }) {
       href={`/blog/${post.slug}`}
       className="group flex flex-col gap-4"
     >
-      <div className="aspect-[16/10] overflow-hidden bg-[#11110f]">
+      <div className="relative aspect-[16/10] overflow-hidden bg-[#11110f]">
         {post.thumbnail_url ? (
-          <img
+          <Image
             src={post.thumbnail_url}
             alt={post.title}
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
+            fill
+            sizes="(min-width: 1024px) 33vw, 100vw"
+            className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.025]"
           />
         ) : (
           <ImageFallback title={post.title} />
@@ -176,12 +181,14 @@ function ArchiveRow({ post }: { post: BlogPost }) {
             Read article <ArticleArrow />
           </span>
         </div>
-        <div className="hidden aspect-[4/3] overflow-hidden bg-[#11110f] md:block">
+        <div className="relative hidden aspect-[4/3] overflow-hidden bg-[#11110f] md:block">
           {post.thumbnail_url ? (
-            <img
+            <Image
               src={post.thumbnail_url}
               alt=""
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+              fill
+              sizes="180px"
+              className="object-cover transition-transform duration-700 group-hover:scale-[1.035]"
             />
           ) : (
             <ImageFallback title={post.title} />
@@ -239,6 +246,8 @@ async function searchPublishedPosts(query: string): Promise<BlogPost[]> {
 
 export const revalidate = 60
 
+const WELCOME_SLUG = "welcome-to-aivory-your-ai-powered-business-automation-platform"
+
 export default async function BlogPage(props: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
@@ -266,8 +275,36 @@ export default async function BlogPage(props: {
     error = err instanceof Error ? err.message : "Failed to load newsroom articles"
   }
 
-  const featuredPosts = !query && page === 1 ? posts.slice(0, 3) : []
-  const archivePosts = featuredPosts.length > 0 ? posts.slice(3) : posts
+  const showHero = !query && page === 1
+
+  let featuredPosts: BlogPost[] = []
+  let archivePosts = posts
+  let welcomePost: BlogPost | undefined
+
+  if (showHero) {
+    if (posts.length > 0) {
+      welcomePost = posts.find((p) => p.slug === WELCOME_SLUG)
+    }
+
+    if (!welcomePost) {
+      try {
+        const allData = await getBlogPosts(1, 50)
+        welcomePost = allData.posts.find((p) => p.slug === WELCOME_SLUG)
+      } catch {
+        welcomePost = undefined
+      }
+    }
+
+    if (welcomePost) {
+      const remaining = posts.filter((p) => p.slug !== WELCOME_SLUG).slice(0, 2)
+      featuredPosts = [welcomePost, ...remaining]
+      const featuredSlugs = new Set(featuredPosts.map((p) => p.slug))
+      archivePosts = posts.filter((p) => !featuredSlugs.has(p.slug))
+    } else {
+      featuredPosts = posts.slice(0, 3)
+      archivePosts = posts.slice(3)
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#050505] font-manrope">
@@ -276,7 +313,7 @@ export default async function BlogPage(props: {
       <main
         className="flex-1 bg-[#efeee8] text-[#11110f]"
         style={{
-          fontFamily: "'Manrope', sans-serif",
+          fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
           fontWeight: 300,
           background: "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)",
         }}
@@ -305,17 +342,17 @@ export default async function BlogPage(props: {
           ])}
         />
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 md:pb-24 md:pt-52">
+        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 lg:px-24 md:pb-24 md:pt-52">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
             Newsroom
           </p>
-          <h1 className="mt-5 text-[52px] font-light leading-[0.95] tracking-[-0.055em] md:text-[82px] lg:text-[104px]">
+          <h1 className="mt-5 text-[44px] font-light leading-[1.15] tracking-[-0.02em] md:text-[64px] lg:text-[80px]">
             News &amp; Insights
           </h1>
         </section>
 
         {featuredPosts.length > 0 && (
-          <section className="mx-auto max-w-[1480px] px-6 pb-16 md:px-12 md:pb-24">
+          <section className="mx-auto max-w-[1480px] px-6 pb-16 md:px-12 lg:px-24 md:pb-24">
             <FeaturedStory post={featuredPosts[0]} />
             {featuredPosts.length > 1 && (
               <div className="mt-12 grid gap-8 border-t border-black/25 pt-10 md:grid-cols-2">
@@ -328,13 +365,13 @@ export default async function BlogPage(props: {
         )}
 
         <section aria-labelledby="all-articles-heading">
-          <div className="mx-auto max-w-[1480px] px-6 pb-8 md:px-12 md:pb-12">
+          <div className="mx-auto max-w-[1480px] px-6 pb-8 md:px-12 lg:px-24 md:pb-12">
             <h2 id="all-articles-heading" className="text-[34px] font-light tracking-[-0.035em] md:text-[52px]">
-              {query ? `Search results for “${query}”` : "All articles"}
+              {query ? `Search results for "${query}"` : "All articles"}
             </h2>
           </div>
 
-          <div className="bg-[#050505] px-6 py-8 text-white md:px-12 md:py-10">
+          <div className="bg-[#050505] px-6 py-8 text-white md:px-12 lg:px-24 md:py-10">
             <form action="/blog" method="get" role="search" className="mx-auto flex max-w-[1480px] items-end gap-4">
               <label htmlFor="newsroom-search" className="sr-only">Search newsroom</label>
               <span aria-hidden="true" className="pb-3 text-white/60">
@@ -360,7 +397,7 @@ export default async function BlogPage(props: {
             </form>
           </div>
 
-          <div className="mx-auto max-w-[1480px] px-6 pb-24 pt-12 md:px-12 md:pb-36 md:pt-16">
+          <div className="mx-auto max-w-[1480px] px-6 pb-24 pt-12 md:px-12 lg:px-24 md:pb-36 md:pt-16">
             {error ? (
               <div className="border-t border-black/25 py-16">
                 <p className="max-w-xl text-[17px] font-light leading-relaxed text-black/70">{error}</p>

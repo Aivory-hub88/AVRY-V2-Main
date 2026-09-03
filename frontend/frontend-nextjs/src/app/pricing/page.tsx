@@ -17,7 +17,6 @@ export const metadata: Metadata = {
   description: 'Simple, transparent pricing. Buy once, own the output.',
   alternates: {
     canonical: '/pricing',
-    languages: { en: '/pricing', id: '/pricing' },
   },
   openGraph: {
     title: 'Pricing | Aivory',
@@ -41,7 +40,7 @@ export default function PricingPage() {
         <main
           className="flex-1 bg-[#efeee8] text-[#11110f]"
           style={{
-            fontFamily: "'Manrope', sans-serif",
+            fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
             fontWeight: 300,
             background:
               'linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)',

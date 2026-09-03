@@ -35,19 +35,19 @@ export function FeaturedProduct({
       >
         <p
           className="text-[#dfe2d8] text-sm uppercase tracking-widest mb-4 font-light"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
         >
           {tagline}
         </p>
         <h2
           className="text-4xl md:text-5xl lg:text-6xl font-light text-white mb-6"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
         >
           {title}
         </h2>
         <p
           className="text-lg text-white/85 max-w-2xl mb-8 font-light leading-relaxed"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
         >
           {description}
         </p>
@@ -60,7 +60,7 @@ export function FeaturedProduct({
               }`}
             >
               <span className="text-accent mt-0.5 flex-shrink-0">✓</span>
-              <span style={{ fontFamily: "'Manrope', sans-serif" }}>{feature}</span>
+              <span style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>{feature}</span>
             </li>
           ))}
         </ul>
