@@ -374,14 +374,31 @@ A **shareable result URL** is the strictly better forwarding artefact: it tells 
 
 Nothing here blocks the ship in §0 — these are follow-ups, in rough priority order.
 
-1. **VPS checkout divergence at `/home/ubuntu/AVRY-V2-Main`.** ~24 files carry local
-   work never committed to `Frntend-nxt` — most notably a `TechnicalFrameButton`
-   component used in 10 files, plus uncommitted careers/blog/payment changes.
-   Every deploy in this rework copied in only the touched files rather than
-   `git pull`, specifically to avoid clobbering that work, which means the
-   divergence is undiminished and the next person to deploy this checkout
-   without knowing that will be tempted to `git pull` and lose it. Needs its
-   own commit-and-reconcile pass.
+1. **VPS checkout divergence at `/home/ubuntu/AVRY-V2-Main`.** ✅ **Resolved 2026-08-04.**
+   The divergence was larger than the ~24 files originally documented — the audit
+   found **64 modified/untracked files** (TechnicalFrameButton used in 10 files,
+   careers/blog/payment changes, the free-assessment implementation, brand assets,
+   admin-dashboard nested-repo changes, plus `.seo-backups/` and `.showcase-backups/`
+   directories). Reconcile was done carefully, non-destructively, in this order:
+   1. **Full backup** to `/home/ubuntu/backups/avry-v2-main-20260804/` — `modified-files.patch`
+      (405K, 64-file diff), `admin-dashboard.patch` (121K, nested-repo diff),
+      `untracked-files.tar.gz` (23M), and `git-status.txt` (snapshot).
+   2. **Local work committed** to a new branch `vps-local-work` (commit `70a24bd`,
+      49 files) so nothing could be lost by any later reset.
+   3. **`main` hard-reset to `origin/main`** — HEAD moved from `d41274c` to `03d1d33`,
+      pulling in the four free-assessment commits (question set, PDF, bilingual,
+      logo fix) that had been pushed to GitHub but never pulled into the VPS.
+   4. **`vps-local-work` pushed to GitHub** (`origin/vps-local-work`) — PR ready at
+      `https://github.com/Aivory-hub88/Frntend-nxt/pull/new/vps-local-work`.
+   5. **Admin-dashboard stash restored** — the nested repo's payments/users/currency/FX
+      changes are back in its working tree.
+   6. **Site verified live** — `aivory.uk` returns HTTP 200.
+   **Remaining caveat:** `main` is now clean and synced, but the VPS-local work lives
+   only on `vps-local-work`. Do **not** `git pull` on the VPS until that branch is
+   merged into `main` (5 conflict files: `package.json`, `package-lock.json`,
+   `src/app/company/page.tsx`, `src/app/free-diagnostic/page.tsx`,
+   `src/components/company/CompanyContent.tsx`). Until then, deploy by copying
+   touched files from `vps-local-work`, as before.
 2. **Indonesian copy has not been read by a native speaker.** ~110 ID strings in
    `assessmentCopy.ts` were written and only machine/self-reviewed (one real
    error — "operasi" vs "operasional", §0.2 — was caught this way and fixed;
