@@ -78,7 +78,7 @@ That last point matters more than the rest of this ADR: **there is no point scop
 
 **Phase 4 (optional) — Let agents schedule their own follow-ups.** The `cron_add`/`schedule` tools already exist; adding them to `allowed_tools` would let an agent say "I'll check back in a week." Deliberately last: it multiplies scheduled load and is the easiest way to create runaway cost.
 
-## 6. The blocker: the scheduler does not execute jobs (5 probes, reproducible)
+## 6. The blocker: the scheduler does not execute jobs (7 probes, reproducible)
 
 **Symptom.** A job is accepted and stored correctly. At its fire time the row disappears from `cron_jobs`. `cron_runs` stays empty. Nothing observable executes. `scheduler.status` reports `ok` throughout, and `restart_count` stays 0.
 
@@ -96,9 +96,16 @@ Probe 3 is the important one: it rules out "shell commands are blocked by the se
 
 **Ruled out.** The job row is written correctly — `agent_alias` persists as `analyst_brain` (checked directly in SQLite), and that alias does exist in `config.agents`, so `resolve_owning_agent` should return `Some`. The CLI and daemon share one store (`data/cron/jobs.db`); this is not a "two databases" problem.
 
-**Not established.** Where between `due_jobs` → `claim_due_jobs` → `process_due_jobs` → `run_*_job` the work is lost. Candidate paths worth reading first: the `release_job` branch in `process_due_jobs` when `resolve_owning_agent` returns `None`, and whether one-shot (`Schedule::At`) jobs are deleted before a run record is written, which would erase the failure reason along with the row.
+**Narrowed further with real tracing** (7 probes total, after §7's fix made the trace readable):
 
-**This should be diagnosed with a debug build and a real log sink, not more config toggles against production.** Five probes is enough to establish the behaviour; it is not the right tool for finding the line.
+- **The daemon consumes the row, not the CLI.** A job was scheduled and its fire time passed while the DB was read *only* through `sqlite3` — `cron list` was never invoked. The row was gone anyway. So this is not the CLI pruning expired one-shots on read.
+- **The scheduler logs nothing whatsoever at fire time.** With `log_persistence = rolling` and the trace confirmed live, the window spanning a job's fire time contains only daemon-startup lines. No due-job pickup, no claim, no run, no warning — at any severity.
+- **The tick loop is alive.** `process_due_jobs` calls `mark_component_ok` every cycle and `scheduler.status` stays `ok` with a fresh `last_ok`, so the loop runs; it simply never has work.
+- **Ruled out:** `skip_missed_run` — it only sets `enabled = 0` with `last_status = 'skipped'`, it does not delete, and our rows disappear entirely. Also not the startup "advance without executing" path, which only runs when `catch_up_on_startup` is false (it is true).
+
+**Worth fixing regardless of the root cause:** `due_jobs` swallows a missing database silently. `with_existing_initialized_connection` returns `Ok(None)` when the DB path does not exist, and `due_jobs` turns that into `Ok(Vec::new())` — indistinguishable from "nothing is due", with no log. Any path misconfiguration in this module is therefore invisible by construction.
+
+**Still not established:** which statement removes the row. **This needs a debug build with instrumentation between `due_jobs` and `process_due_jobs`, not more probing against production.** Seven probes is more than enough to characterise the behaviour; it is the wrong instrument for finding the line.
 
 **Consequence for this ADR: Phase 1 does not start until this is fixed.** Scoping tenants onto a scheduler that discards its jobs would produce a feature that appears to work in the UI and silently never runs — the worst possible failure mode for something a customer relies on to happen at 3am.
 
@@ -108,7 +115,9 @@ Probe 3 is the important one: it rules out "shell commands are blocked by the se
 
 Practical effect: `backend` and `log_persistence` were inert, so nothing configured there ever took effect — which is exactly why the scheduler's own `WARN` lines (e.g. "Cron job has no owning agent…", "failed to claim in-flight lock") were invisible during this investigation, and why the cron bug above is still undiagnosed.
 
-Predates this work (confirmed against the pre-change backup). Stale keys removed on both config directories; the section now parses and the warning is gone. Enabling `log_persistence` still did not produce a trace file, so there is a second, separate gap in that path worth its own look.
+Predates this work (confirmed against the pre-change backup). Stale keys removed on both config directories; the section now parses and the warning is gone.
+
+**The stale key also cost an hour of the investigation above.** `runtime_trace_path = "state/runtime-trace.jsonl"` sent me looking in `<config-dir>/state/`, which holds only `daemon_state.json`. The trace has been written the whole time to **`<config-dir>/data/state/runtime-trace.jsonl`** — and instance B, which never had `log_persistence` set and therefore fell through to the `rolling` default, had a live trace file sitting there all along. Tracing was never broken; the dead config section made it look that way. Both instances now sit at `rolling` explicitly.
 
 ## 8. Cost and risk notes
 
