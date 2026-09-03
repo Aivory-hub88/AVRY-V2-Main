@@ -1,7 +1,7 @@
 # ADR-008 — Cerveau multi-agent collaboration: agents that delegate to and check each other
 
-**Status:** Proposed (research complete, phasing defined, nothing implemented yet)
-**Date:** 2026-09-02
+**Status:** Phase 1 deployed 2026-09-03; Phases 2-5 proposed
+**Date:** 2026-09-02 (Phase 1 outcome appended 2026-09-03)
 **Context:** The ask was "make Cerveau more like LobeHub / Grok, make Mission Control as capable as LobeHub's, and let agents talk to and check each other — it's Rust, but it should be *more* advanced, not less." This ADR answers that with a landscape scan (what LobeHub/Grok/the A2A standard actually do in 2026), an honest audit of what Cerveau already has, and a phased build that starts from the parts that are already written and dormant.
 
 Related: [ADR-002](ADR-002-CERVEAU-TENANT-DESIGN.md) (tenant isolation), [ADR-006](ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md) (client deployment + tenant custom MCP), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), `CERVEAU-WORKING-OFFICE-PLANNING.md` (Mission Control).
@@ -111,23 +111,43 @@ The honest summary: **Cerveau's runtime is more capable than its product surface
 
 Each phase is independently shippable and independently valuable. Exit gates are live-verifiable, in the style of ADR-006.
 
-### Phase 1 — Wake the engine (config only, no Rust)
+### Phase 1 — Wake the engine (config only, no Rust) — ✅ **DEPLOYED 2026-09-03**
 
-Wire `delegates` for the six brains along their natural seams:
+> **The pairings first sketched here were wrong, and the gate count was wrong.** Both are corrected below from what the live system actually does. Kept visible rather than silently rewritten, because the mistake is the instructive part.
 
-```toml
-[agents.workflow_brain]
-delegates = [{ agent = "builder_brain", mode = "bounded" }]
+**Correction 1 — bounded mode intersects tools, so a target broader than its caller runs crippled, not refused.** `bounded_agentic_tools_are_capped_by_caller_policy` (`delegate.rs`) is explicit: a tool in the target's own profile but absent from the caller's yields *nothing*. Measured against the live envelopes:
 
-[agents.diagnostic_brain]
-delegates = [{ agent = "analyst_brain", mode = "bounded" }]
+| Agent | tools | agentic |
+|---|---|---|
+| `workflow_brain` | 2 (`tool_search`, `http_request`) | yes |
+| `comms_brain` | 5 | **no** |
+| `diagnostic_brain` | 10 | yes |
+| `security_brain` | 10 (incl. `shell`) | yes |
+| `analyst_brain` | 12 | yes |
+| `builder_brain` | 14 (incl. `shell`, `git_operations`) | yes |
 
-[agents.comms_brain]
-delegates = [{ agent = "analyst_brain", mode = "bounded" }]
-```
+So the original `workflow_brain → builder_brain` would have handed `builder_brain` two tools — no `file_write`, no `shell` — an expensive model call that cannot build anything. And `comms_brain → analyst_brain` put a non-agentic agent in the caller seat, where there is no tool loop to run a delegation from.
 
-**Exit gate:** a real Console turn where `workflow_brain` delegates a sub-task to `builder_brain` and the delegation appears in execution logs with a `task_id`; cost per turn measured before/after; no tenant-isolation regression (`tenant_isolation.rs` still green, and the delegate's memory access stays inside the caller's tenant scope).
-**Risk:** low. Config-only, reversible by deleting three lines. **The one thing to watch is cost** — every delegation is an extra model call.
+**Correction 2 — waking delegation takes four gates, not one.** `delegates` alone changes nothing; the tool never even registers:
+
+1. `agents.<caller>.delegates` — the reachability allow-list.
+2. `risk_profiles.<profile>.allowed_tools` must contain `"delegate"` — it is allow-listed like any other tool.
+3. `risk_profiles.<profile>.delegation_policy.mode = "allow"` — **defaults to `forbidden`**, fail-closed. This is the gate that silently keeps everything off.
+4. `"delegate"` in `auto_approve` — the profiles are `supervised` with `require_approval_for_medium_risk`, and the webhook/Console path has no interactive approver, so the hop is denied fail-closed. Auto-approving it is sound because the hop grants no new capability: bounded mode caps the target at the caller's own ceiling, depth is 1, and every risky action *inside* the sub-agent still hits its own per-tool gate.
+
+**What shipped** (on the user's call to enable it for every agent): a full mesh — all six agents may delegate to all five others, `bounded` everywhere, `max_delegation_depth = 1` everywhere so no chains or cycles can form.
+
+**Exit gate — met.** Verified almost entirely without spending tokens, via `config get` and `GET /api/tools?agent=<alias>`, which exposes the delegate tool's advertised target list:
+
+- each agent advertises exactly its five peers and correctly excludes itself;
+- before wiring, an untouched agent showed `(delegate tool not registered)` — the control;
+- one real hop executed end-to-end: `diagnostic_brain` → `analyst_brain` returned `analyst_brain replied: PONG`.
+
+Total spend for the whole exercise: **five short model calls.**
+
+**Cost characteristics.** The hop is opt-in per turn — the model only pays when it chooses to delegate. The measured round trip was ~65s wall clock for two model calls, so latency, not just spend, is the thing to watch on interactive paths.
+
+**Operational finding surfaced by this work:** the two instances behind HAProxy read **separate config directories** (`~/.zeroclaw-cerveau` and `~/.zeroclaw-cerveau-b`) and had already drifted 72 lines apart before any of this — instance B was missing the `obscura` MCP server, `parallel_tools`, two auto-approve entries, and had one `enabled` flag inverted. Delegation was applied to both so the feature is deterministic across the load balancer; **the pre-existing drift is untouched and still open.**
 
 ### Phase 2 — Synthesis step (small Rust)
 
