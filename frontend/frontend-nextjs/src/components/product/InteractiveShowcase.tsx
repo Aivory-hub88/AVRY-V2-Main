@@ -10,6 +10,8 @@ import {
   RoadmapAnimation as DashboardRoadmapAnimation,
   ConsoleAnimation as DashboardConsoleAnimation,
 } from "./OperationalFrameworkScenes";
+import { WorkflowAnimation } from "./WorkflowCanvasAnimation";
+export { WorkflowAnimation };
 
 const LabFlaskCanvas = dynamic(
   () => import("./LabFlask3D").then((mod) => mod.LabFlaskCanvas),
@@ -336,7 +338,7 @@ export function DiagnosticAnimation() {
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="flex items-center justify-center w-full h-full absolute inset-0"
             >
-              <span className="text-sm sm:text-base text-white/90 font-medium">
+              <span className="text-sm sm:text-base text-white/90 font-light">
                 Lets begin your Business Operations Assessment
               </span>
             </motion.div>
@@ -353,7 +355,7 @@ export function DiagnosticAnimation() {
               style={{ top: "50%", left: "50%", transformOrigin: "center" }}
             >
               <div className="flex items-center justify-between pb-3 border-b border-[#2d3125]">
-                <span className="text-sm font-medium text-white/90">Phase 1 of 4</span>
+                <span className="text-sm font-light text-white/90">Phase 1 of 4</span>
                 <span className="text-[10px] text-white/50">0/4 phases complete</span>
               </div>
               <div className="w-full h-1 bg-[#2d3125] rounded-full overflow-hidden -mt-3">
@@ -432,7 +434,7 @@ export function DiagnosticAnimation() {
               style={{ top: "50%", left: "50%", transformOrigin: "center" }}
             >
               <div className="flex items-center justify-between pb-3 border-b border-[#2d3125]">
-                <span className="text-sm font-medium text-white/90">Phase 1 of 4</span>
+                <span className="text-sm font-light text-white/90">Phase 1 of 4</span>
                 <span className="text-[10px] text-white/50">0/4 phases complete</span>
               </div>
               <div className="w-full h-1 bg-[#2d3125] rounded-full overflow-hidden -mt-3">
@@ -440,7 +442,7 @@ export function DiagnosticAnimation() {
               </div>
 
               <div className="flex flex-col mt-2">
-                <span className="text-[10px] text-white/50 font-medium mb-1">
+                <span className="text-[10px] text-white/50 font-light mb-1">
                   {currentStep.phase}
                 </span>
                 <span className="text-xs text-white/90">
@@ -514,7 +516,7 @@ export function DiagnosticAnimation() {
                   />
                 ))}
               </div>
-              <span className="text-sm sm:text-base text-[#c4c9b8] font-medium tracking-wide">
+              <span className="text-sm sm:text-base text-[#c4c9b8] font-light tracking-wide">
                 Aivory is analysing responses{dots}
               </span>
             </motion.div>
@@ -618,7 +620,7 @@ export function DiagnosticAnimation() {
       >
         <div className="w-full max-w-[80%] md:max-w-sm flex flex-col gap-4">
           <div className="text-center mb-2">
-            <span className="text-sm sm:text-base text-[#ff7a7a] font-medium tracking-wider uppercase mb-1 block">
+            <span className="text-sm sm:text-base text-[#ff7a7a] font-light tracking-wider uppercase mb-1 block">
               Critical Bottlenecks
             </span>
             <span className="text-xs text-white/70">
@@ -650,7 +652,7 @@ export function DiagnosticAnimation() {
             >
               <div className="w-2 h-2 mt-1.5 rounded-full bg-[#ff7a7a] shrink-0" />
               <div className="flex flex-col gap-0.5">
-                <span className="text-sm text-white/90 font-medium">
+                <span className="text-sm text-white/90 font-light">
                   {item.title}
                 </span>
                 <span className="text-xs text-white/70">{item.desc}</span>
@@ -713,7 +715,7 @@ export function DiagnosticAnimation() {
                   <div className="h-[4px] w-[68%] rounded-full bg-white/10" />
                   {/* mini score row */}
                   <div className="flex items-center gap-2 pt-1">
-                    <span className="text-[7px] leading-none font-semibold text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
+                    <span className="text-[7px] leading-none font-light text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
                       42%
                     </span>
                     <div className="h-[4px] flex-1 rounded-full bg-white/10 overflow-hidden">
@@ -731,7 +733,7 @@ export function DiagnosticAnimation() {
                   }}
                 />
               </div>
-              <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-medium px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+              <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-light px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                 Deep Assessment Results
               </span>
               <span className="text-xs sm:text-sm text-white/70 bg-white/10 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-4 py-1 rounded-full backdrop-blur-sm mt-2 opacity-0 animate-[fade-in-text_2.0s_ease-out_forwards]">
@@ -954,7 +956,7 @@ export function ConsoleAnimation() {
                   />
                 ))}
               </div>
-              <div className="text-white/70 text-[11px] sm:text-[12px] font-medium">
+              <div className="text-white/70 text-[11px] sm:text-[12px] font-light">
                 Analysing systems{dots}
               </div>
             </div>
@@ -962,7 +964,7 @@ export function ConsoleAnimation() {
 
           {phase === "response" && (
             <div className="flex flex-col gap-2.5 pl-1 animate-fade-in-up mt-1">
-              <div className="text-white/90 text-[12px] sm:text-[13px] font-medium">
+              <div className="text-white/90 text-[12px] sm:text-[13px] font-light">
                 Comprehensive audit complete:
               </div>
               {[
@@ -1073,7 +1075,7 @@ export function ConsoleAnimation() {
 }
 
 // ── 05. Workflow ──
-export function WorkflowAnimation() {
+export function LegacyWorkflowAnimation() {
   const [phase, setPhase] = useState<
     | "typing"
     | "sent"
@@ -1251,7 +1253,7 @@ export function WorkflowAnimation() {
                   />
                 ))}
               </div>
-              <span className="text-white/70 text-[12px] sm:text-[13px] font-medium">
+              <span className="text-white/70 text-[12px] sm:text-[13px] font-light">
                 Aivory is generating workflow
                 <span className="animate-pulse">{dots}</span>
               </span>
@@ -1318,7 +1320,7 @@ export function WorkflowAnimation() {
                 <span className="absolute top-1/2 -translate-y-1/2 -right-[6px] w-3 h-3 rounded-full bg-[#0c0d0f] border-2 border-[#c4c9b8] z-20" />
                 <div className="flex items-center gap-1 mb-1.5">
                   <span className="w-1 h-1 rounded-full bg-[#c4c9b8]" />
-                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-white/65 font-semibold">
+                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-white/65 font-light">
                     Trigger
                   </span>
                 </div>
@@ -1326,10 +1328,12 @@ export function WorkflowAnimation() {
                   <img
                     src="/integrations/icons/gmail.svg"
                     alt="Gmail"
+                    width={32}
+                    height={32}
                     className="w-5 h-5 sm:w-[22px] sm:h-[22px]"
                   />
                 </div>
-                <span className="text-[10px] sm:text-[12px] font-semibold text-white leading-none">
+                <span className="text-[10px] sm:text-[12px] font-light text-white leading-none">
                   Gmail
                 </span>
               </div>
@@ -1351,7 +1355,7 @@ export function WorkflowAnimation() {
                 <span className="absolute top-1/2 -translate-y-1/2 -right-[6px] w-3 h-3 rounded-full bg-[#0c0d0f] border-2 border-[#c1ccc8] z-20" />
                 <div className="flex items-center gap-1 mb-1.5">
                   <span className="w-1 h-1 rounded-full bg-[#c4c9b8]" />
-                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-[#c4c9b8]/80 font-semibold">
+                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-[#c4c9b8]/80 font-light">
                     AI Agent
                   </span>
                 </div>
@@ -1364,7 +1368,7 @@ export function WorkflowAnimation() {
                     <path d="M12 2l1.6 4.6L18 8.2l-4.4 1.6L12 14l-1.6-4.2L6 8.2l4.4-1.6L12 2zm6 10l.9 2.5L21 15.4l-2.1.9L18 19l-.9-2.7L15 15.4l2.1-.9L18 12zM6 13l.8 2.2L9 16l-2.2.8L6 19l-.8-2.2L3 16l2.2-.8L6 13z" />
                   </svg>
                 </div>
-                <span className="text-[10px] sm:text-[12px] font-semibold text-white leading-none">
+                <span className="text-[10px] sm:text-[12px] font-light text-white leading-none">
                   Extract
                 </span>
               </div>
@@ -1382,7 +1386,7 @@ export function WorkflowAnimation() {
                 <span className="absolute top-1/2 -translate-y-1/2 -left-[6px] w-3 h-3 rounded-full bg-[#0c0d0f] border-2 border-[#c1ccc8] z-20" />
                 <div className="flex items-center gap-1 mb-1.5">
                   <span className="w-1 h-1 rounded-full bg-[#c1ccc8]" />
-                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-white/65 font-semibold">
+                  <span className="text-[6.5px] sm:text-[8px] uppercase tracking-[0.14em] text-white/65 font-light">
                     Action
                   </span>
                 </div>
@@ -1390,10 +1394,12 @@ export function WorkflowAnimation() {
                   <img
                     src="/integrations/icons/slack.svg"
                     alt="Slack"
+                    width={16}
+                    height={16}
                     className="w-5 h-5 sm:w-[22px] sm:h-[22px]"
                   />
                 </div>
-                <span className="text-[10px] sm:text-[12px] font-semibold text-white leading-none">
+                <span className="text-[10px] sm:text-[12px] font-light text-white leading-none">
                   Slack
                 </span>
               </div>
@@ -1405,10 +1411,10 @@ export function WorkflowAnimation() {
                 className={`flex items-center justify-center gap-3 mt-1 opacity-0 ${phase === "buttons" ? "animate-fade-in-up opacity-100" : ""}`}
                 style={{ animationFillMode: "forwards" }}
               >
-                <button className="bg-transparent border border-white/20 hover:bg-white/10 text-white/80 text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-medium">
+                <button className="bg-transparent border border-white/20 hover:bg-white/10 text-white/80 text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-light">
                   Download JSON
                 </button>
-                <button className="bg-[#c1ccc8] hover:bg-[#aab5b1] text-black text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-semibold shadow-[0_0_10px_rgba(193,204,200,0.3)]">
+                <button className="bg-[#c1ccc8] hover:bg-[#aab5b1] text-black text-[10px] sm:text-xs py-1.5 px-4 sm:px-5 rounded-full transition-colors font-light shadow-[0_0_10px_rgba(193,204,200,0.3)]">
                   Deploy to n8n
                 </button>
               </div>
@@ -1618,7 +1624,7 @@ export function RoadmapAnimation() {
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className="flex items-center justify-center w-full h-full absolute inset-0 z-20"
           >
-            <span className="text-sm sm:text-base text-white/90 font-medium text-center px-4 max-w-sm">
+            <span className="text-sm sm:text-base text-white/90 font-light text-center px-4 max-w-sm">
               Generating Implementation Roadmap from System Blueprint
             </span>
           </motion.div>
@@ -1679,7 +1685,7 @@ export function RoadmapAnimation() {
                     <div className="h-[4px] w-[86%] rounded-full bg-white/10" />
                     <div className="h-[4px] w-[68%] rounded-full bg-white/10" />
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="text-[7px] leading-none font-semibold text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
+                      <span className="text-[7px] leading-none font-light text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
                         98%
                       </span>
                       <div className="h-[4px] flex-1 rounded-full bg-white/10 overflow-hidden">
@@ -1696,7 +1702,7 @@ export function RoadmapAnimation() {
                     }}
                   />
                 </div>
-                <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-medium px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-light px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                   System Blueprint
                 </span>
               </div>
@@ -1785,7 +1791,7 @@ export function RoadmapAnimation() {
                 <div
                   className={`w-10 h-10 rounded-full border flex items-center justify-center text-xs transition-all duration-500 relative z-10 ${
                     isActive
-                      ? "border-[#c4c9b8] bg-white/10 backdrop-blur-md border-white/20 text-[#c4c9b8] font-semibold scale-110 shadow-[0_0_15px_rgba(187, 226, 239,0.3)]"
+                      ? "border-[#c4c9b8] bg-white/10 backdrop-blur-md border-white/20 text-[#c4c9b8] font-light scale-110 shadow-[0_0_15px_rgba(187, 226, 239,0.3)]"
                       : "border-white/10 bg-white/5 backdrop-blur-md text-white/60 scale-100"
                   }`}
                   style={{ fontFamily: "'Doto', 'Courier New', monospace" }}
@@ -1915,6 +1921,8 @@ function IntroAnimation() {
         <img
           src="/Aivory_logo_2_2026.svg"
           alt="Aivory Agent"
+          width={383}
+          height={79}
           className="h-6 w-auto opacity-80 mx-auto"
         />
       </div>
@@ -1934,7 +1942,7 @@ function IntroAnimation() {
         </div>
 
         <div
-          className={`absolute inset-0 flex items-center justify-center text-xl md:text-2xl font-medium text-white transition-all duration-700 ease-in-out ${getLineClasses(4)}`}
+          className={`absolute inset-0 flex items-center justify-center text-xl md:text-2xl font-light text-white transition-all duration-700 ease-in-out ${getLineClasses(4)}`}
         >
           Let's find where AI fits in your business.
         </div>
@@ -1949,7 +1957,7 @@ function IntroAnimation() {
         <div
           className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-1000 ease-out ${step >= 6 ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
         >
-          <div className="text-[12px] text-[#dfe2d8] uppercase tracking-widest font-medium mb-3 mt-4 animate-text-bounce">
+          <div className="text-[12px] text-[#dfe2d8] uppercase tracking-widest font-light mb-3 mt-4 animate-text-bounce">
             SCROLL TO EXPLORE
           </div>
           <style>{`
@@ -2118,7 +2126,7 @@ export function BlueprintAnimation() {
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 className="flex items-center justify-center w-full h-full absolute inset-0 z-20"
               >
-                <span className="text-sm sm:text-base text-white/90 font-medium text-center px-4 max-w-sm">
+                <span className="text-sm sm:text-base text-white/90 font-light text-center px-4 max-w-sm">
                   Generating System Blueprint from Deep Assessment Results
                 </span>
               </motion.div>
@@ -2186,7 +2194,7 @@ export function BlueprintAnimation() {
                         <div className="h-[4px] w-[68%] rounded-full bg-white/10" />
                         {/* mini score row */}
                         <div className="flex items-center gap-2 pt-1">
-                          <span className="text-[7px] leading-none font-semibold text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
+                          <span className="text-[7px] leading-none font-light text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
                             42%
                           </span>
                           <div className="h-[4px] flex-1 rounded-full bg-white/10 overflow-hidden">
@@ -2204,7 +2212,7 @@ export function BlueprintAnimation() {
                         }}
                       />
                     </div>
-                    <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-medium px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                    <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-light px-3 py-1 bg-[#0d0d0d]/80 border border-white/5 rounded-md whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                       Deep Assessment Results
                     </span>
                   </div>
@@ -2287,7 +2295,7 @@ export function BlueprintAnimation() {
                       Data: Partially Centralised
                     </div>
                     <div
-                      className="bg-[#c4c9b8]/10 border border-[#c4c9b8]/30 rounded-md px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm text-[#c4c9b8] shadow-[0_0_15px_rgba(187, 226, 239,0.15)] font-medium whitespace-nowrap opacity-0 animate-[pop-in-pill_0.6s_ease-out_forwards]"
+                      className="bg-[#c4c9b8]/10 border border-[#c4c9b8]/30 rounded-md px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm text-[#c4c9b8] shadow-[0_0_15px_rgba(187, 226, 239,0.15)] font-light whitespace-nowrap opacity-0 animate-[pop-in-pill_0.6s_ease-out_forwards]"
                       style={{ animationDelay: "3.9s" }}
                     >
                       Score: 42%
@@ -2307,7 +2315,7 @@ export function BlueprintAnimation() {
                 </div>
               </div>
               <div className="flex flex-col items-center">
-                <span className="text-sm sm:text-base text-[#c4c9b8] uppercase tracking-widest font-medium">
+                <span className="text-sm sm:text-base text-[#c4c9b8] uppercase tracking-widest font-light">
                   Brewing Blueprint
                 </span>
                 <div className="w-32 sm:w-48 h-1 bg-white/10 rounded-full mt-4 overflow-hidden relative">
@@ -2325,7 +2333,7 @@ export function BlueprintAnimation() {
           <div
             className={`flex flex-col items-center mb-4 sm:mb-8 ${phase === "blueprint" ? "animate-[blueprint-header-enter_0.8s_ease-out_forwards]" : "opacity-0"}`}
           >
-            <span className="text-[10px] sm:text-xs text-[#c4c9b8] uppercase tracking-[0.1em] font-medium mb-1 drop-shadow-[0_0_8px_rgba(187, 226, 239,0.5)]">
+            <span className="text-[10px] sm:text-xs text-[#c4c9b8] uppercase tracking-[0.1em] font-light mb-1 drop-shadow-[0_0_8px_rgba(187, 226, 239,0.5)]">
               Tailored Blueprint
             </span>
             <span className="text-lg sm:text-xl text-white font-light text-center">
@@ -2372,7 +2380,7 @@ export function BlueprintAnimation() {
                   <span className="text-[7.5px] sm:text-[10px] text-white/65 uppercase tracking-wider mb-0.5">
                     Constraint Detected
                   </span>
-                  <span className="text-[9px] sm:text-sm text-white/90 font-medium leading-tight sm:leading-snug truncate">
+                  <span className="text-[9px] sm:text-sm text-white/90 font-light leading-tight sm:leading-snug truncate">
                     Partially Centralised Data
                   </span>
                 </div>
@@ -2394,7 +2402,7 @@ export function BlueprintAnimation() {
                   <span className="text-[7.5px] sm:text-[10px] text-[#c4c9b8]/80 uppercase tracking-wider mb-0.5">
                     Resolution Layer
                   </span>
-                  <span className="text-[9px] sm:text-sm text-white/90 font-medium leading-tight sm:leading-snug truncate">
+                  <span className="text-[9px] sm:text-sm text-white/90 font-light leading-tight sm:leading-snug truncate">
                     Autonomous Data Sync
                   </span>
                 </div>
@@ -2444,7 +2452,7 @@ export function BlueprintAnimation() {
                   <span className="text-[7.5px] sm:text-[10px] text-white/65 uppercase tracking-wider mb-0.5">
                     Objective Targeted
                   </span>
-                  <span className="text-[9px] sm:text-sm text-white/90 font-medium leading-tight sm:leading-snug truncate">
+                  <span className="text-[9px] sm:text-sm text-white/90 font-light leading-tight sm:leading-snug truncate">
                     Scale Ops (No Headcount)
                   </span>
                 </div>
@@ -2467,7 +2475,7 @@ export function BlueprintAnimation() {
                   <span className="text-[7.5px] sm:text-[10px] text-[#c4c9b8]/80 uppercase tracking-wider mb-0.5">
                     Action Engine
                   </span>
-                  <span className="text-[9px] sm:text-sm text-white/90 font-medium leading-tight sm:leading-snug truncate">
+                  <span className="text-[9px] sm:text-sm text-white/90 font-light leading-tight sm:leading-snug truncate">
                     Automated Triage Flow
                   </span>
                 </div>
@@ -2488,7 +2496,7 @@ export function BlueprintAnimation() {
             className={`mt-4 sm:mt-8 text-center ${phase === "blueprint" ? "animate-[blueprint-card-enter_0.7s_ease-out_forwards]" : "opacity-0"}`}
             style={{ animationDelay: phase === "blueprint" ? "0.6s" : "0s" }}
           >
-            <span className="text-[9px] sm:text-[10px] text-[#c4c9b8]/60 uppercase tracking-[0.15em] font-medium drop-shadow-sm">
+            <span className="text-[9px] sm:text-[10px] text-[#c4c9b8]/60 uppercase tracking-[0.15em] font-light drop-shadow-sm">
               Aivory Engine Processing Capacity: 98% Efficiency
             </span>
           </div>
@@ -2540,7 +2548,7 @@ export function BlueprintAnimation() {
                       <div className="h-[4px] w-[86%] rounded-full bg-white/10" />
                       <div className="h-[4px] w-[68%] rounded-full bg-white/10" />
                       <div className="flex items-center gap-2 pt-1">
-                        <span className="text-[7px] leading-none font-semibold text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
+                        <span className="text-[7px] leading-none font-light text-[#c4c9b8] bg-[#c4c9b8]/12 border border-[#c4c9b8]/30 rounded px-1.5 py-[3px]">
                           98%
                         </span>
                         <div className="h-[4px] flex-1 rounded-full bg-white/10 overflow-hidden">
@@ -2557,10 +2565,10 @@ export function BlueprintAnimation() {
                       }}
                     />
                   </div>
-                  <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-medium px-4 py-1.5 bg-[#0d0d0d]/80 border border-white/5 rounded-full whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                  <span className="text-[10px] sm:text-[11px] text-[#c4c9b8]/90 uppercase tracking-[0.22em] font-light px-4 py-1.5 bg-[#0d0d0d]/80 border border-white/5 rounded-full whitespace-nowrap backdrop-blur-sm shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                     System Blueprint
                   </span>
-                  <span className="text-[19px] text-white/50 font-medium tracking-wide mt-1 animate-pulse">
+                  <span className="text-[19px] text-white/50 font-light tracking-wide mt-1 animate-pulse">
                     Ready for phased rollout
                   </span>
                 </div>
@@ -2573,7 +2581,11 @@ export function BlueprintAnimation() {
   );
 }
 
-export function InteractiveShowcase() {
+export function InteractiveShowcase({
+  containedDashboard = true,
+}: {
+  containedDashboard?: boolean;
+}) {
   const [activeIndex, setActiveIndex] = useState(-1);
   const [connectedIndex, setConnectedIndex] = useState(-1);
 
@@ -2673,13 +2685,13 @@ export function InteractiveShowcase() {
               >
                 Operational Framework
               </SpotlightButton>
-              <h3 className="text-3xl md:text-4xl lg:text-5xl font-light tracking-tight mb-6 leading-tight" style={{ zoom: 0.7 }}>
+              <h3 className="text-[37px] md:text-[40px] lg:text-[46px] font-light tracking-tight mb-6 leading-tight" style={{ zoom: 0.7 }}>
                 From Operational Clarity
                 <br />
-                to <span className="italic" style={{ color: "#e4effd" }}>Intelligent Operations</span>
+                to <span style={{ color: "#e4effd" }}>Intelligent Operations</span>
               </h3>
               <p className="text-white/75 max-w-lg font-light leading-relaxed">
-                We guide organisations through every stage of transformation. From understanding how the business operates today to redesigning workflows and deploying governed AI that delivers measurable business outcomes.
+                A self-guided path through every stage of transformation. From understanding how the business operates today to redesigning workflows and deploying governed AI that delivers measurable business outcomes.
               </p>
             </div>
 
@@ -2709,7 +2721,7 @@ export function InteractiveShowcase() {
                       const words = product.title.split(" ");
                       if (words.length <= 1)
                         return (
-                          <span className="italic" style={{ color: "#e4effd" }}>
+                          <span style={{ color: "#e4effd" }}>
                             {product.title}
                           </span>
                         );
@@ -2718,7 +2730,7 @@ export function InteractiveShowcase() {
                         <>
                           {words.join(" ")}
                           {product.breakTitle ? <br /> : " "}
-                          <span className="italic" style={{ color: "#e4effd" }}>
+                          <span style={{ color: "#e4effd" }}>
                             {lastWord}
                           </span>
                         </>
@@ -2766,9 +2778,13 @@ export function InteractiveShowcase() {
                 {/* Mobile Inline Visualizer */}
                 <SpotlightCard
                   className="flex lg:hidden w-full mt-10 p-0"
-                  style={{ minHeight: "380px" }}
+                  style={{ minHeight: idx === 4 ? "460px" : "380px" }}
                 >
-                  <div className="absolute inset-0 flex flex-col overflow-hidden">
+                  <div
+                    className={`absolute flex flex-col overflow-hidden rounded-[18px] border border-white/[0.16] bg-[#353531] shadow-[0_18px_48px_rgba(0,0,0,0.48)] ${
+                      idx === 4 ? "inset-[4%]" : "inset-[7%]"
+                    }`}
+                  >
                     {idx === 0 && (
                       <div className="flex-1 relative w-full h-full">
                         <DashboardDiagnosticAnimation />
@@ -2801,9 +2817,44 @@ export function InteractiveShowcase() {
             <SpotlightCard
               autoplay={true}
               className="w-full h-full transition-all duration-500 p-0 flex flex-col shadow-2xl relative overflow-hidden"
+              style={
+                containedDashboard
+                  ? {
+                      backgroundColor: "rgba(11, 12, 18, 0.7)",
+                      backdropFilter: "blur(18px)",
+                      WebkitBackdropFilter: "blur(18px)",
+                      boxShadow:
+                        "0 28px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1)",
+                    }
+                  : undefined
+              }
             >
-              {/* Showcase Screen Layers */}
-              <div className="flex-1 relative w-full h-full">
+              {containedDashboard && (
+                <>
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        "radial-gradient(75% 80% at 50% 100%, rgba(84, 64, 170, 0.16), transparent 60%), radial-gradient(55% 60% at 8% 12%, rgba(255,255,255,0.07), transparent 62%)",
+                    }}
+                  />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 border border-white/[0.06]"
+                  />
+                </>
+              )}
+              {/* Showcase screen layers. Every product scene stays inset while retaining a substantial, readable UI scale. */}
+              <div
+                className={`relative z-10 shrink-0 transition-[width,height,border-radius,box-shadow] duration-500 ${
+                  containedDashboard && activeIndex === 4
+                    ? "m-auto h-[88%] w-[90%] max-w-[760px] overflow-hidden rounded-[22px] border border-white/[0.18] bg-[#353531] shadow-[0_24px_64px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                    : containedDashboard && activeIndex >= 0 && activeIndex <= 3
+                      ? "m-auto h-[74%] w-[82%] max-w-[680px] overflow-hidden rounded-[22px] border border-white/[0.18] bg-[#353531] shadow-[0_24px_64px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]"
+                      : "h-full w-full"
+                }`}
+              >
                 {/* Intro Screen */}
                 <div
                   className={`absolute inset-0 flex flex-col justify-center transition-all duration-700 ease-in-out ${

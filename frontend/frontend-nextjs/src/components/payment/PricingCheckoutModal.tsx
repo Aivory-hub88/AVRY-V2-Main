@@ -1,0 +1,860 @@
+'use client';
+
+/**
+ * PricingCheckoutModal — design mockup (not wired to real payments yet).
+ *
+ * Matches the /pricing section's visual language (light #dfe4e5 panel, sage
+ * #c4c9b8 accent, Manrope, flat CTA buttons) instead of the generic dark
+ * dashboard `PaymentModal`, and follows a short flow similar to Claude's
+ * upgrade flow: order summary → payment channel → channel-specific data entry
+ * (+ PIN/OTP for e-wallets) → confirmation. The data-entry step exists so the
+ * flow reads as a real checkout (for Midtrans channel-activation verification
+ * screenshots), not just a channel picker.
+ *
+ * Sign-in/sign-up is the one part of this flow that IS real: it calls the
+ * actual backend auth service (`@/lib/auth` login/signup), the same one the
+ * rest of the site uses, so testing here reflects real accounts (e.g. the
+ * seeded superadmins) — not a mock.
+ *
+ * PAYMENT MOCK ONLY: no network calls are made for the checkout itself, and
+ * no entered payment data (card number, PIN, OTP, etc.) is transmitted or
+ * stored anywhere. `handlePay` simulates a processing delay then shows a
+ * success state. Once Card/GoPay/DANA/QRIS are actually enabled on the
+ * Midtrans merchant account, wire this up to `createPaymentTransaction` /
+ * `startMidtransSnap` from `@/lib/payment` (see the existing dark
+ * `payment-modal.tsx` for the real integration) before promoting this to
+ * production.
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useLanguage } from '@/components/context/LanguageContext';
+import { getProductById, isSubscription } from '@/lib/pricing';
+import { getUser, isAuthenticated, login, signup, type User } from '@/lib/auth';
+
+export interface PricingCheckoutModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  productId: string | null;
+  currency?: 'IDR' | 'USD';
+}
+
+type Step = 'summary' | 'auth' | 'method' | 'details' | 'pin' | 'otp' | 'processing' | 'success';
+type Channel = 'card' | 'gopay' | 'dana' | 'qris';
+
+const CHANNELS: { id: Channel; label: string; sublabel: string }[] = [
+  { id: 'card', label: 'Credit / Debit Card', sublabel: 'Visa, Mastercard, JCB' },
+  { id: 'gopay', label: 'GoPay', sublabel: 'Pay with your GoPay balance' },
+  { id: 'dana', label: 'DANA', sublabel: 'Pay with your DANA balance' },
+  { id: 'qris', label: 'QRIS', sublabel: 'Scan with any e-wallet or banking app' },
+];
+
+function ChannelIcon({ id }: { id: Channel }) {
+  if (id === 'card') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#494949" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2.5" y="5.5" width="19" height="13" rx="1.8" />
+        <line x1="2.5" y1="9.5" x2="21.5" y2="9.5" />
+        <line x1="5.5" y1="14.5" x2="9.5" y2="14.5" />
+      </svg>
+    );
+  }
+  if (id === 'qris') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#494949" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="6" height="6" rx="1" />
+        <rect x="15" y="3" width="6" height="6" rx="1" />
+        <rect x="3" y="15" width="6" height="6" rx="1" />
+        <line x1="15" y1="15" x2="15" y2="21" />
+        <line x1="18" y1="15" x2="21" y2="15" />
+        <line x1="18" y1="18" x2="21" y2="18" />
+        <line x1="15" y1="21" x2="21" y2="21" />
+      </svg>
+    );
+  }
+  // GoPay / DANA — generic e-wallet mark, brand distinguished by accent color only.
+  const accent = id === 'gopay' ? '#00AA5B' : '#118EE9';
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="3" stroke={accent} strokeWidth="1.6" />
+      <circle cx="16.5" cy="12" r="1.6" fill={accent} />
+    </svg>
+  );
+}
+
+/**
+ * Decorative QR placeholder styled like a real QR code (three finder-pattern
+ * "eyes", a timing strip, and a dense data fill) so it reads as authentic in
+ * screenshots — it does not encode any data and is not scannable. Built from
+ * a pure deterministic matrix (no Math.random) so server and client render
+ * identical markup.
+ */
+const QR_SIZE = 21;
+
+function buildQrMatrix(): boolean[][] {
+  const finderZones: Array<[number, number]> = [
+    [0, 0],
+    [0, QR_SIZE - 7],
+    [QR_SIZE - 7, 0],
+  ];
+
+  const finderPixel = (localRow: number, localCol: number): boolean => {
+    if (localRow === 0 || localRow === 6 || localCol === 0 || localCol === 6) return true; // outer ring
+    if (localRow === 1 || localRow === 5 || localCol === 1 || localCol === 5) return false; // white ring
+    return true; // 3x3 core
+  };
+
+  const matrix: boolean[][] = [];
+  for (let r = 0; r < QR_SIZE; r++) {
+    const row: boolean[] = [];
+    for (let c = 0; c < QR_SIZE; c++) {
+      const zone = finderZones.find(([zr, zc]) => r >= zr && r < zr + 7 && c >= zc && c < zc + 7);
+      if (zone) {
+        row.push(finderPixel(r - zone[0], c - zone[1]));
+        continue;
+      }
+      if (r === 6 || c === 6) {
+        row.push((r + c) % 2 === 0); // timing pattern
+        continue;
+      }
+      if (r === QR_SIZE - 8 && c === 8) {
+        row.push(true); // fixed dark module
+        continue;
+      }
+      // Dense pseudo-random data fill — deterministic function of position.
+      row.push((r * 13 + c * 7 + r * c * 3) % 5 < 2);
+    }
+    matrix.push(row);
+  }
+  return matrix;
+}
+
+const QR_MATRIX = buildQrMatrix();
+
+function QrPlaceholder() {
+  return (
+    <div className="w-[176px] h-[176px] p-3 bg-white rounded-xl">
+      <svg viewBox={`0 0 ${QR_SIZE} ${QR_SIZE}`} width="100%" height="100%" shapeRendering="crispEdges">
+        <rect x={0} y={0} width={QR_SIZE} height={QR_SIZE} fill="#fff" />
+        {QR_MATRIX.map((row, r) =>
+          row.map((on, c) => (on ? <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill="#1a1a1a" /> : null))
+        )}
+      </svg>
+    </div>
+  );
+}
+
+/** A row of single-digit boxes for PIN/OTP entry, with auto-advance and backspace-to-previous. */
+function DigitBoxes({
+  length,
+  value,
+  onChange,
+  mask,
+}: {
+  length: number;
+  value: string;
+  onChange: (v: string) => void;
+  mask?: boolean;
+}) {
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
+  const digits = value.padEnd(length, ' ').split('');
+
+  const setDigit = (idx: number, char: string) => {
+    const arr = value.split('');
+    arr[idx] = char;
+    const next = arr.join('').slice(0, length);
+    onChange(next);
+  };
+
+  const handleChange = (idx: number, raw: string) => {
+    const d = raw.replace(/\D/g, '').slice(-1);
+    if (!d) return;
+    setDigit(idx, d);
+    if (idx < length - 1) refs.current[idx + 1]?.focus();
+  };
+
+  const handleKeyDown = (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (value[idx]) {
+        setDigit(idx, '');
+      } else if (idx > 0) {
+        refs.current[idx - 1]?.focus();
+        setDigit(idx - 1, '');
+      }
+    }
+  };
+
+  return (
+    <div className="flex gap-2.5 justify-center">
+      {Array.from({ length }).map((_, i) => (
+        <input
+          key={i}
+          ref={(el) => { refs.current[i] = el; }}
+          type={mask ? 'password' : 'text'}
+          inputMode="numeric"
+          maxLength={1}
+          value={digits[i] === ' ' ? '' : digits[i]}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          className="w-11 h-13 py-3 text-center text-[18px] text-[#1a1a1a] border border-[#b0b5b4] bg-white focus:outline-none focus:border-[#494949] transition-colors"
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Format a whole-dollar price into the active currency's display string (mirrors PricingStepOne/Two). */
+function formatPrice(basePriceUsd: number, activeCurrency: 'IDR' | 'USD', exchangeRate: number): string {
+  if (activeCurrency === 'USD') return `$${basePriceUsd}`;
+  const idrValue = basePriceUsd * (exchangeRate * 1.05);
+  if (idrValue >= 1000000) return `Rp ${parseFloat((idrValue / 1000000).toFixed(2))} jt`;
+  if (idrValue >= 1000) return `Rp ${Math.round(idrValue / 1000)} rb`;
+  return `Rp ${Math.round(idrValue)}`;
+}
+
+function formatCardNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 16);
+  return digits.replace(/(.{4})/g, '$1 ').trim();
+}
+
+function formatExpiry(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+}
+
+const inputClass =
+  'w-full bg-white border border-[#b0b5b4] px-3.5 py-2.5 text-[14px] text-[#1a1a1a] placeholder:text-[#8a8f8d]/70 focus:outline-none focus:border-[#494949] transition-colors';
+const labelClass = 'block text-[11px] font-medium uppercase tracking-wide text-[#8a8f8d] mb-1.5';
+
+export function PricingCheckoutModal({ isOpen, onClose, productId, currency }: PricingCheckoutModalProps) {
+  const { language, exchangeRate } = useLanguage();
+  const [step, setStep] = useState<Step>('summary');
+  const [channel, setChannel] = useState<Channel | null>(null);
+
+  // Card fields
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingPostal, setBillingPostal] = useState('');
+  const [billingCountry, setBillingCountry] = useState('Indonesia');
+
+  // GoPay / DANA fields
+  const [phone, setPhone] = useState('');
+  const [pin, setPin] = useState('');
+  const [otp, setOtp] = useState('');
+
+  // Auth — real login/signup against the backend auth service (@/lib/auth).
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+  const [authCompany, setAuthCompany] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep('summary');
+      setChannel(null);
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvv('');
+      setCardName('');
+      setBillingAddress('');
+      setBillingCity('');
+      setBillingPostal('');
+      setBillingCountry('Indonesia');
+      setPhone('');
+      setPin('');
+      setOtp('');
+      setAuthMode('signin');
+      setAuthEmail('');
+      setAuthPassword('');
+      setAuthConfirmPassword('');
+      setAuthCompany('');
+      setAuthError(null);
+      setAuthLoading(false);
+      setCurrentUser(getUser());
+    }
+  }, [isOpen, productId]);
+
+  // Rendered via a portal (below), which needs a real DOM to attach to — so
+  // wait for client mount rather than reaching for `document` during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!isOpen || !productId || !mounted) return null;
+  const product = getProductById(productId);
+  if (!product) return null;
+
+  const activeCurrency = currency || (language === 'id' ? 'IDR' : 'USD');
+  const priceLabel = formatPrice(product.price, activeCurrency, exchangeRate);
+  const intervalLabel = isSubscription(product)
+    ? activeCurrency === 'IDR' ? '/ bulan' : '/ month'
+    : activeCurrency === 'IDR' ? 'Sekali bayar' : 'One time';
+
+  const isEwallet = channel === 'gopay' || channel === 'dana';
+
+  const detailsValid =
+    channel === 'card'
+      ? cardNumber.replace(/\D/g, '').length >= 12 &&
+        cardExpiry.length === 5 &&
+        cardCvv.length >= 3 &&
+        cardName.trim().length > 1 &&
+        billingAddress.trim().length > 3 &&
+        billingCity.trim().length > 1 &&
+        billingPostal.trim().length >= 4
+      : isEwallet
+      ? phone.replace(/\D/g, '').length >= 8
+      : true; // qris has nothing to fill in
+
+  const handlePay = () => {
+    setStep('processing');
+    // MOCK: simulate a gateway round-trip. Replace with the real
+    // createPaymentTransaction()/startMidtransSnap() call from @/lib/payment
+    // once this channel is actually enabled on the Midtrans merchant account.
+    setTimeout(() => setStep('success'), 1600);
+  };
+
+  const handleDetailsContinue = () => {
+    // GoPay/DANA verify with an in-app PIN, then an SMS OTP, before Midtrans
+    // considers the charge authorized — card and QRIS go straight to paying.
+    if (isEwallet) {
+      setStep('pin');
+    } else {
+      handlePay();
+    }
+  };
+
+  const handleSummaryContinue = () => {
+    setStep(isAuthenticated() ? 'method' : 'auth');
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    if (authMode === 'signup' && authPassword !== authConfirmPassword) {
+      setAuthError('Passwords do not match.');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const user =
+        authMode === 'signin'
+          ? await login(authEmail, authPassword)
+          : await signup(authEmail, authPassword, authCompany || undefined);
+      setCurrentUser(user);
+      setStep('method');
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const channelLabel = CHANNELS.find((c) => c.id === channel)?.label ?? '';
+
+  // Portal straight to <body>: the pricing page's scroll-reveal sections use
+  // `transform`/`zoom` on ancestors, which makes `position: fixed` resolve
+  // against that transformed ancestor instead of the viewport — the modal
+  // would only "look" centered when the page happened to be scrolled to
+  // that section. Rendering outside that tree avoids the bug entirely.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-[#1a1a1a]/55 backdrop-blur-sm p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="relative w-full max-w-[440px] bg-[#dfe4e5] rounded-[28px] shadow-2xl font-sans text-[#494949] max-h-[90vh] overflow-y-auto">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-6 top-6 text-[#494949]/50 hover:text-[#494949] transition-colors text-2xl leading-none"
+        >
+          &times;
+        </button>
+
+        <div className="px-8 py-10 sm:px-10 sm:pt-10 sm:pb-9">
+          {step === 'summary' && (
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#8a8f8d]">
+                {isSubscription(product) ? 'Subscription' : 'One-time purchase'}
+              </span>
+              <h2 className="mt-3 text-[26px] leading-[1.1] font-normal text-[#1a1a1a] whitespace-pre-line">
+                {product.name}
+              </h2>
+
+              <div className="mt-8 flex items-end gap-2.5">
+                <span className="text-[40px] font-extrabold leading-none text-[#1a1a1a]">{priceLabel}</span>
+                <span className="pb-1 text-[15px] text-[#494949]">{intervalLabel}</span>
+              </div>
+              <div className="mt-3 w-full h-[4px] bg-[#c4c9b8]" />
+
+              <button
+                type="button"
+                onClick={handleSummaryContinue}
+                className="mt-10 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4]"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+
+          {step === 'auth' && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setStep('summary')}
+                className="text-[13px] text-[#8a8f8d] hover:text-[#494949] transition-colors mb-4"
+              >
+                &larr; Back
+              </button>
+              <h2 className="text-[22px] font-normal text-[#1a1a1a] mb-1">
+                {authMode === 'signin' ? 'Sign in to continue' : 'Create your account'}
+              </h2>
+              <p className="text-[14px] text-[#8a8f8d] mb-6">
+                {product.name} &middot; <span className="font-semibold text-[#494949]">{priceLabel}</span>
+              </p>
+
+              <div className="flex mb-6 border border-[#b0b5b4] rounded-full p-1 bg-white/40">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('signin'); setAuthError(null); }}
+                  className={`flex-1 py-2 text-[13px] font-medium rounded-full transition-colors ${
+                    authMode === 'signin' ? 'bg-[#c4c9b8] text-[#494949]' : 'text-[#8a8f8d]'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('signup'); setAuthError(null); }}
+                  className={`flex-1 py-2 text-[13px] font-medium rounded-full transition-colors ${
+                    authMode === 'signup' ? 'bg-[#c4c9b8] text-[#494949]' : 'text-[#8a8f8d]'
+                  }`}
+                >
+                  Sign Up
+                </button>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+                <div>
+                  <label className={labelClass}>Email</label>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="you@company.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                {authMode === 'signup' && (
+                  <div>
+                    <label className={labelClass}>Company (optional)</label>
+                    <input
+                      type="text"
+                      autoComplete="organization"
+                      placeholder="Acme Corporation"
+                      value={authCompany}
+                      onChange={(e) => setAuthCompany(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClass}>Password</label>
+                  <input
+                    type="password"
+                    required
+                    autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
+                    placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+
+                {authMode === 'signup' && (
+                  <div>
+                    <label className={labelClass}>Confirm Password</label>
+                    <input
+                      type="password"
+                      required
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={authConfirmPassword}
+                      onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                )}
+
+                {authError && (
+                  <p className="text-[13px] text-[#a33] bg-[#a33]/5 border border-[#a33]/20 px-3 py-2 rounded">
+                    {authError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="mt-2 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {authLoading ? 'Please wait…' : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                </button>
+              </form>
+
+              <p className="mt-4 text-center text-[11px] text-[#8a8f8d]">
+                This step is real — it signs you in against the live Aivory account system.
+              </p>
+            </div>
+          )}
+
+          {step === 'method' && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setStep('summary')}
+                className="text-[13px] text-[#8a8f8d] hover:text-[#494949] transition-colors mb-4"
+              >
+                &larr; Back
+              </button>
+              <h2 className="text-[22px] font-normal text-[#1a1a1a] mb-1">Choose payment method</h2>
+              <p className="text-[14px] text-[#8a8f8d] mb-6">
+                {product.name} &middot; <span className="font-semibold text-[#494949]">{priceLabel}</span>
+              </p>
+
+              <div className="flex flex-col gap-2.5">
+                {CHANNELS.map((c) => {
+                  const selected = channel === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setChannel(c.id)}
+                      className={`flex items-center gap-3.5 w-full text-left px-4 py-3.5 border transition-colors ${
+                        selected
+                          ? 'border-[#494949] bg-white/70'
+                          : 'border-[#b0b5b4] bg-white/30 hover:bg-white/50'
+                      }`}
+                    >
+                      <span className="shrink-0 w-9 h-9 rounded-full bg-white flex items-center justify-center">
+                        <ChannelIcon id={c.id} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[14px] font-medium text-[#1a1a1a]">{c.label}</span>
+                        <span className="block text-[12px] text-[#8a8f8d] truncate">{c.sublabel}</span>
+                      </span>
+                      <span
+                        className={`shrink-0 w-4 h-4 rounded-full border-2 ${
+                          selected ? 'border-[#494949] bg-[#494949]' : 'border-[#b0b5b4]'
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={!channel}
+                onClick={() => setStep('details')}
+                className="mt-8 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#c4c9b8]"
+              >
+                Continue
+              </button>
+
+              <p className="mt-4 text-center text-[11px] text-[#8a8f8d]">
+                Preview only — live payment coming soon.
+              </p>
+            </div>
+          )}
+
+          {step === 'details' && channel && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setStep('method')}
+                className="text-[13px] text-[#8a8f8d] hover:text-[#494949] transition-colors mb-4"
+              >
+                &larr; Back
+              </button>
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0">
+                  <ChannelIcon id={channel} />
+                </span>
+                <h2 className="text-[20px] font-normal text-[#1a1a1a]">{channelLabel}</h2>
+              </div>
+              <p className="text-[14px] text-[#8a8f8d] mb-6">
+                {product.name} &middot; <span className="font-semibold text-[#494949]">{priceLabel}</span>
+              </p>
+
+              {channel === 'card' && (
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className={labelClass}>Card Number</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="4811 1111 1111 1114"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className={labelClass}>Expiry</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className={labelClass}>CVV</label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="123"
+                        maxLength={4}
+                        value={cardCvv}
+                        onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Cardholder Name</label>
+                    <input
+                      type="text"
+                      placeholder="As it appears on the card"
+                      value={cardName}
+                      onChange={(e) => setCardName(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div className="mt-1 pt-4 border-t border-[#b0b5b4]">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.15em] text-[#8a8f8d] mb-3">
+                      Billing Address
+                    </span>
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <label className={labelClass}>Address</label>
+                        <input
+                          type="text"
+                          placeholder="Street address"
+                          value={billingAddress}
+                          onChange={(e) => setBillingAddress(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className={labelClass}>City</label>
+                          <input
+                            type="text"
+                            placeholder="Jakarta"
+                            value={billingCity}
+                            onChange={(e) => setBillingCity(e.target.value)}
+                            className={inputClass}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className={labelClass}>Postal Code</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="12345"
+                            value={billingPostal}
+                            onChange={(e) => setBillingPostal(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            className={inputClass}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Country</label>
+                        <input
+                          type="text"
+                          value={billingCountry}
+                          onChange={(e) => setBillingCountry(e.target.value)}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {isEwallet && (
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <label className={labelClass}>{channelLabel} Phone Number</label>
+                    <div className="flex">
+                      <span className="flex items-center px-3.5 border border-r-0 border-[#b0b5b4] bg-white/60 text-[14px] text-[#494949]">
+                        +62
+                      </span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        placeholder="812xxxxxxx"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 13))}
+                        className={`${inputClass} flex-1`}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[12px] text-[#8a8f8d] leading-relaxed">
+                    Next, you&apos;ll confirm with your {channelLabel} PIN and a one-time code sent to this number.
+                  </p>
+                </div>
+              )}
+
+              {channel === 'qris' && (
+                <div className="flex flex-col items-center py-2">
+                  <QrPlaceholder />
+                  <p className="mt-5 text-[13px] text-[#494949] text-center">
+                    Open any e-wallet or mobile banking app and scan this code to pay {priceLabel}.
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={!detailsValid}
+                onClick={handleDetailsContinue}
+                className="mt-8 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#c4c9b8]"
+              >
+                {channel === 'qris' ? "I've scanned and paid" : isEwallet ? 'Continue' : `Pay ${priceLabel}`}
+              </button>
+
+              <p className="mt-4 text-center text-[11px] text-[#8a8f8d]">
+                Preview only — no data is transmitted or stored.
+              </p>
+            </div>
+          )}
+
+          {step === 'pin' && isEwallet && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setStep('details')}
+                className="text-[13px] text-[#8a8f8d] hover:text-[#494949] transition-colors mb-4"
+              >
+                &larr; Back
+              </button>
+              <div className="flex items-center gap-2.5 mb-1">
+                <span className="w-7 h-7 rounded-full bg-white flex items-center justify-center shrink-0">
+                  <ChannelIcon id={channel} />
+                </span>
+                <h2 className="text-[20px] font-normal text-[#1a1a1a]">Enter your {channelLabel} PIN</h2>
+              </div>
+              <p className="text-[14px] text-[#8a8f8d] mb-8">
+                Confirm the payment of <span className="font-semibold text-[#494949]">{priceLabel}</span> for {product.name}.
+              </p>
+
+              <DigitBoxes length={6} value={pin} onChange={setPin} mask />
+
+              <button
+                type="button"
+                disabled={pin.length !== 6}
+                onClick={() => setStep('otp')}
+                className="mt-8 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#c4c9b8]"
+              >
+                Confirm PIN
+              </button>
+
+              <p className="mt-4 text-center text-[11px] text-[#8a8f8d]">
+                Preview only — no data is transmitted or stored.
+              </p>
+            </div>
+          )}
+
+          {step === 'otp' && isEwallet && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setStep('pin')}
+                className="text-[13px] text-[#8a8f8d] hover:text-[#494949] transition-colors mb-4"
+              >
+                &larr; Back
+              </button>
+              <h2 className="text-[20px] font-normal text-[#1a1a1a] mb-1">Enter the OTP code</h2>
+              <p className="text-[14px] text-[#8a8f8d] mb-8">
+                We sent a 6-digit code to +62 {phone || 'xxxxxxxxx'} to verify this payment.
+              </p>
+
+              <DigitBoxes length={6} value={otp} onChange={setOtp} />
+
+              <button
+                type="button"
+                disabled={otp.length !== 6}
+                onClick={handlePay}
+                className="mt-8 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#c4c9b8]"
+              >
+                Verify &amp; Pay {priceLabel}
+              </button>
+
+              <p className="mt-4 text-center text-[11px] text-[#8a8f8d]">
+                Preview only — no data is transmitted or stored.
+              </p>
+            </div>
+          )}
+
+          {step === 'processing' && (
+            <div className="py-10 flex flex-col items-center text-center">
+              <div className="w-10 h-10 rounded-full border-[3px] border-[#c4c9b8] border-t-[#494949] animate-spin" />
+              <p className="mt-6 text-[15px] text-[#494949]">
+                {isEwallet ? `Confirming your ${channelLabel} payment…` : 'Processing your payment…'}
+              </p>
+            </div>
+          )}
+
+          {step === 'success' && (
+            <div className="py-6 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-full bg-[#c4c9b8] flex items-center justify-center">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="mt-5 text-[22px] font-normal text-[#1a1a1a]">Payment successful</h2>
+              <p className="mt-2 text-[14px] text-[#8a8f8d] max-w-[280px]">
+                {product.name} &middot; {priceLabel} via {channelLabel}
+              </p>
+              {currentUser?.email && (
+                <p className="mt-1 text-[12px] text-[#8a8f8d]">Signed in as {currentUser.email}</p>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-8 w-full bg-[#c4c9b8] text-[#494949] py-[14px] px-4 text-[15px] font-medium text-center transition-colors hover:bg-[#b0b5a4]"
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+export default PricingCheckoutModal;

@@ -1,7 +1,7 @@
 services:
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: avry-postgres
     restart: unless-stopped
     networks:
@@ -62,21 +62,40 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: https://api.aivory.id
         NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
-        NEXT_PUBLIC_BLOG_URL: https://aivory.id/api/blog
-        NEXT_PUBLIC_CAREERS_URL: https://aivory.id/api/careers
+        NEXT_PUBLIC_BLOG_URL: /api/blog
+        NEXT_PUBLIC_CAREERS_URL: /api/careers
         NEXT_PUBLIC_DIAGNOSTICS_URL: https://api.aivory.id/diagnostics
         NEXT_PUBLIC_BLUEPRINT_URL: https://api.aivory.id/blueprint
         NEXT_PUBLIC_ADMIN_DASHBOARD_URL: https://admin.aivory.id/admin
         NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
         NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
         NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: 0x4AAAAAAESmFOravtG7NiWO
     container_name: avry-website
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null --timeout=3 http://127.0.0.1:3000/favicon.ico || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - aivory-network
     environment:
       - HONEYPOT_INGEST_TOKEN=${HONEYPOT_INGEST_TOKEN}
+      # Server-side only: /api/turnstile/verify exchanges the widget token
+      # with Cloudflare. The sitekey in the build args above is public; this is not.
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET}
+      - TURNSTILE_HOSTNAMES=${TURNSTILE_HOSTNAMES}
       - BACKEND_SERVICE_URL=http://avry-backend:8081
+      # Free-assessment lead capture + report email. Without these the
+      # routes fail closed with 503 and every lead is silently dropped.
+      - LEAD_INGEST_TOKEN=${LEAD_INGEST_TOKEN}
+      - N8N_REPORT_WEBHOOK_URL=${N8N_REPORT_WEBHOOK_URL}
+      - REPORT_EMAIL_TOKEN=${REPORT_EMAIL_TOKEN}
+      # Contact page + homepage transformation-intake form.
+      - N8N_CONTACT_WEBHOOK_URL=${N8N_CONTACT_WEBHOOK_URL}
+      - CONTACT_FORM_TOKEN=${CONTACT_FORM_TOKEN}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
@@ -84,7 +103,7 @@ services:
       - "traefik.http.routers.main-app.entrypoints=websecure,web"
       - "traefik.http.routers.main-app.tls.certresolver=letsencrypt"
       - "traefik.http.routers.main-app.priority=1"
-      - "traefik.http.routers.main-app-api.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && PathPrefix(`/api/exchange-rate`)"
+      - "traefik.http.routers.main-app-api.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && (PathPrefix(`/api/exchange-rate`) || PathPrefix(`/api/turnstile`) || PathPrefix(`/api/assessment-lead`) || PathPrefix(`/api/assessment-report-email`) || PathPrefix(`/api/assessment-event`) || PathPrefix(`/api/contact-form`))"
       - "traefik.http.routers.main-app-api.entrypoints=websecure,web"
       - "traefik.http.routers.main-app-api.tls.certresolver=letsencrypt"
       - "traefik.http.routers.main-app-api.priority=20"
@@ -94,6 +113,10 @@ services:
       - "traefik.http.routers.main-app-trap.priority=20"
       - "traefik.http.routers.main-app-trap.service=main-app"
       - "traefik.http.services.main-app.loadbalancer.server.port=3000"
+      # Remove from LB pool when not ready; prevents 502 during deploys
+      - "traefik.http.services.main-app.loadbalancer.healthcheck.path=/favicon.ico"
+      - "traefik.http.services.main-app.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.main-app.loadbalancer.healthcheck.timeout=3s"
 
   # ── User Dashboard (port 9001) ─────────────────────────────────────────────
   avry-user-dashboard:
@@ -109,6 +132,7 @@ services:
         NEXT_PUBLIC_WORKFLOWS_URL: https://api.aivory.id/workflows
         NEXT_PUBLIC_PAYMENTS_URL: https://api.aivory.id/payments
         NEXT_PUBLIC_ROADMAP_URL: https://api.aivory.id/roadmap
+        NEXT_PUBLIC_SLACK_APP_ID: A0BF382BKB9
     container_name: avry-user-dashboard
     restart: unless-stopped
     networks:
@@ -128,6 +152,7 @@ services:
       - N8N_AS_CODE_URL=http://host.docker.internal:3500
       - N8N_BASE_URL=http://n8n:5678
       - N8N_PUBLIC_URL=https://n8n.aivory.id
+      - APPROVAL_REGISTRATION_TOKEN=${APPROVAL_REGISTRATION_TOKEN}
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_URL=${DATABASE_URL}
       - N8N_CREDENTIALS_ENCRYPTION_KEY=${N8N_CREDENTIALS_ENCRYPTION_KEY}
@@ -163,9 +188,9 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://api.aivory.id
-        NEXT_PUBLIC_BLOG_SERVICE_URL: https://aivory.id/api/blog
-        NEXT_PUBLIC_CAREERS_SERVICE_URL: https://aivory.id/api/careers
-        NEXT_PUBLIC_CAREERS_URL: https://aivory.id/api/careers
+        NEXT_PUBLIC_BLOG_SERVICE_URL: /api/blog
+        NEXT_PUBLIC_CAREERS_SERVICE_URL: /api/careers
+        NEXT_PUBLIC_CAREERS_URL: /api/careers
         NEXT_PUBLIC_BACKEND_URL: https://api.aivory.id
     container_name: avry-admin-dashboards
     restart: unless-stopped
@@ -210,6 +235,7 @@ services:
     environment:
       - PORT=8081
       - DATABASE_URL=${DATABASE_URL}
+      - LEAD_INGEST_TOKEN=${LEAD_INGEST_TOKEN}
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - ENVIRONMENT=production
@@ -230,6 +256,25 @@ services:
       - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET:-}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
       - HONEYPOT_INGEST_TOKEN=${HONEYPOT_INGEST_TOKEN}
+      - MCP_SERVER_AUTH_ENCRYPTION_KEY=${MCP_SERVER_AUTH_ENCRYPTION_KEY}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      # Password-reset mail. Same relay avry-careers/avry-payments already use;
+      # with SMTP_HOST unset the reset endpoints still work but no link is
+      # delivered, so this must be present for self-service reset to function.
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      # The shared SMTP identity is careers@ — wrong voice for a security
+      # email, so account mail gets its own sender when one is configured.
+      - AUTH_FROM_EMAIL=${AUTH_FROM_EMAIL:-}
+      # Where the emailed links point. The admin base needs the /admin segment:
+      # the dashboard runs under Next.js basePath "/admin".
+      - PASSWORD_RESET_URL_BASE=${PASSWORD_RESET_URL_BASE:-https://aivory.uk/reset-password}
+      - ADMIN_PASSWORD_RESET_URL_BASE=${ADMIN_PASSWORD_RESET_URL_BASE:-https://admin.aivory.id/admin/reset-password}
+      - PASSWORD_RESET_TTL_MINUTES=${PASSWORD_RESET_TTL_MINUTES:-60}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -471,6 +516,26 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY}
       - MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY}
+      # Listed one by one rather than via `env_file: .env`: this service parses
+      # cors_origins as list[str], and the root .env carries a comma-separated
+      # CORS_ORIGINS that pydantic-settings cannot decode, so pulling the whole
+      # file in crashes it at startup.
+      - MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION}
+      - FX_RATE_URL=${FX_RATE_URL}
+      - FX_MARGIN_PERCENT=${FX_MARGIN_PERCENT}
+      - FX_TTL_SECONDS=${FX_TTL_SECONDS}
+      - USD_IDR_RATE=${USD_IDR_RATE}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      # Receipt delivery goes through the n8n workflow; SMTP_* stays as the
+      # fallback path inside _send_receipt.
+      - N8N_RECEIPT_WEBHOOK_URL=${N8N_RECEIPT_WEBHOOK_URL}
+      - RECEIPT_EMAIL_TOKEN=${RECEIPT_EMAIL_TOKEN}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+      - PAYMENTS_FROM_EMAIL=${PAYMENTS_FROM_EMAIL}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3030/health',timeout=5).status==200 else 1)"]
       interval: 30s
@@ -480,7 +545,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
-      - "traefik.http.routers.payments.rule=Host(`api.aivory.id`) && PathPrefix(`/payments`)"
+      - "traefik.http.routers.payments.rule=(Host(`api.aivory.id`) || Host(`backend.aivory.id`)) && PathPrefix(`/payments`)"
       - "traefik.http.routers.payments.entrypoints=web,websecure"
       - "traefik.http.routers.payments.tls.certresolver=letsencrypt"
       - "traefik.http.routers.payments.priority=10"

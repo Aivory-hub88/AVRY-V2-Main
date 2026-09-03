@@ -1,5 +1,11 @@
 # Agent Feature — Overview
 
+**Amended 2026-08-19:** added the Discord deploy channel (§2, §3, §7) and
+corrected the stale `DeployModal` references from the original write-up
+below — Deploy is now a tab inside `CustomizeAgentModal`, not a separate
+modal/button. Everything else in this doc is unchanged from its original
+2026-08-05 write-up and not re-verified as part of this pass.
+
 **Status:** Shipped and live in production (part of the 106-commit backlog
 that reached the VPS on 2026-08-05 alongside the Deep Diagnostic Indonesian
 rollout — see `[[DEEP-DIAGNOSTIC-INDONESIAN-LANGUAGE-PLANNING]]` §7). Built
@@ -64,13 +70,67 @@ frontend.
 - **`app/agents/page.tsx`** — the main page. Renders the 5 prebuilt cards
   plus any admin-published agents pulled from `/dashboard/api/agent-catalog`
   (`page.tsx:911-927`). Each card:
-  - **Deploy** button → `DeployModal` (`page.tsx:246-576`): Slack OAuth,
-    Telegram QR-code pairing, or a **WhatsApp button that is a visible but
-    non-functional stub** (no `onClick`, `page.tsx:399-413` — don't point
-    users at it).
-  - **Customize** (gear icon) → `CustomizeAgentModal`.
-  - Live deployment rows per channel with one-click disconnect
-    (`DeploymentRow`, `page.tsx:578-614`).
+  - **Configure** button → `CustomizeAgentModal.tsx` — one modal, 5 tabs:
+    Identity, Connections, Tools, MCP, **Deploy**. (Stale as of an earlier
+    version of this doc: there used to be a standalone `DeployModal`
+    triggered by its own "Deploy" button, separate from a gear-icon
+    "Customize" button — that was merged into this single modal's Deploy
+    tab a while back, so settings happen before deploy instead of via a
+    competing entry point. `DeploymentRow`/one-click disconnect,
+    previously called out at `page.tsx:578-614`, moved with it.)
+  - The **Deploy** tab lists five channels, in this order: **Slack** (OAuth
+    install), **Telegram** (QR-code pairing), **Discord** (added
+    2026-08-19 — see below), **API** (Pro plan+, own app/bot), **WhatsApp**
+    (button present; as of this doc's last check it had no `onClick` —
+    re-verify before relying on that being fixed).
+  - An **Agent Activity** feed of structured actions the agent has taken
+    (`page.tsx:810-861`) and a credits-balance pill (`page.tsx:863-889`).
+
+**Discord deploy channel (2026-08-19).** Unlike Telegram (Bot-API webhook,
+one shared bot per agent type via a deep-link QR) and Slack (full OAuth
+install), Discord pushes messages over a persistent Gateway WebSocket, not
+an inbound webhook — so it needed its own always-on connection process,
+and there's no deep-link equivalent for auto-redeeming a token. Landed as:
+one shared "Aivory Agent" bot across every agent type (deliberate choice,
+mirrors the WhatsApp/Kapso "Aivory Agent" decision elsewhere in this
+project — not per-tenant bring-your-own-bot); a short human-typed connect
+code (`XXXX-XXXX`) redeemed via a `/connect <code>` slash command instead
+of a QR scan; binding keyed by `(guild_id, channel_id)`, so a tenant
+chooses exactly one channel in their server rather than the bot going
+live everywhere it's invited.
+- **New:** `backend/avry-backend/app/services/discord_service.py`
+  (binding/redeem/message-routing logic, mirrors `telegram_service.py`
+  closely), `backend/avry-backend/app/routes/discord.py` (dashboard-facing
+  JWT routes + two internal `X-Internal-Token` routes the listener calls:
+  `/redeem`, `/message`), `backend/vps-bridge/discord-listener.js` (the
+  always-on Gateway process — deliberately thin, translates Discord
+  Gateway events into calls against `discord_service.py`'s internal
+  routes and relays the reply back; all real logic — credit/tier gating,
+  attachment handling, calling the shared agent gateway — stays in
+  Python, same shape as Telegram's Bot-API-webhook-into-Python pattern),
+  `frontend/avry-user-dashboard/lib/discordDeploy.ts` (dashboard API
+  client, mirrors `telegramDeploy.ts`).
+- Routes through the **same channel-agnostic agent gateway** every other
+  channel uses (`vps-bridge`'s `/telegram/message` — the route name is
+  legacy, the handler is generic over `channel`), so Discord gets full
+  tool-calling (Composio integrations, n8n workflow triggers, and
+  Cerveau's native tools for `engine='cerveau'` tenants) with zero new
+  tool-layer code.
+- No native Discord buttons/message-components yet for the F-1 pending-
+  approval flow (Telegram has inline Approve/Deny buttons) — a pending
+  approval surfaces as plain text asking the user to reply "approve" or
+  "deny". Real buttons need a second, signature-verified HTTP Interactions
+  endpoint (Ed25519, the app's Public Key) in addition to the Gateway
+  connection — deferred, not required for v1.
+- **Not yet committed to git** — like the rest of this repo's known
+  local-vs-VPS divergence (`[[dashboard-local-vps-divergence]]`), these
+  files were patched directly onto the live VPS source
+  (`/home/ubuntu/avry-user-dashboard`, `/home/ubuntu/AVRY-V2-Main/backend/
+  avry-backend`, `/home/ubuntu/AVRY/vps-bridge`) and rebuilt/redeployed
+  from there, with `.bak-pre-discord-20260819`-suffixed backups left next
+  to each modified file. Worth a proper commit+push once this has run a
+  few days without incident, same as the Cerveau `cerveau-main-v0.8.4`
+  branch from the same day.
   - An **Agent Activity** feed of structured actions the agent has taken
     (`page.tsx:810-861`) and a credits-balance pill (`page.tsx:863-889`).
 - **`components/header/AgentSelector.tsx`** — despite the folder name, this
@@ -100,6 +160,12 @@ backend service**, not new backend logic added by this deploy:
   - `POST /api/v1/agent-actions`
   - `POST /api/v1/telegram/agent-chat`, `/api/v1/telegram/bindings`,
     `/api/v1/slack/installations`
+  - `POST /api/v1/discord/deploy-link`, `GET /api/v1/discord/link-status/
+    {code}`, `GET/DELETE /api/v1/discord/bindings*` (dashboard, JWT). Two
+    more Discord routes exist but are **not** called from this repo —
+    `/api/v1/discord/redeem` and `/api/v1/discord/message` are internal,
+    `X-Internal-Token`-gated, called only by `vps-bridge/discord-
+    listener.js`.
 - This is a **deliberate bypass of the zeroclaw/VPS-bridge path** the rest
   of the Console uses — the default Console chat goes through
   `config.VPS_BRIDGE_URL` → zeroclaw gateway
@@ -172,7 +238,10 @@ chat with it from the Console) — not a general agent-authoring platform.
   `components/agents/CustomizeAgentModal.tsx`,
   `components/header/AgentSelector.tsx`, `lib/agentProfiles.ts`,
   `lib/agentActions.ts`, `lib/agentChat.ts`, `contexts/ModeContext.tsx`,
-  `hooks/useChat.ts`
+  `hooks/useChat.ts`, `lib/discordDeploy.ts` (Discord deploy, 2026-08-19)
+- **Discord deploy channel, other repos:** `backend/avry-backend/app/
+  services/discord_service.py`, `backend/avry-backend/app/routes/
+  discord.py`, `backend/vps-bridge/discord-listener.js`
 - **Concept (B) — generic CRUD stub:** `types/agents.ts`,
   `app/agents/new/page.tsx`, `app/agents/[id]/page.tsx`,
   `app/api/agents/route.ts`

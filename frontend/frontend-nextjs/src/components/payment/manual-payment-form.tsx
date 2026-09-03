@@ -54,11 +54,24 @@ export function ManualPaymentForm({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  /**
+   * Field ids are kebab-case for the DOM; state keys are camelCase. The two were
+   * previously bridged by `[e.target.name]: value`, which wrote a
+   * `"transaction-id"` key that nothing reads — so both controlled inputs were
+   * frozen at their initial values and every submission carried an empty
+   * transaction reference.
+   */
+  const FIELD_KEYS: Record<string, keyof ManualPaymentFormData> = {
+    'transaction-id': 'transactionId',
+    'payment-method': 'paymentMethod',
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    const key = FIELD_KEYS[name] ?? (name as keyof ManualPaymentFormData);
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [key]: value,
     }));
     setError(null);
   };
@@ -66,14 +79,22 @@ export function ManualPaymentForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // A rejected file is cleared from the input, not just from state —
+      // otherwise the control keeps showing the file it refused, and the user has
+      // an error message next to what looks like a valid selection.
+      const reject = (message: string) => {
+        setError(message);
+        e.target.value = '';
+      };
+
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file (PNG, JPG, etc.)');
+        reject('Please upload an image file (PNG, JPG, etc.)');
         return;
       }
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
+        reject('File size must be less than 5MB');
         return;
       }
       setFormData(prev => ({
@@ -86,6 +107,15 @@ export function ManualPaymentForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Checked here, not left to the input's `required`: browser validation is
+    // skipped on a programmatic submit, and the reference is what an admin
+    // matches against the bank statement — an empty one is unverifiable.
+    if (!formData.transactionId.trim()) {
+      setError('Please enter a transaction ID');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -101,16 +131,30 @@ export function ManualPaymentForm({
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium text-white mb-2">Manual Payment</h3>
-      <p className="text-sm text-gray-200 mb-6">
+      <p className="text-sm text-gray-400 mb-6">
         Send proof of payment to our team for manual verification.
         <br />
         <span className="text-brand-mint">Amount: ${amount.toFixed(2)} for {product}</span>
       </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {/*
+        `aria-label` so the element exposes the `form` role — an unnamed <form> is
+        a generic region to assistive tech.
+
+        `noValidate` because native constraint validation suppresses the submit
+        event when a `required` field is empty: the fields keep `required` for
+        semantics, while `handleSubmit` decides what the user is told, so the
+        message is the same whether submission came from a click or from code.
+      */}
+      <form
+        onSubmit={handleSubmit}
+        aria-label="Manual payment"
+        noValidate
+        className="space-y-4"
+      >
         {/* Payment Proof Upload */}
         <div className="space-y-2">
-          <label htmlFor="payment-proof" className="block text-sm font-medium text-gray-100">
+          <label htmlFor="payment-proof" className="block text-sm font-medium text-gray-300">
             Payment Proof / Screenshot
           </label>
           <div className="relative">
@@ -120,7 +164,7 @@ export function ManualPaymentForm({
               name="payment-proof"
               accept="image/*"
               onChange={handleFileChange}
-              className="block w-full text-sm text-gray-200
+              className="block w-full text-sm text-gray-400
                 file:mr-4 file:py-2 file:px-4
                 file:rounded-lg file:border-0
                 file:text-sm file:font-semibold
@@ -130,19 +174,19 @@ export function ManualPaymentForm({
               "
             />
             {formData.paymentProof && (
-              <p className="text-xs text-gray-300 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Selected: {formData.paymentProof.name}
               </p>
             )}
           </div>
-          <p className="text-xs text-gray-300">
+          <p className="text-xs text-gray-500">
             Accepted formats: PNG, JPG, JPEG (max 5MB)
           </p>
         </div>
 
         {/* Transaction ID */}
         <div className="space-y-2">
-          <label htmlFor="transaction-id" className="block text-sm font-medium text-gray-100">
+          <label htmlFor="transaction-id" className="block text-sm font-medium text-gray-300">
             Transaction ID / Reference Number
           </label>
           <input
@@ -152,7 +196,11 @@ export function ManualPaymentForm({
             value={formData.transactionId}
             onChange={handleInputChange}
             placeholder="Enter transaction ID"
+            // Kept for semantics (screen readers announce the field as required),
+            // but the form is `noValidate` so the message shown is ours — see the
+            // form element below.
             required
+            aria-invalid={Boolean(error) && !formData.transactionId.trim()}
             className="w-full px-4 py-2 bg-bg-tertiary border border-border-default 
               rounded-lg text-white placeholder-gray-500
               focus:outline-none focus:ring-2 focus:ring-brand-mint focus:border-transparent
@@ -163,7 +211,7 @@ export function ManualPaymentForm({
 
         {/* Payment Method */}
         <div className="space-y-2">
-          <label htmlFor="payment-method" className="block text-sm font-medium text-gray-100">
+          <label htmlFor="payment-method" className="block text-sm font-medium text-gray-300">
             Payment Method
           </label>
           <select

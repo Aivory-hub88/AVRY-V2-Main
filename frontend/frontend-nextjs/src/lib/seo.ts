@@ -19,13 +19,13 @@ export const DEFAULT_OG_IMAGE = '/hero-video-poster.jpg';
 const ORGANIZATION_DESCRIPTION =
   'Aivory (also known as Aivory AI) is AI infrastructure for business transformation and operational intelligence, helping organisations move from operational clarity to governed AI agents and autonomous workflows.';
 const ORGANIZATION_DISAMBIGUATION =
-  'Business transformation and AI operations platform (United Kingdom / global). Distinct from dental practice software, HRMS platforms, code-compliance tooling, consumer AI apps, or creative studios that share a similar name.';
+  'Business transformation and AI operations platform (United Kingdom / global), founded by Irfan Reichmann and canonically published at aivory.uk. Distinct from dental practice software, HRMS platforms, code-compliance tooling, consumer AI apps, or creative studios that share a similar name — none of those are affiliated with this organisation.';
 const WEBSITE_DESCRIPTION =
   'AI infrastructure for business transformation — from operational assessment to autonomous AI agents.';
 const HOMEPAGE_DESCRIPTION =
   'AI infrastructure for business transformation, operational intelligence, governed AI agents, and workflow automation. Assess operations, design your blueprint, and deploy with confidence.';
 const PLATFORM_DESCRIPTION =
-  'AI operations platform that guides organisations from business operations assessment to governed AI agent deployment, workflow automation, and operational intelligence.';
+  'Aivory is the agentic AI operations platform that guides organisations from business operations assessment to autonomous AI agent orchestration, no-code workflow automation, and operational intelligence.';
 const BASTION_DESCRIPTION =
   'AI-powered autonomous infrastructure defence platform combining continuous monitoring, adaptive threat response, zero-trust posture, and operational resilience.';
 const FOUNDER_DESCRIPTION =
@@ -83,7 +83,7 @@ export function createOrganization(siteUrl: PublicSiteUrl) {
     '@type': 'Organization',
     '@id': `${siteUrl}/#organisation`,
     name: 'Aivory AI',
-    alternateName: ['Aivory', 'Aivory Platform', 'Aivory UK'],
+    alternateName: ['Aivory', 'Aivory Platform', 'Aivory UK', 'aivory.uk'],
     legalName: 'Aivory',
     url: `${siteUrl}/`,
     logo: {
@@ -95,28 +95,70 @@ export function createOrganization(siteUrl: PublicSiteUrl) {
     },
     image: { '@id': `${siteUrl}/#logo` },
     slogan: 'Make AI Make Sense®',
+    brand: {
+      '@type': 'Brand',
+      '@id': `${siteUrl}/#brand`,
+      name: 'Aivory',
+      slogan: 'Make AI Make Sense®',
+      logo: { '@id': `${siteUrl}/#logo` },
+    },
     description: ORGANIZATION_DESCRIPTION,
     disambiguatingDescription: ORGANIZATION_DISAMBIGUATION,
     foundingDate: '2024',
     founder: { '@id': `${siteUrl}/#founder` },
     employee: [{ '@id': `${siteUrl}/#founder` }],
-    areaServed: {
-      '@type': 'Place',
-      name: 'Worldwide',
-    },
+    areaServed: [
+      { '@type': 'Place', name: 'Worldwide' },
+      { '@type': 'Country', name: 'Indonesia' },
+      { '@type': 'Country', name: 'United Kingdom' },
+      { '@type': 'Country', name: 'Netherlands' },
+      { '@type': 'Country', name: 'Germany' },
+      { '@type': 'Country', name: 'France' },
+      { '@type': 'Country', name: 'United States' },
+      { '@type': 'Country', name: 'Japan' },
+      { '@type': 'Country', name: 'Spain' },
+      { '@type': 'Country', name: 'South Korea' },
+      { '@type': 'Country', name: 'China' },
+      { '@type': 'Country', name: 'Australia' },
+      { '@type': 'Country', name: 'New Zealand' },
+      { '@type': 'Place', name: 'Europe' },
+      { '@type': 'Country', name: 'Portugal' },
+      { '@type': 'Country', name: 'United Arab Emirates' },
+      { '@type': 'Country', name: 'Oman' },
+      { '@type': 'Country', name: 'Saudi Arabia' },
+      { '@type': 'Country', name: 'Bahrain' },
+      { '@type': 'Country', name: 'Qatar' },
+    ],
     knowsAbout: [
       'AI Business Transformation',
+      'AI Operations Platform',
+      'Agentic AI Platform',
       'Operational Intelligence',
       'Autonomous AI Agents',
+      'AI Agent Orchestration',
       'Business Operations Assessment',
       'AI Readiness Diagnostic',
+      'Operational Maturity Assessment',
       'Workflow Automation',
+      'No-Code AI Agent Deployment',
       'Autonomous Infrastructure Defence',
       'Governed AI Systems',
+      'AI Sales Automation',
+      'AI Customer Service Automation',
+      'AI Marketing Automation',
+      'Agentic AI',
+      'Agentic Worker',
+      'Agentic Assistant',
+      'Workflow Builder',
+      'Automation Builder',
+      'AI Blueprint',
+      'AI Roadmap',
+      'Operational Clarity',
     ],
     sameAs: [
-      'https://www.linkedin.com/company/aivory/',
-      'https://github.com/Aivory-hub88',
+      'https://www.linkedin.com/company/aivoryai/',
+      'https://www.producthunt.com/products/aivory-ai',
+      'https://www.instagram.com/aivorylab.ai',
     ],
     award: ['NVIDIA Inception Program (2026)'],
     contactPoint: {
@@ -139,7 +181,10 @@ export function createWebsite(siteUrl: PublicSiteUrl) {
     '@id': `${siteUrl}/#website`,
     url: `${siteUrl}/`,
     name: 'Aivory AI',
+    alternateName: ['Aivory', 'aivory.uk'],
     description: WEBSITE_DESCRIPTION,
+    isFamilyFriendly: true,
+    copyrightHolder: { '@id': `${siteUrl}/#organisation` },
     publisher: { '@id': `${siteUrl}/#organisation` },
     inLanguage: siteUrl === AIVORY_UK_URL ? ['en', 'id'] : ['id', 'en'],
     potentialAction: {
@@ -169,9 +214,10 @@ const OFFER_DESCRIPTIONS: Record<string, string> = {
   [PRODUCT_IDS.DEEP_DIAGNOSTIC]: 'One-time operational maturity and AI opportunity assessment',
   [PRODUCT_IDS.BLUEPRINT]: 'Operational transformation blueprint and AI deployment strategy',
   [PRODUCT_IDS.FULL_STACK]: 'Assessment, blueprint, and transformation roadmap',
-  [PRODUCT_IDS.FOUNDATION]: 'Monthly platform licence — Operational Workspace and 1 AI Workforce',
-  [PRODUCT_IDS.PRO]: 'Monthly business licence for expanded AI operations and automation',
-  [PRODUCT_IDS.ENTERPRISE]: 'Monthly enterprise licence for governed AI operations at scale',
+  [PRODUCT_IDS.OPERATIONAL]: 'Monthly platform licence — Operational Workspace and 1 AI Workforce',
+  [PRODUCT_IDS.BUSINESS]: 'Monthly business licence for expanded AI operations and automation',
+  // Enterprise is sales-assisted and not in the product catalogue, so it
+  // publishes no Offer and needs no description here.
 };
 
 function createOffer(siteUrl: PublicSiteUrl, product: Product) {
@@ -202,7 +248,7 @@ function createPlatformApplication(siteUrl: PublicSiteUrl) {
     '@type': 'SoftwareApplication',
     '@id': `${siteUrl}/#software`,
     name: 'Aivory Platform',
-    alternateName: ['Aivory AI', 'Aivory AI Operations Platform'],
+    alternateName: ['Aivory AI', 'Aivory AI Operations Platform', 'Aivory Agentic AI Platform'],
     applicationCategory: 'BusinessApplication',
     applicationSubCategory: 'AI Operations Platform',
     operatingSystem: 'Web',
@@ -227,10 +273,11 @@ function createPlatformApplication(siteUrl: PublicSiteUrl) {
 function createBastionApplication(siteUrl: PublicSiteUrl) {
   const bastionUrl = absoluteUrlForSite(siteUrl, '/bastion');
   return {
-    '@type': 'SoftwareApplication',
-    '@id': `${bastionUrl}#software`,
+    '@type': 'Service',
+    '@id': `${bastionUrl}#service`,
     name: 'Bastion',
-    applicationCategory: 'SecurityApplication',
+    serviceType: 'Autonomous Infrastructure Defence',
+    provider: { '@id': `${siteUrl}/#organisation` },
     applicationSubCategory: 'Autonomous Infrastructure Defence',
     operatingSystem: 'Cloud, Hybrid, On-Premises, Edge, Container',
     url: bastionUrl,
@@ -338,6 +385,82 @@ export function createFaqPage(siteUrl: PublicSiteUrl) {
   };
 }
 
+/**
+ * Localised copies of FAQ_ENTITIES for the /ar and /ja About pages.
+ * Machine-drafted for structure/consistency with the English source --
+ * recommend a native-speaker pass before treating this copy as final brand
+ * voice, same caveat as ASSESSMENT_STEPS_AR / ASSESSMENT_STEPS_JA below.
+ */
+export const FAQ_ENTITIES_AR = [
+  {
+    question: 'ما هي Aivory؟',
+    answer: 'Aivory هي بنية تحتية للذكاء الاصطناعي مخصصة للتحول المؤسسي والذكاء التشغيلي، أسسها إرفان رايشمان. تساعد المؤسسات على البدء بوضوح تشغيلي، وتصميم مخططات التحول، ونشر وكلاء وسير عمل ذكاء اصطناعي خاضعة للحوكمة. وهي ليست برنامج عيادات أسنان أو نظام موارد بشرية أو أداة امتثال للأكواد.',
+  },
+  {
+    question: 'هل Aivory هي نفسها Aivory AI؟',
+    answer: 'نعم. "Aivory" و"Aivory AI" يشيران إلى نفس المنصة، المتاحة على aivory.uk. هناك منتجات أخرى غير مرتبطة تستخدم اسمًا مشابهًا لأدوات امتثال الأكواد، أو توسيم البيانات، أو برامج طب الأسنان، أو تطبيقات إبداعية للمستهلكين — لا علاقة لأي منها بـ Aivory.',
+  },
+  {
+    question: 'من أسس Aivory؟',
+    answer: 'أسس Aivory إرفان رايشمان، الذي يركز على التبني العملي للذكاء الاصطناعي من خلال الوضوح التشغيلي والأنظمة الخاضعة للحوكمة.',
+  },
+  {
+    question: 'كيف يعمل تقييم العمليات التجارية؟',
+    answer: 'يقيّم التقييم الصحة التشغيلية، وجاهزية البيانات، ونضج العمليات، ومجالات فرص الذكاء الاصطناعي. يحدد نقاط الاختناق وينتج نقطة انطلاق واضحة قبل نشر أي نظام ذكاء اصطناعي.',
+  },
+  {
+    question: 'ماذا يتضمن مخطط التحول؟',
+    answer: 'يتضمن مخطط التحول بنية سير عمل للحالة المستقبلية، واستراتيجية نشر الذكاء الاصطناعي، وتوصيات التكامل، وإطار عمل تنفيذي للإدارة العليا بناءً على نتائج التقييم الخاص بك.',
+  },
+  {
+    question: 'هل تدعم Aivory وكلاء الذكاء الاصطناعي متعددي اللغات؟',
+    answer: 'نعم. وكلاء Aivory متعددو اللغات بشكل افتراضي ويمكنهم العمل عبر قنوات التواصل مع العملاء دون الحاجة إلى إعدادات إضافية.',
+  },
+  {
+    question: 'ما هو Bastion؟',
+    answer: 'Bastion هو منتج الدفاع الذاتي عن البنية التحتية من Aivory. يجمع بين الكشف المدعوم بالذكاء الاصطناعي، والمراقبة المستمرة، ووضعية الثقة الصفرية، والاستجابة التكيفية عبر البيئات السحابية والهجينة والمحلية والحافة والحاويات.',
+  },
+  {
+    question: 'هل Aivory هي نفسها شركات أخرى تحمل اسم Aivory؟',
+    answer: 'لا. Aivory هي منصة تحول مؤسسي وعمليات ذكاء اصطناعي أسسها إرفان رايشمان. المؤسسات الأخرى التي تستخدم اسمًا مشابهًا تعمل في فئات مختلفة مثل برامج طب الأسنان، أو أنظمة الموارد البشرية، أو الامتثال للأكواد، أو تطبيقات المستهلكين.',
+  },
+] as const;
+
+export const FAQ_ENTITIES_JA = [
+  {
+    question: 'Aivoryとは何ですか?',
+    answer: 'AivoryはIrfan Reichmannが設立した、ビジネストランスフォーメーションとオペレーショナル・インテリジェンスのためのAIインフラです。組織が業務の明確な把握から始め、変革のブループリントを設計し、ガバナンスの効いたAIエージェントとワークフローを展開できるよう支援します。歯科ソフトウェアやHRMS、コード準拠ツールとは異なります。',
+  },
+  {
+    question: 'AivoryとAivory AIは同じものですか?',
+    answer: 'はい。「Aivory」と「Aivory AI」はaivory.ukで提供される同じプラットフォームを指します。コード準拠ツール、データアノテーション、歯科ソフトウェア、コンシューマー向けクリエイティブアプリなどで類似名称を使用する無関係な製品がいくつか存在しますが、いずれもAivoryとは提携していません。',
+  },
+  {
+    question: 'Aivoryの創業者は誰ですか?',
+    answer: 'AivoryはIrfan Reichmannによって設立されました。同氏は業務の明確な把握とガバナンスの効いたシステムを通じた実践的なAI導入に注力しています。',
+  },
+  {
+    question: 'Business Operations Assessmentはどのように機能しますか?',
+    answer: 'この評価では、業務の健全性、データの準備状況、プロセスの成熟度、AI活用の機会領域を評価します。ボトルネックを特定し、AIシステムを導入する前の明確な出発点を導き出します。',
+  },
+  {
+    question: 'Transformation Blueprintには何が含まれますか?',
+    answer: 'Transformation Blueprintには、評価結果に基づいた将来像のワークフロー設計、AI導入戦略、統合に関する提案、そして経営層向けの実行フレームワークが含まれます。',
+  },
+  {
+    question: 'Aivoryは多言語AIエージェントに対応していますか?',
+    answer: 'はい。Aivoryのエージェントは標準で多言語に対応しており、追加設定なしで複数の顧客対応チャネルを横断して運用できます。',
+  },
+  {
+    question: 'Bastionとは何ですか?',
+    answer: 'Bastionは、Aivoryの自律型インフラ防御製品です。AIを活用した検知、継続的な監視、ゼロトラスト態勢、そしてクラウド、ハイブリッド、オンプレミス、エッジ、コンテナ環境にまたがる適応的な対応を組み合わせています。',
+  },
+  {
+    question: 'Aivoryは同名の他社と同じ会社ですか?',
+    answer: 'いいえ。AivoryはIrfan Reichmannが設立したビジネストランスフォーメーションとAIオペレーションのプラットフォームです。類似の名称を使用する他の組織は、歯科ソフトウェア、人事システム、コード準拠、コンシューマーアプリなど、異なる分野で事業を展開しています。',
+  },
+] as const;
+
 export const ASSESSMENT_STEPS = [
   {
     name: 'Start the diagnostic',
@@ -354,6 +477,45 @@ export const ASSESSMENT_STEPS = [
   {
     name: 'Generate Transformation Blueprint',
     text: 'Convert assessment insights into a structured architecture and implementation roadmap.',
+  },
+] as const;
+
+/** Localised copies of ASSESSMENT_STEPS -- see FAQ_ENTITIES_AR/JA caveat above. */
+export const ASSESSMENT_STEPS_AR = [
+  {
+    name: 'ابدأ التشخيص',
+    text: 'ابدأ تقييم العمليات التجارية لتقييم سير العمل الحالي والقيود وبيئة البيانات.',
+  },
+  {
+    name: 'راجع درجات الأداء التشغيلي',
+    text: 'افحص درجات الاستراتيجية، وجاهزية البيانات، ونضج العمليات، إلى جانب نقاط الاختناق المكتشفة.',
+  },
+  {
+    name: 'حدد فرص الذكاء الاصطناعي',
+    text: 'حدد أين يمكن للذكاء الاصطناعي أن يحقق أثرًا قابلًا للقياس دون زيادة عدد الموظفين أو التسبب في بدايات خاطئة.',
+  },
+  {
+    name: 'أنشئ مخطط التحول',
+    text: 'حوّل رؤى التقييم إلى بنية منظمة وخارطة طريق للتنفيذ.',
+  },
+] as const;
+
+export const ASSESSMENT_STEPS_JA = [
+  {
+    name: '診断を開始する',
+    text: 'Business Operations Assessmentを開始し、現在のワークフロー、制約、データ環境を評価します。',
+  },
+  {
+    name: '業務スコアを確認する',
+    text: '戦略、データの準備状況、プロセス成熟度のスコアと、検出されたボトルネックを確認します。',
+  },
+  {
+    name: 'AI活用の機会を特定する',
+    text: '人員を増やさず、誤った着手を避けながら、AIが測定可能な効果を生み出せる領域を洗い出します。',
+  },
+  {
+    name: 'Transformation Blueprintを生成する',
+    text: '評価から得たインサイトを、構造化されたアーキテクチャと実行ロードマップに変換します。',
   },
 ] as const;
 
@@ -499,6 +661,26 @@ export function createBreadcrumbList(
       position: index + 1,
       name: entry.name,
       item: entry.item,
+    })),
+  };
+}
+
+/** Builds a standalone FAQPage graph from arbitrary Q&A pairs (e.g. an FAQ section parsed out of blog post content). */
+export function createFaqPageFromEntries(
+  url: string,
+  entries: ReadonlyArray<{ question: string; answer: string }>,
+) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    url,
+    mainEntity: entries.map((entry) => ({
+      '@type': 'Question',
+      name: entry.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: entry.answer,
+      },
     })),
   };
 }
@@ -685,6 +867,137 @@ export function clampDescription(text: string, max = 160): string {
   const slice = clean.slice(0, max);
   const lastSpace = slice.lastIndexOf(' ');
   return `${(lastSpace > 40 ? slice.slice(0, lastSpace) : slice).trim()}…`;
+}
+
+export const GLOSSARY_ENTRIES = [
+  {
+    term: 'Agentic AI Platform',
+    definition:
+      'Software that lets AI agents decide their own sequence of steps toward a goal, rather than following a fixed script. A genuine agentic platform also orchestrates multiple agents, governs which actions run unattended, and lets non-developers configure new workflows.',
+    href: '/blog/what-is-an-agentic-ai-platform-a-practical-definition-for-business-leaders',
+  },
+  {
+    term: 'AI Operations Platform',
+    definition:
+      'A platform that takes an organisation from operational assessment through to deployed, governed AI agents and workflow automation, rather than offering any single one of those pieces in isolation.',
+    href: '/product',
+  },
+  {
+    term: 'AI Agent Orchestration',
+    definition:
+      'The coordination layer that lets several AI agents work on related parts of a task, handing off context between them, so a lead qualification workflow, for example, can involve one agent enriching data and another notifying a salesperson.',
+    href: '/blog/what-is-an-agentic-ai-platform-a-practical-definition-for-business-leaders',
+  },
+  {
+    term: 'Autonomous AI Agent',
+    definition:
+      'An AI system given a goal and a set of tools, which decides for itself which tools to use and in what order, adjusting its approach as new information arrives, rather than following a predetermined sequence of steps.',
+    href: '/product',
+  },
+  {
+    term: 'AI Readiness Assessment',
+    definition:
+      'A structured evaluation of an organisation’s data quality, process maturity, and governance before any AI system is deployed, used to identify where automation will create measurable value and where it will not.',
+    href: '/free-diagnostic',
+  },
+  {
+    term: 'Operational Maturity Assessment',
+    definition:
+      'An audit of how consistently an organisation’s processes actually run in practice, covering strategy, data, and people, used to find the root causes of operational bottlenecks before choosing what to automate.',
+    href: '/blog/business-operations-assessment-find-the-bottlenecks-before-you-automate',
+  },
+  {
+    term: 'No-Code AI Agent Deployment',
+    definition:
+      'Connecting an AI agent to business tools such as a CRM or messaging platform through an approval-based interface, rather than custom integration code, so operations teams can configure and launch agents without an engineering ticket.',
+    href: '/blog/deploying-ai-agents-to-slack-and-hubspot-a-no-code-walkthrough',
+  },
+  {
+    term: 'Multilingual AI Agents',
+    definition:
+      'Agents that reason natively in whatever language a request arrives in, rather than translating into English internally, and that reply in the same language without a separate workflow being configured per language.',
+    href: '/blog/multilingual-ai-agents-why-language-should-not-limit-your-automation',
+  },
+  {
+    term: 'Governed AI Operations',
+    definition:
+      'Running AI-enabled workflows with proportionate human oversight, a clear audit trail, and defined limits on what an agent can do unattended, so autonomy is deliberately bounded rather than open-ended.',
+    href: '/blog/governed-ai-operations-control-human-oversight-and-auditability',
+  },
+  {
+    term: 'AI Workforce',
+    definition:
+      'A set of AI agents deployed to handle defined operational tasks alongside human staff, distinct from traditional automation in that each agent can adapt its approach rather than replay a fixed script.',
+    href: '/blog/ai-workforce-vs-traditional-automation-what-should-your-business-deploy',
+  },
+  {
+    term: 'Robotic Process Automation (RPA)',
+    definition:
+      'Software that replays a fixed sequence of steps against a user interface or system, typically to move data between applications. RPA cannot adapt when an input looks different from what it was configured to expect.',
+    href: '/blog/ai-agent-vs-chatbot-vs-rpa-what-actually-differs',
+  },
+  {
+    term: 'Business Operations Assessment',
+    definition:
+      'A diagnostic that scores an organisation’s process, data, strategy, governance, and people maturity, producing a baseline that transformation and automation decisions can be measured against.',
+    href: '/free-diagnostic',
+  },
+  {
+    term: 'Workflow Automation',
+    definition:
+      'The practice of encoding a business process as a repeatable, monitored sequence of actions across systems, with or without AI decision-making involved at each step.',
+    href: '/product',
+  },
+  {
+    term: 'Human-in-the-Loop',
+    definition:
+      'A design principle where a person reviews or approves an AI system’s output before it takes effect, typically applied to actions with real external consequences rather than ones that are easy to reverse.',
+    href: '/about#how-it-works',
+  },
+  {
+    term: 'Large Language Model (LLM)',
+    definition:
+      'A machine learning model trained on large volumes of text to generate and reason about language. The model itself is a component; how a platform decides when to call it, what tools to give it, and who reviews its output is what determines whether the result is useful in production.',
+    href: '/blog/llm-selection-guide-for-business-operations-a-practical-framework',
+  },
+] as const;
+
+const GLOSSARY_DESCRIPTION =
+  'Plain-English definitions for the terms that matter in AI operations: agentic AI platforms, autonomous agents, AI readiness assessments, orchestration, and governed deployment.';
+
+export function buildGlossaryPageGraph(siteUrl: PublicSiteUrl): Record<string, unknown> {
+  const glossaryUrl = absoluteUrlForSite(siteUrl, '/glossary');
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': `${glossaryUrl}#webpage`,
+        url: glossaryUrl,
+        name: 'AI Operations Glossary — Aivory',
+        description: GLOSSARY_DESCRIPTION,
+        isPartOf: { '@id': `${siteUrl}/#website` },
+        about: { '@id': `${siteUrl}/#organisation` },
+        publisher: { '@id': `${siteUrl}/#organisation` },
+        inLanguage: siteUrl === AIVORY_UK_URL ? 'en' : 'id',
+        mainEntity: { '@id': `${glossaryUrl}#termset` },
+      },
+      {
+        '@type': 'DefinedTermSet',
+        '@id': `${glossaryUrl}#termset`,
+        name: 'AI Operations Glossary',
+        description: GLOSSARY_DESCRIPTION,
+        url: glossaryUrl,
+        hasDefinedTerm: GLOSSARY_ENTRIES.map((entry) => ({
+          '@type': 'DefinedTerm',
+          name: entry.term,
+          description: entry.definition,
+          url: absoluteUrlForSite(siteUrl, entry.href),
+          inDefinedTermSet: { '@id': `${glossaryUrl}#termset` },
+        })),
+      },
+    ],
+  };
 }
 
 export function JsonLd({ data }: { data: Record<string, unknown> }) {

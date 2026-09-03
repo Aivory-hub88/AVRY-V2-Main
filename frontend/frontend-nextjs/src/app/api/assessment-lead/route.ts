@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveMx } from 'node:dns/promises';
 
 /**
  * Free assessment lead capture.
@@ -17,6 +18,54 @@ const BACKEND_URL = process.env.BACKEND_SERVICE_URL || 'http://avry-backend:8081
 const INGEST_TOKEN = process.env.LEAD_INGEST_TOKEN;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * Does this domain accept mail at all?
+ *
+ * A syntax check passes `someone@example.com`, which can never receive
+ * anything — RFC 7505 has example.com publish a "null MX" precisely to say so.
+ * Two of the first six leads captured here were exactly that, so the report was
+ * generated and emailed into a void.
+ *
+ * This is a DELIVERABILITY check, not a "is this a real person" check: it says
+ * whether the domain can receive mail, never whether the mailbox exists. The
+ * only definitive signal for that is a bounce.
+ *
+ * Deliberately NOT a free-vs-business-email filter. Every genuine lead this
+ * form has captured so far is on gmail.com; rejecting those would leave none.
+ *
+ * Fails OPEN. A DNS outage or a slow resolver must never cost a real lead, so
+ * anything other than a confident "this domain refuses mail" lets the lead
+ * through.
+ */
+const MX_TIMEOUT_MS = 2500;
+const MX_CACHE_TTL_MS = 60 * 60 * 1000;
+const mxCache = new Map<string, { ok: boolean; at: number }>();
+
+async function domainAcceptsMail(domain: string): Promise<boolean> {
+  const cached = mxCache.get(domain);
+  if (cached && Date.now() - cached.at < MX_CACHE_TTL_MS) return cached.ok;
+
+  let ok = true;
+  try {
+    const records = await Promise.race([
+      resolveMx(domain),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('mx_timeout')), MX_TIMEOUT_MS)),
+    ]);
+    // A single empty exchange is RFC 7505's null MX: "this domain accepts no
+    // mail". No records at all means the same thing in practice here.
+    ok = records.length > 0 && !(records.length === 1 && records[0].exchange === '');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    // NXDOMAIN / NODATA are answers, not failures: the domain cannot take mail.
+    // Everything else (timeout, SERVFAIL, resolver down) fails open.
+    ok = !(code === 'ENOTFOUND' || code === 'ENODATA');
+  }
+
+  mxCache.set(domain, { ok, at: Date.now() });
+  return ok;
+}
 
 function str(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -35,6 +84,17 @@ export async function POST(request: NextRequest) {
   const email = str(body.email, 255)?.toLowerCase();
   if (!email || !EMAIL_RE.test(email)) {
     return NextResponse.json({ ok: false, error: 'invalid_email' }, { status: 400 });
+  }
+
+  const domain = email.split('@')[1];
+  if (domain && !(await domainAcceptsMail(domain))) {
+    // Distinct from `invalid_email` so the page can say something specific and
+    // withhold the unlock — this is the one failure the visitor can fix, and
+    // unlocking would hand them a report we know we cannot deliver.
+    return NextResponse.json(
+      { ok: false, error: 'undeliverable_domain' },
+      { status: 400 },
+    );
   }
 
   if (!INGEST_TOKEN) {

@@ -106,18 +106,25 @@ export async function getUserTier() {
 }
 
 /**
- * Get payment products (payments service).
+ * Get the payment catalogue (payments service).
+ *
+ * `/config` is the authoritative product list — id, name, USD and IDR price —
+ * and is also what tells the browser which Midtrans environment to load.
  */
 export async function getPaymentProducts() {
-  return apiRequest("payments", "/api/v1/payments/products");
+  return apiRequest("payments", "/api/v1/payments/config");
 }
 
 /**
  * Create payment transaction (payments service).
+ *
+ * Prefer `openPaymentModal` in `lib/payment.ts` for the full checkout; this is
+ * the bare transaction call. No amount is sent — the service prices the product.
+ *
  * @param product - Product ID or name
  */
 export async function createPaymentTransaction(product: string | number) {
-  return apiRequest("payments", "/api/v1/payments/create", {
+  return apiRequest("payments", "/api/v1/payments/midtrans/create", {
     method: "POST",
     body: JSON.stringify({ product }),
   });

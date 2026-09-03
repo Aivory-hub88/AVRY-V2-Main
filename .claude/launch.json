@@ -8,6 +8,12 @@
       "port": 3001
     },
     {
+      "name": "landing-preview (frontend-nextjs)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend/frontend-nextjs", "run", "dev:preview"],
+      "port": 3005
+    },
+    {
       "name": "user-dashboard",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "frontend/avry-user-dashboard", "run", "dev"],

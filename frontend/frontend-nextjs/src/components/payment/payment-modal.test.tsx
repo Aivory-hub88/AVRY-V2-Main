@@ -157,11 +157,14 @@ describe('PaymentModal', () => {
         />
       );
 
-      // The component shows "Payment Pending" when user is not authenticated
-      // because startMidtransSnap is called with a pending result
+      // Was asserting "Payment Pending" here, which is what the component
+      // used to show a signed-out visitor: the auth effect set an `info`
+      // status and renderStatus() fell through to the pending screen. The
+      // test name always described the correct behaviour.
       await waitFor(() => {
-        expect(screen.getByText('Payment Pending')).toBeInTheDocument();
+        expect(screen.getByText('Authentication Required')).toBeInTheDocument();
       });
+      expect(screen.queryByText('Payment Pending')).not.toBeInTheDocument();
     });
   });
 
@@ -381,7 +384,8 @@ describe('PaymentModal', () => {
     it('shows success message after manual payment submission', async () => {
       vi.mocked(paymentLib.recordManualPayment).mockResolvedValue({
         success: true,
-      });
+        order_id: 'ORDER-123',
+      } as never);
 
       render(
         <PaymentModal 
@@ -410,10 +414,16 @@ describe('PaymentModal', () => {
         fireEvent.click(submitBtn);
       }
 
-      // Wait for success message
+      // "Payment recorded successfully!" has not existed in the app for a
+      // long time; the handler writes a "submitted for verification" message
+      // instead, which the success screen used to discard. A manual transfer
+      // is awaiting confirmation, so it must not read as settled.
       await waitFor(() => {
-        expect(screen.getByText('Payment recorded successfully!')).toBeInTheDocument();
-      }, { timeout: 10000 });
+        expect(screen.getByText('Payment Submitted')).toBeInTheDocument();
+      });
+      expect(
+        screen.getByText(/submitted for verification \(order ORDER-123\)/i)
+      ).toBeInTheDocument();
     });
   });
 
@@ -429,21 +439,29 @@ describe('PaymentModal', () => {
         />
       );
 
-      // When user is not authenticated, the component shows "Payment Pending"
-      // because startMidtransSnap is called with a pending result
+      // Previously expected "Payment Pending" AND a login button on the same
+      // screen -- two states at once. A signed-out visitor gets the
+      // authentication prompt, which is where the login button lives.
       await waitFor(() => {
-        expect(screen.getByText('Payment Pending')).toBeInTheDocument();
+        expect(screen.getByText('Authentication Required')).toBeInTheDocument();
       });
 
-      // The login button should be present to allow user to log in
       const loginBtn = screen.getByText('Log In');
       expect(loginBtn).toBeInTheDocument();
+
+      // The component does not call login() directly -- handleLogin
+      // dispatches an `openLoginModal` window event that the app's own login
+      // modal listens for. Asserting on authLib.login was left over from an
+      // earlier implementation.
+      const openLoginModal = vi.fn();
+      window.addEventListener('openLoginModal', openLoginModal);
 
       if (loginBtn) {
         fireEvent.click(loginBtn);
       }
 
-      expect(authLib.login).toHaveBeenCalled();
+      expect(openLoginModal).toHaveBeenCalled();
+      window.removeEventListener('openLoginModal', openLoginModal);
     });
 
     it('shows error when user has no id', async () => {
