@@ -14,9 +14,11 @@ const { Worker } = require('bullmq');
 const IORedis = require('ioredis');
 const { QUEUE_NAME, redisOptions, runDeepDiagnostic } = require('./lib/diagnosticQueue');
 const { QUEUE_NAME: BLUEPRINT_QUEUE_NAME, runBlueprintGeneration } = require('./lib/blueprintQueue');
+const { QUEUE_NAME: ROADMAP_QUEUE_NAME, runRoadmapGeneration } = require('./lib/roadmapQueue');
 
 const concurrency = parseInt(process.env.DIAGNOSTIC_WORKER_CONCURRENCY || '5', 10);
 const blueprintConcurrency = parseInt(process.env.BLUEPRINT_WORKER_CONCURRENCY || '3', 10);
+const roadmapConcurrency = parseInt(process.env.ROADMAP_WORKER_CONCURRENCY || '3', 10);
 
 const worker = new Worker(
   QUEUE_NAME,
@@ -50,5 +52,22 @@ blueprintWorker.on('failed', (job, err) => {
   console.error(`[blueprint-worker] failed ${job?.id}: ${err?.message}`);
 });
 
+const roadmapWorker = new Worker(
+  ROADMAP_QUEUE_NAME,
+  async (job) => {
+    console.log(`[roadmap-worker] processing job ${job.id}`);
+    return await runRoadmapGeneration(job.data);
+  },
+  { connection: new IORedis(redisOptions), concurrency: roadmapConcurrency }
+);
+
+roadmapWorker.on('completed', (job) => {
+  console.log(`[roadmap-worker] completed ${job.id} (${job.returnvalue?.content?.length || 0} chars)`);
+});
+roadmapWorker.on('failed', (job, err) => {
+  console.error(`[roadmap-worker] failed ${job?.id}: ${err?.message}`);
+});
+
 console.log(`[diag-worker] started, queue=${QUEUE_NAME}, concurrency=${concurrency}`);
 console.log(`[blueprint-worker] started, queue=${BLUEPRINT_QUEUE_NAME}, concurrency=${blueprintConcurrency}`);
+console.log(`[roadmap-worker] started, queue=${ROADMAP_QUEUE_NAME}, concurrency=${roadmapConcurrency}`);

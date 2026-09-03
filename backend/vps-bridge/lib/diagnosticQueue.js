@@ -15,6 +15,12 @@ const { v4: uuidv4 } = require('uuid');
 
 const QUEUE_NAME = 'diagnostics';
 
+// Model + timeout knobs. DIAGNOSTIC_MODEL is a hybrid-thinking model on
+// OpenRouter; the ladder below disables thinking on tier 1 (see callModel).
+const DIAGNOSTIC_MODEL = process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b';
+const DIAGNOSTIC_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_TIMEOUT_MS || '60000', 10);
+const DIAGNOSTIC_FALLBACK_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_FALLBACK_TIMEOUT_MS || '115000', 10);
+
 const redisOptions = {
   host: process.env.REDIS_HOST || '127.0.0.1',
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
@@ -82,58 +88,138 @@ function isUsableDiagnosticResult(result) {
 }
 
 /**
+ * One OpenRouter chat completion with SSE streaming. `reasoningEnabled=false`
+ * actually disables thinking on hybrid models (measured on the blueprint
+ * ladder 2026-08-22: 14.5s with reasoning off vs 128.6s on the SAME prompt —
+ * {exclude:true} does NOT skip thinking, it merely hides it). Streaming keeps
+ * the connection active so an idle-response stall surfaces as TTFT in the
+ * logs instead of a silent black box.
+ */
+async function callModel({ userContent, reasoningEnabled, timeoutMs, tier }) {
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
+
+  const body = {
+    model: DIAGNOSTIC_MODEL,
+    messages: [
+      { role: 'system', content: DIAGNOSTIC_SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ],
+    stream: true,
+    max_tokens: 4000,
+  };
+  // Only send the param when disabling — omitting it preserves the model's
+  // default (reasoning on) for the fallback attempt.
+  if (!reasoningEnabled) body.reasoning = { enabled: false };
+
+  const t0 = Date.now();
+  console.log(`[diag-worker] model call start tier=${tier} model=${DIAGNOSTIC_MODEL} reasoning=${reasoningEnabled ? 'on' : 'off'} promptChars=${userContent.length}`);
+  let orRes;
+  try {
+    orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://aivory.app',
+        'X-Title': 'Aivory',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    const isTimeout = err && (err.name === 'TimeoutError' || err.name === 'AbortError');
+    console.warn(`[diag-worker] model call ${isTimeout ? 'TIMED OUT' : 'NETWORK ERROR'} tier=${tier} elapsedMs=${Date.now() - t0}: ${err.message}`);
+    throw err;
+  }
+  console.log(`[diag-worker] model call headers tier=${tier} status=${orRes.status} elapsedMs=${Date.now() - t0}`);
+
+  if (!orRes.ok || !orRes.body) {
+    const errText = orRes.body ? await orRes.text().catch(() => 'unknown error') : 'no body';
+    throw new Error(`OpenRouter error ${orRes.status}: ${String(errText).substring(0, 200)}`);
+  }
+
+  const reader = orRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let ttftMs = null;
+  let finishReason = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith('data:')) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.error) throw new Error(`OpenRouter stream error: ${String(evt.error?.message || evt.error).substring(0, 200)}`);
+      const delta = evt.choices?.[0]?.delta?.content;
+      if (delta) {
+        if (ttftMs === null) ttftMs = Date.now() - t0;
+        content += delta;
+      }
+      if (evt.choices?.[0]?.finish_reason) finishReason = evt.choices[0].finish_reason;
+    }
+  }
+  console.log(`[diag-worker] model call done tier=${tier} reasoning=${reasoningEnabled ? 'on' : 'off'} elapsedMs=${Date.now() - t0} ttftMs=${ttftMs} finish=${finishReason} chars=${content.length}`);
+  if (!content.trim()) throw new Error('Diagnostic generation returned empty content');
+  return content;
+}
+
+/** Fence-tolerant JSON extraction — models occasionally wrap JSON in ```json fences. */
+function extractJson(content) {
+  try {
+    return JSON.parse(content);
+  } catch {
+    const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : null;
+    if (!jsonStr) throw new Error('AI engine returned invalid JSON');
+    return JSON.parse(jsonStr);
+  }
+}
+
+/**
  * Run the deep diagnostic against OpenRouter and return the normalized result.
  * Throws on any failure (worker marks the job failed) — including a
  * structurally unusable result, so BullMQ's retry (see server.js
  * diagnosticQueue.add) gets a real second attempt instead of the caller
  * silently receiving placeholder content.
+ *
+ * 2026-08-25: two-tier ladder, mirroring the blueprint queue's proven
+ * pattern. Tier 1 = reasoning OFF (fast; the diagnostic JSON is small and
+ * structured — thinking added 100s+ for no quality gain in every inspected
+ * case). Tier 2 = reasoning ON (the old behaviour) only when tier 1 failed
+ * or produced an unusable assessment.
  */
 async function runDeepDiagnostic(payload) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-  if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
+  const userContent = JSON.stringify(payload, null, 2);
 
-  const openrouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://aivory.app',
-      'X-Title': 'Aivory',
-    },
-    body: JSON.stringify({
-      model: process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b',
-      messages: [
-        { role: 'system', content: DIAGNOSTIC_SYSTEM_PROMPT },
-        { role: 'user', content: JSON.stringify(payload, null, 2) },
-      ],
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(115_000),
-  });
-
-  if (!openrouterRes.ok) {
-    const errText = await openrouterRes.text().catch(() => 'unknown error');
-    throw new Error(`OpenRouter error ${openrouterRes.status}: ${String(errText).substring(0, 200)}`);
-  }
-
-  const openrouterData = await openrouterRes.json();
-  const content = openrouterData?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('AI engine returned empty response');
-
-  let result;
+  // Tier 1: fast, no-reasoning.
   try {
-    result = JSON.parse(content);
-  } catch {
-    const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : null;
-    if (!jsonStr) throw new Error('AI engine returned invalid JSON');
-    result = JSON.parse(jsonStr);
+    const fast = await callModel({ userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_TIMEOUT_MS, tier: 'fast' });
+    const result = extractJson(fast);
+    if (isUsableDiagnosticResult(result)) return normalizeDiagnostic(result);
+    console.warn('[diag-worker] tier=fast result unusable — escalating to tier=fallback');
+  } catch (err) {
+    console.warn(`[diag-worker] tier=fast failed (${err.message}) — escalating to tier=fallback`);
   }
 
+  // Tier 2: reasoning-on — the pre-2026-08-25 behaviour.
+  const content = await callModel({ userContent, reasoningEnabled: true, timeoutMs: DIAGNOSTIC_FALLBACK_TIMEOUT_MS, tier: 'fallback' });
+  const result = extractJson(content);
   if (!isUsableDiagnosticResult(result)) {
     throw new Error('Diagnostic generation returned an incomplete/malformed assessment (missing score, maturity_level, or any findings)');
   }
+  return normalizeDiagnostic(result);
+}
 
+function normalizeDiagnostic(result) {
   const diagnosticId = `DIAG_${uuidv4().replace(/-/g, '').substring(0, 12).toUpperCase()}`;
   const score = result.ai_readiness_score ?? result.score;
   return {
