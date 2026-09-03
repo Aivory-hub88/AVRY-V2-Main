@@ -1,57 +1,56 @@
-'use client';
-
-import { useScrollAnimation } from '@/hooks/useScrollAnimation';
-
 export function CompanyHero() {
-  const { ref, isVisible } = useScrollAnimation({ threshold: 0.05 });
-
   return (
-    <section
-      ref={ref}
-      className={`animate-on-scroll ${
-        isVisible ? 'is-visible' : ''
-      } relative min-h-screen flex items-center justify-center overflow-hidden bg-black bg-grid-pattern border-b border-white/10`}
-    >
-      {/* Light gradient highlight to mimic x.ai top screen shine */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none opacity-20 blur-[100px]"
-        style={{
-          background: 'radial-gradient(ellipse 50% 50% at 50% 0%, #c4c9b8 0%, transparent 80%)',
-        }}
-      />
-
-      {/* Hero Content */}
-      <div className="relative z-10 text-center px-6 max-w-4xl mx-auto flex flex-col items-center pt-24">
-        {/* Headline */}
-        <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-light text-white mb-8 leading-[1.15] tracking-tight max-w-3xl"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          Aivory is an AI adoption platform.
+    <>
+      <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 lg:px-24 md:pb-24 md:pt-52">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
+          Company
+        </p>
+        <h1 className="mt-5 max-w-[1180px] text-[44px] font-light leading-[1.15] tracking-[-0.02em] text-[#11110f] md:text-[64px] lg:text-[80px]">
+          Better operations begin with clarity.
         </h1>
+      </section>
 
-        {/* Subtitle Paragraphs */}
-        <div className="flex flex-col gap-6 text-base sm:text-lg text-white/75 max-w-3xl mx-auto mb-10 font-light leading-relaxed" style={{ fontFamily: "'Manrope', sans-serif" }}>
-          <p>
-            We help organisations identify where AI creates real value, design the right systems, and bring them into production without guesswork, wasted budget, or drawn-out consulting cycles.
-          </p>
-          <p>
-            Everything happens in one place. From AI readiness assessment to implementation blueprint to deployment tools. From the moment you begin to the moment AI is actively running in your business, Aivory guides the entire journey.
-          </p>
-        </div>
-      </div>
+      <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-32">
+        <div className="grid border-t border-black/25 pt-8 lg:grid-cols-12 lg:gap-12">
+          <div className="flex flex-col pb-10 lg:col-span-5 lg:min-h-[430px] lg:pb-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-black/60">
+              About Aivory
+            </p>
+            <h2 className="mt-6 max-w-xl text-[32px] font-light leading-[1.05] tracking-[-0.035em] text-[#11110f] md:text-[46px]">
+              We help ambitious teams make complex work easier to understand,
+              improve, and run.
+            </h2>
+            <div className="mt-8 max-w-md space-y-5 text-[15px] font-light leading-[1.7] text-black/70 md:text-[16px] lg:mt-auto">
+              <p>
+                Aivory brings diagnosis, planning, and implementation into one
+                connected way of working.
+              </p>
+              <p>
+                The result is clearer decisions, stronger workflows, and systems
+                that continue to work long after the first project is complete.
+              </p>
+            </div>
+          </div>
 
-      {/* Wireframe Scroll Guide (Vertical line showing page flow) */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-        <div className="w-[1px] h-20 bg-gradient-to-b from-transparent to-white/15" />
-        <div
-          className="text-[9px] tracking-[0.15em] text-[#dfe2d8] uppercase my-3 font-light"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          SCROLL TO EXPLORE
+          <figure className="lg:col-span-7">
+            <div className="aspect-[16/9] overflow-hidden bg-[#11110f]">
+              <img
+                src="/images/Company/five-people-renaissance-meeting.webp"
+                alt="Five Renaissance figures gathered around a table in a red and navy editorial illustration"
+                width={1400}
+                height={781}
+                className="h-full w-full object-cover"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </div>
+            <figcaption className="mt-3 font-mono text-[9px] uppercase tracking-[0.14em] text-black/50">
+              Built for business operations
+            </figcaption>
+          </figure>
         </div>
-        <div className="w-[1px] h-12 bg-white/20" />
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

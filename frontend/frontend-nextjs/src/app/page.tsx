@@ -3,13 +3,14 @@ import HeroSection from '@/components/home/HeroSection';
 import AIReadySection from '@/components/home/AIReadySection';
 import FeatureCards from '@/components/home/FeatureCards';
 import StatsSection from '@/components/home/StatsSection';
+import VideoDemoSection from '@/components/home/VideoDemoSection';
+import EnterpriseComparisonSection from '@/components/home/EnterpriseComparisonSection';
 import PricingClientWrapper from '@/app/pricing/PricingClientWrapper';
 import PrivacySection from '@/components/home/PrivacySection';
 import PreFooterCTA from '@/components/home/PreFooterCTA';
 import Footer from '@/components/Footer';
 import ScrollRevealProvider from '@/components/home/ScrollRevealProvider';
 import { HalftoneWaveWrapper } from '@/components/ui/HalftoneWaveWrapper';
-import BastionBackground from '@/components/bastion/BastionBackground';
 import { DarkSectionSpotlight } from '@/components/ui/DarkSectionSpotlight';
 import { JsonLd, buildHomePageGraph, siteUrlFromHeaders } from '@/lib/seo';
 
@@ -20,11 +21,10 @@ export default function HomePage() {
     <main className="relative">
       <JsonLd data={buildHomePageGraph(siteUrl)} />
       <ScrollRevealProvider />
-      <section style={{ padding: 0 }} className="relative z-[1] bg-black">
-        {/* Global Ambient Background Gradient Wash (Fixed across ENTIRE page in #165444 emerald teal) */}
-        <BastionBackground mode="gradient-only" className="fixed inset-0 z-0 pointer-events-none overflow-hidden" />
-        
-        {/* Global seamless background for the ENTIRE page, down to the footer */}
+      <section style={{ padding: 0 }} className="relative z-[1] bg-background">
+        {/* Halftone flower — no separate gradient wash underneath it, so the
+            page still reads as pitch black wherever the flower's own
+            opacity crossfades to 0. */}
         <div className="fixed inset-0 z-0 pointer-events-none">
           <div className="w-full h-full">
             <HalftoneWaveWrapper />
@@ -39,13 +39,15 @@ export default function HomePage() {
           <div className="relative z-10">
             <AIReadySection />
 
-            <div className="w-full py-16 md:py-24 px-6 flex flex-col items-center justify-center text-center">
+            <VideoDemoSection />
+
+            <div className="w-full pt-4 md:pt-8 pb-2 md:pb-4 px-6 flex flex-col items-center justify-center text-center">
               <h2
-                className="text-2xl md:text-3xl lg:text-4xl font-light tracking-tight text-[#B3B3B3] leading-relaxed max-w-3xl"
-                style={{ fontFamily: "'Manrope', sans-serif" }}
+                className="text-[26px] sm:text-[28px] md:text-[28px] lg:text-[32px] font-light tracking-tight text-[#B3B3B3] leading-[1.35] max-w-3xl"
+                style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif", fontWeight: 300 }}
               >
-                Beyond AI chat.<br />
-                <span className="text-white font-medium">Built for business operations.</span>
+                Beyond AI chat<br />
+                <span className="text-white font-light">Understand how business really works</span>
               </h2>
             </div>
 
@@ -55,8 +57,10 @@ export default function HomePage() {
               <StatsSection />
             </div>
 
+            <EnterpriseComparisonSection />
+
             <div>
-              <PricingClientWrapper />
+              <PricingClientWrapper withBackground />
             </div>
 
             <div>

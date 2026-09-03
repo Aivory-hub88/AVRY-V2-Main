@@ -28,7 +28,7 @@
 
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { renderPage } from "@/test/render-page";
 import "@testing-library/jest-dom/vitest";
 import fc from "fast-check";
 
@@ -128,7 +128,7 @@ describe("Property 1: Section completeness & order", () => {
   // -------------------------------------------------------------------------
   describe("completeness (Req 1.1, 1.3, 1.4)", () => {
     it("renders all nine legacy regions, each reachable by a stable identifier", () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
 
       for (const { id, find } of LEGACY_SECTION_ORDER) {
         const el = find(container);
@@ -138,7 +138,7 @@ describe("Property 1: Section completeness & order", () => {
     });
 
     it("exposes exactly the nine expected regions (no region resolves to -1)", () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const indices = regionDomIndices(container);
 
       expect(indices).toHaveLength(9);
@@ -153,7 +153,7 @@ describe("Property 1: Section completeness & order", () => {
   // -------------------------------------------------------------------------
   describe("order (Req 1.2)", () => {
     it("places the nine regions in strictly increasing DOM index per LEGACY_SECTION_ORDER", () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const indices = regionDomIndices(container).map((r) => r.index);
 
       // Strictly increasing: each region begins after the previous one.
@@ -166,7 +166,7 @@ describe("Property 1: Section completeness & order", () => {
     });
 
     it("orders every region pair (i < j) as region[i] before region[j] (compareDocumentPosition)", () => {
-      const { container } = render(<Home />);
+      const { container } = renderPage(<Home />);
       const elements = LEGACY_SECTION_ORDER.map(({ id, find }) => {
         const el = find(container);
         expect(el, `region "${id}" must be present`).not.toBeNull();

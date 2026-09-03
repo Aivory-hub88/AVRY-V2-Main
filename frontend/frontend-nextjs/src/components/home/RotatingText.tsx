@@ -4,15 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 
 const messages = [
   'Make AI Make Sense&reg;',
-  'From Data &rarr; Decisions &rarr; Action.',
-  'For your business operation.',
-  'Start with clarity.',
-  'Discover where AI creates measurable value.',
-  'Know what to build before you build anything.',
-  'Turn AI ambition into execution.',
-  'Transform operations with confidence.',
-  'Build intelligence that delivers business outcomes.',
-  'Transforming business complexity into operational clarity.',
+  'Operational clarity, not another pilot',
+  'From data &rarr; decisions &rarr; action',
+  'Transform operations with confidence',
+  'Turn complexity into operational clarity',
+  'From operational clarity to governed execution',
+  'Assess &rarr; Design &rarr; Deploy',
+  'Turn data into decisions you can act on',
 ];
 
 export default function RotatingText() {
@@ -58,7 +56,7 @@ export default function RotatingText() {
     <div
       style={{
         position: 'relative',
-        height: '5.5rem',
+        height: '3.75rem',
         overflow: 'hidden',
         width: '100%',
         marginBottom: '2.5rem',
@@ -66,9 +64,9 @@ export default function RotatingText() {
     >
       <p
         ref={textRef}
-        className="text-[21px] md:text-[33.6px] font-light text-[#d2d4cc] text-center w-full leading-tight"
+        className="text-[16px] md:text-[24px] font-light text-[#d2d4cc] text-center w-full leading-tight"
         style={{
-          fontFamily: "'Manrope', sans-serif",
+          fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
           position: 'absolute',
           top: '50%',
           left: 0,

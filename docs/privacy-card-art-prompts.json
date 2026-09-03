@@ -1,0 +1,130 @@
+{
+  "$comment": "Art brief for the 8 tapestry cards in frontend/frontend-nextjs/src/components/home/PrivacySection.tsx. All eight are live as of 2026-08-01. To replace one: generate a new image, run it through the resize step below, overwrite frontend/frontend-nextjs/public/images/privacy/<file>, and update the card's `alt` text if the scene changed.",
+
+  "$pipeline": "Full-size masters live in frontend/frontend-nextjs/art-masters/privacy (gitignored, never served). Shipped files are 900x672 WebP q80, ~200 KB each, produced with Pillow: im.resize((900, round(900*h/w)), LANCZOS).save(dst, 'WEBP', quality=80, method=6).",
+
+  "output": {
+    "aspect_ratio": "4:3",
+    "recommended_pixels": "1600x1200 (min 1200x900)",
+    "format": "webp, quality 82 (keep a png master)",
+    "destination": "frontend/frontend-nextjs/public/images/privacy/",
+    "public_url_prefix": "/images/privacy/",
+    "note": "No basePath on this app — reference assets from the site root."
+  },
+
+  "series_consistency": {
+    "why": "The eight cards sit in one grid; they must read as one commissioned set, not eight separate experiments.",
+    "rules": [
+      "Same camera, same lens feel, same raking light from the upper left in every card.",
+      "Same fabric border treatment: a visible stitched edge inset from the frame.",
+      "Emblem centred, occupying ~55% of the frame height, landscape visible behind it.",
+      "Every card uses the shared palette; only the temperature shifts (summer cards cooler, autumn cards warmer)."
+    ],
+    "midjourney": "Generate card 01 first, then reuse it as a style reference: append `--sref <url-of-card-01> --sw 100` to cards 02–08. Keep `--ar 4:3 --style raw --s 250 --chaos 0`.",
+    "flux_sd": "Fix the seed for the series (e.g. 720431) and vary only the subject clause. Use the same sampler/steps for all eight.",
+    "dalle": "Paste `style_core` + `palette_clause` verbatim at the top of each request, then the card's `subject`."
+  },
+
+  "style_core": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade",
+
+  "palette_clause": "summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen",
+
+  "scene_clause": "behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge",
+
+  "negative_prompt": "flat vector art, digital gradient, smooth plastic, glossy, CGI 3d render, clip art, text, letters, watermark, signature, logo, jpeg artifacts, blur, low relief, printed fabric, embroidery patch on white background, human face, photorealistic photograph of a real object",
+
+  "cards": [
+    {
+      "index": 1,
+      "file": "01-no-training.webp",
+      "label": "We don't train on your data.",
+      "tag": "no training",
+      "temperature": "autumn dusk — deep indigo and plum sky over terracotta and olive ridges",
+      "subject": "a Renaissance heraldic escutcheon (shield) worked in deep crimson coiled yarn with a thick marigold rope border, charged with a bold cream yarn check mark laid in satin stitch, a single marigold star stitched above the shield",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: a Renaissance heraldic escutcheon (shield) worked in deep crimson coiled yarn with a thick marigold rope border, charged with a bold cream yarn check mark laid in satin stitch, a single marigold star stitched above the shield. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Autumn dusk: deep indigo and plum sky over terracotta and olive ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils in contour rows, satin stitch, french knots, fuzzy fibre halo, raking warm light from upper left, matte wool, museum textile-craft photography :: a Renaissance heraldic shield in deep crimson coiled yarn with a marigold rope border charged with a bold cream check mark, a marigold star above :: stitched landscape behind, two-tone sky of horizontal rope rows, concentric-coil sun upper right, french-knot clouds, three combed ridges, tufted field, running-stitch border :: indigo and plum sky over terracotta and olive, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 2,
+      "file": "02-on-premise.webp",
+      "label": "Processed & Stored Locally",
+      "tag": "on-premise",
+      "temperature": "high summer — sky blue and teal sky over sage and olive ridges",
+      "subject": "a heraldic embattled tower of ecru stone-coloured yarn with crenellations, standing on a rust-coloured mound of dense french knots, its arched door and two arrow-slit windows worked in deep crimson, all outlined in amber rope",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: a heraldic embattled tower of ecru stone-coloured yarn with crenellations, standing on a rust-coloured mound of dense french knots, its arched door and two arrow-slit windows worked in deep crimson, all outlined in amber rope. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. High summer: sky blue and teal sky over sage and olive ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: a heraldic embattled tower in ecru yarn on a rust french-knot mound, crimson arched door and arrow slits, amber rope outlines :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: sky blue and teal over sage and olive, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 3,
+      "file": "03-compliance.webp",
+      "label": "GDPR compliant by design.",
+      "tag": "compliance",
+      "temperature": "autumn haze — amber and coral sky over crimson, plum and terracotta ridges",
+      "subject": "a large circular wax-seal roundel of deep indigo coiled yarn inside a thick marigold rope ring, encircled by twelve small marigold yarn stars, its centre left plain and smooth for lettering to be added later",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: a large circular wax-seal roundel of deep indigo coiled yarn inside a thick marigold rope ring, encircled by twelve small marigold yarn stars, its centre left plain and smooth. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Autumn haze: amber and coral sky over crimson, plum and terracotta ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: a circular wax-seal roundel of deep indigo coiled yarn in a thick marigold rope ring, twelve small marigold stars around it, plain smooth centre :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: amber and coral sky over crimson plum terracotta, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, letters, watermark, vector, cgi, gloss",
+      "note": "Leave the centre empty. The word GDPR is typeset in Manrope Light over the image in the component, so it stays crisp and editable."
+    },
+    {
+      "index": 4,
+      "file": "04-no-logs.webp",
+      "label": "Zero server logging",
+      "tag": "no logs",
+      "temperature": "evening after harvest — indigo and sky-blue sky over olive, terracotta and amber ridges",
+      "subject": "an open medieval codex with two cream yarn pages ruled by fine crimson thread lines and a marigold rope spine, struck diagonally by one thick crimson yarn bar from lower left to upper right, in the manner of a heraldic bend",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: an open medieval codex with two cream yarn pages ruled by fine crimson thread lines and a marigold rope spine, struck diagonally by one thick crimson yarn bar from lower left to upper right in the manner of a heraldic bend. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Evening after harvest: indigo and sky-blue sky over olive, terracotta and amber ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: an open medieval codex, cream yarn pages with fine crimson rule lines, marigold rope spine, struck by one thick crimson diagonal bar :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: indigo and sky-blue over olive terracotta amber, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 5,
+      "file": "05-end-to-end.webp",
+      "label": "End to end private",
+      "tag": "end-to-end",
+      "temperature": "warm shore — teal and sky-blue sky over sage, amber and terracotta ridges",
+      "subject": "two crimson yarn roundels at left and right joined by a braided cord of cream and marigold wool twisted into a lover's knot at the centre, where a small crimson padlock with a marigold shackle and a cream keyhole is stitched over the knot",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: two crimson yarn roundels at left and right joined by a braided cord of cream and marigold wool twisted into a lover's knot at the centre, where a small crimson padlock with a marigold shackle and a cream keyhole is stitched over the knot. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Warm shore: teal and sky-blue sky over sage, amber and terracotta ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: two crimson yarn roundels joined by a braided cream and marigold cord tied in a lover's knot, a small crimson padlock stitched over the centre :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: teal and sky-blue over sage amber terracotta, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 6,
+      "file": "06-at-rest.webp",
+      "label": "Encrypted at rest",
+      "tag": "at rest",
+      "temperature": "golden hour — coral and marigold sky over olive, terracotta and amber ridges",
+      "subject": "a domed treasure coffer of burnt terracotta coiled yarn bound by two deep crimson straps and a marigold rope frame, a cream lock plate with a dark keyhole at its centre, fine cream lattice stitches running diagonally across the body",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: a domed treasure coffer of burnt terracotta coiled yarn bound by two deep crimson straps and a marigold rope frame, a cream lock plate with a dark keyhole at its centre, fine cream lattice stitches running diagonally across the body. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Golden hour: coral and marigold sky over olive, terracotta and amber ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: a domed treasure coffer in burnt terracotta coiled yarn, two crimson straps, marigold rope frame, cream lock plate with keyhole, diagonal cream lattice stitching :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: coral and marigold sky over olive terracotta amber, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 7,
+      "file": "07-no-sharing.webp",
+      "label": "No third-party sharing",
+      "tag": "no sharing",
+      "temperature": "cold front, late autumn — indigo and teal sky over olive, plum and terracotta ridges",
+      "subject": "three deep indigo yarn roundels — one at the left, two at the right — linked by cream cords, the cords cut through by a single thick crimson yarn bar running diagonally across them",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: three deep indigo yarn roundels, one at the left and two at the right, linked by cream cords, the cords cut through by a single thick crimson yarn bar running diagonally across them. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. Cold front in late autumn: indigo and teal sky over olive, plum and terracotta ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: three deep indigo yarn roundels linked by cream cords, the cords severed by one thick crimson diagonal bar :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: indigo and teal over olive plum terracotta, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    },
+    {
+      "index": 8,
+      "file": "08-enterprise.webp",
+      "label": "Enterprise grade",
+      "tag": "enterprise",
+      "temperature": "state occasion — plum and indigo sky over sage, terracotta and amber ridges",
+      "subject": "a heraldic crown of marigold coiled yarn with three points, cream pearl knots on the tips, a deep crimson jewelled band, cradled by a laurel wreath of two curving branches whose leaves are dense terracotta french knots",
+      "prompt": "macro photograph of a handmade wool tapestry, thick chunky yarn in high relief, couched rope coils laid in contour rows, satin stitch, french knots, turkey-work tufts, individual fibres and a soft fuzzy halo visible on every edge, raking warm sunlight from the upper left casting real shadows in the grooves between strands, matte natural wool with no sheen, shallow depth of field, museum textile-craft photography, tactile and handmade. Subject: a heraldic crown of marigold coiled yarn with three points, cream pearl knots on the tips, a deep crimson jewelled band, cradled by a laurel wreath of two curving branches whose leaves are dense terracotta french knots. Behind the emblem a stitched landscape: a two-tone sky of horizontal rope rows, a small sun of concentric yarn coils with short ray stitches in the upper right, two cloud puffs made of dense french knots, three layered rolling ridges each combed in a different stitch direction, a hedgerow of knots and a field of upright tufts along the bottom edge, the whole panel bordered by a running-stitch edge. State occasion: plum and indigo sky over sage, terracotta and amber ridges. Summer and autumn wool palette only: marigold yellow, golden amber, burnt terracotta, warm coral, deep crimson, dusty plum, olive, sage green, teal, soft sky blue, deep indigo, cream and ecru linen.",
+      "midjourney": "macro photograph of a handmade wool tapestry, chunky yarn high relief, couched rope coils, french knots, fuzzy fibre halo, raking warm light upper left, matte wool, museum textile-craft photography :: a heraldic crown in marigold coiled yarn with cream pearl knots and a crimson jewelled band, cradled by a laurel wreath of terracotta french-knot leaves :: stitched landscape behind, sky of horizontal rope rows, concentric-coil sun, knot clouds, three combed ridges, tufted field, running-stitch border :: plum and indigo sky over sage terracotta amber, summer-autumn wool palette --ar 4:3 --style raw --s 250 --chaos 0 --no text, watermark, vector, cgi, gloss"
+    }
+  ],
+
+  "wiring": {
+    "file": "frontend/frontend-nextjs/src/components/home/PrivacySection.tsx",
+    "array": "privacyItems",
+    "example": "{ text: \"We don't train on your data.\", tag: 'no training', image: '/images/privacy/01-no-training.webp', alt: '…', tint: '#2E2A1C' },",
+    "fields": {
+      "image": "public path to the shipped WebP",
+      "alt": "describes the tapestry for screen readers — rewrite it whenever the art changes",
+      "tint": "warm colour held behind the panel while the image decodes"
+    }
+  }
+}

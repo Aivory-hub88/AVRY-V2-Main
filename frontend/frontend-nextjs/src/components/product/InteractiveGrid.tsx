@@ -89,7 +89,7 @@ function SpotlightCard({ children, className = '' }: { children: React.ReactNode
   );
 }
 
-// ── Autonomous Agent Card ─────────────────────────────────
+// ── Generalist Agent Card ─────────────────────────────────
 // Animated chat conversation cycling through Slack, WhatsApp, Telegram interfaces
 function AutonomousAgentAnimation() {
   const [phase, setPhase] = useState(0);
@@ -150,7 +150,7 @@ function AutonomousAgentAnimation() {
           <Image src={current.icon} alt={current.name} width={14} height={14} />
         </div>
         <div className="flex flex-col">
-          <span className="text-[11px] text-white/90 font-medium">{current.name}</span>
+          <span className="text-[11px] text-white/90 font-light">{current.name}</span>
           <span className="text-[9px] text-white/40">{current.channel}</span>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
@@ -190,7 +190,7 @@ function AutonomousAgentAnimation() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
-                  <span className="text-[9px] text-white/40 font-medium uppercase tracking-wider">Aivory Agent</span>
+                  <span className="text-[9px] text-white/40 font-light uppercase tracking-wider">Aivory Agent</span>
                 </div>
               )}
               {msg.text}
@@ -291,7 +291,7 @@ function TemplateLibraryAnimation() {
           <div className="text-white/40 group-hover:text-white/70 transition-colors duration-300">
             {tmpl.icon}
           </div>
-          <span className="text-[9px] text-white/40 group-hover:text-white/60 font-medium uppercase tracking-wider transition-colors duration-300 text-center leading-tight">
+          <span className="text-[9px] text-white/40 group-hover:text-white/60 font-light uppercase tracking-wider transition-colors duration-300 text-center leading-tight">
             {tmpl.label}
           </span>
         </div>
@@ -434,17 +434,18 @@ export function InteractiveGrid() {
           >
             THE PLATFORM
           </SpotlightButton>
-          <h3 className="text-4xl md:text-5xl font-light tracking-normal mb-4" style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 300 }}>
-            Your AI Operations <span className="italic" style={{ color: '#e4effd' }}>Stack.</span>
+          <h3 className="text-[26px] sm:text-[28px] md:text-[28px] lg:text-[32px] font-light tracking-tight mb-4" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif", fontWeight: 300 }}>
+            Add Agentic Hands to Your <span style={{ color: '#e4effd' }}>Team.</span>
           </h3>
           <p className="text-white max-w-xl mx-auto font-light leading-relaxed">
-            Agents that act, easy to deploy, no code needed, integrations that connect, and templates that ship fast.
+            Agents that act, easy to deploy, no code needed — built to work alongside your team, not instead of it.
           </p>
         </div>
 
         {/* 3-Column Grid Layout matching Grok style */}
-        <motion.div 
+        <motion.div
           className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          style={{ zoom: 0.8 }}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.1 }}
@@ -453,16 +454,16 @@ export function InteractiveGrid() {
           }}
         >
 
-          {/* Card 1: Autonomous AI Agent */}
+          {/* Card 1: Generalist AI Agent */}
           <motion.div variants={{
             hidden: { opacity: 0, y: 30, scale: 0.95 },
             visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 25, stiffness: 200 } }
           }} className="flex flex-col h-full">
             <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
               <div className="relative z-10 mb-5">
-                <h4 className="text-lg font-medium text-white mb-2">Autonomous AI Agent</h4>
+                <h4 className="text-lg font-light text-white mb-2">Generalist AI Agent</h4>
                 <p className="text-white/50 text-[13px] font-light leading-relaxed">
-                  Deploy autonomous agents inside your communication hubs. They triage, respond, and update your CRM 24/7.
+                  One agent carrying every toolkit, deployed inside your communication hubs. It triages, responds, and updates your CRM 24/7.
                 </p>
               </div>
               {/* Animated chat interface */}
@@ -479,7 +480,7 @@ export function InteractiveGrid() {
           }} className="flex flex-col h-full">
             <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
               <div className="relative z-10 mb-5">
-                <h4 className="text-lg font-medium text-white mb-2">App Integrations</h4>
+                <h4 className="text-lg font-light text-white mb-2">App Integrations</h4>
                 <p className="text-white/50 text-[13px] font-light leading-relaxed">
                   Connect your external applications and seamlessly search across conversations, documents and emails.
                 </p>
@@ -498,7 +499,7 @@ export function InteractiveGrid() {
           }} className="flex flex-col h-full">
             <SpotlightCard className="flex flex-col p-6 auto-spotlight h-full">
               <div className="relative z-10 mb-5">
-                <h4 className="text-lg font-medium text-white mb-2">Template Library</h4>
+                <h4 className="text-lg font-light text-white mb-2">Template Library</h4>
                 <p className="text-white/50 text-[13px] font-light leading-relaxed">
                   Speed up deployment with pre-built template flows. Connect tools and route notifications instantly.
                 </p>
@@ -513,8 +514,9 @@ export function InteractiveGrid() {
         </motion.div>
         
         {/* NEW AGENT CARDS */}
-        <motion.div 
+        <motion.div
           className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6"
+          style={{ zoom: 0.8 }}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.1 }}
@@ -541,11 +543,11 @@ export function InteractiveGrid() {
 }
 
 const MULTILINGUAL_TEXTS = [
-  { text: "Multilingual by default. No configuration required.", font: "'Manrope', sans-serif" },
-  { text: "Multibahasa secara default. Tanpa konfigurasi tambahan.", font: "'Manrope', sans-serif" },
-  { text: "Multilingue par défaut. Aucune configuration requise.", font: "'Manrope', sans-serif" },
-  { text: "Mehrsprachig standardmäßig. Keine Konfiguration erforderlich.", font: "'Manrope', sans-serif" },
-  { text: "Multilingüe por defecto. No se requiere configuración.", font: "'Manrope', sans-serif" },
+  { text: "Multilingual by default. No configuration required.", font: "var(--font-manrope), 'Manrope', sans-serif" },
+  { text: "Multibahasa secara default. Tanpa konfigurasi tambahan.", font: "var(--font-manrope), 'Manrope', sans-serif" },
+  { text: "Multilingue par défaut. Aucune configuration requise.", font: "var(--font-manrope), 'Manrope', sans-serif" },
+  { text: "Mehrsprachig standardmäßig. Keine Konfiguration erforderlich.", font: "var(--font-manrope), 'Manrope', sans-serif" },
+  { text: "Multilingüe por defecto. No se requiere configuración.", font: "var(--font-manrope), 'Manrope', sans-serif" },
   { text: "默认支持多语言。无需任何配置。", font: "'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif" },
   { text: "標準で多言語対応。設定は一切不要です。", font: "'Hiragino Kaku Gothic ProN', 'Meiryo', 'Noto Sans JP', sans-serif" },
   { text: "متعدد اللغات افتراضياً. لا حاجة لأي إعداد", font: "'Tajawal', 'Cairo', 'Noto Kufi Arabic', system-ui, sans-serif" }
@@ -597,8 +599,8 @@ function IntegrationsMarquee() {
         }}
       />
       <div className="text-center mb-10 md:mb-12 px-6 relative">
-        <h3 className="relative text-[22px] md:text-[32px] font-light text-white mb-3 tracking-normal" style={{ fontFamily: "'Manrope', sans-serif", textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
-          Every Aivory agent speaks your customer&apos;s language. Literally.
+        <h3 className="relative text-[22px] md:text-[32px] font-light text-white mb-3 tracking-normal" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif", textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
+          Every Aivory agent speaks multiple languages. Literally.
         </h3>
         <p className={`relative text-[20px] md:text-[22px] text-white font-light transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`} style={{ fontFamily: MULTILINGUAL_TEXTS[langIndex].font, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
           {MULTILINGUAL_TEXTS[langIndex].text}
@@ -619,10 +621,10 @@ function IntegrationsMarquee() {
           <div key={idx} className="flex flex-none shrink-0 items-center justify-center gap-3 grayscale transition-all duration-300 px-8">
             {!item.icon ? null : (
               <div style={{ filter: 'brightness(0) invert(1) drop-shadow(0 2px 6px rgba(0,0,0,0.7))', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img src={item.icon} alt={item.name} className="w-full h-full object-contain" />
+                <img src={item.icon} alt={item.name} width={32} height={32} className="w-full h-full object-contain" />
               </div>
             )}
-            <span className="text-white/90 font-semibold text-xl tracking-tight whitespace-nowrap" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.75)' }}>{item.name}</span>
+            <span className="text-white/90 font-light text-xl tracking-tight whitespace-nowrap" style={{ textShadow: '0 2px 8px rgba(0,0,0,0.75)' }}>{item.name}</span>
           </div>
         ))}
       </div>
@@ -634,16 +636,16 @@ function IntegrationsMarquee() {
 
 const NEW_AGENTS = [
   {
-    title: 'Customer Service Agent',
-    description: 'Resolve up to 80% of tier-1 support tickets instantly and escalate complex cases with full context.',
+    title: 'Ticket Ops Agent',
+    description: 'Triage inbound support tickets across WhatsApp, Telegram, and Email — then hand your team everything they need to resolve them fast.',
     status: 'ACTIVE · WHATSAPP · TELEGRAM · EMAIL',
     delay: 0,
     tasks: [
-      { source: 'WhatsApp · #3821', status: 'Resolved', message: '"Where is my order?"', result: 'Tracked. ETA: 2 days. Customer notified.' },
-      { source: 'Email · #3822', status: 'Escalating', message: '"Billing issue, third complaint."', result: 'Flagged. Routing to human agent.' },
-      { source: 'Telegram · #3823', status: 'Resolved', message: '"Password reset request."', result: 'Reset link sent. CRM updated.' },
+      { source: 'WhatsApp · #3821', status: 'Triaged', message: '"Where is my order?"', result: 'Order status pulled. Reply drafted for your team.' },
+      { source: 'Email · #3822', status: 'Escalating', message: '"Billing issue, third complaint."', result: 'Flagged. Routed to human agent with full context.' },
+      { source: 'Telegram · #3823', status: 'Triaged', message: '"Password reset request."', result: 'Reset steps drafted. Queued for agent approval.' },
       { source: 'WhatsApp · #3824', status: 'Processing', message: '"Refund request — order #9042."', result: 'Checking policy · Verifying order' },
-      { source: 'Email · #3825', status: 'Resolved', message: '"Product compatibility question."', result: 'Answered. FAQ link attached.' },
+      { source: 'Email · #3825', status: 'Triaged', message: '"Product compatibility question."', result: 'FAQ match found. Draft reply queued for review.' },
       { source: 'Telegram · #3826', status: 'Escalating', message: '"Delivery missed, customer angry."', result: 'Priority flag set. Manager alerted.' },
     ],
   },
@@ -679,7 +681,7 @@ const NEW_AGENTS = [
 
 function getBadgeColor(status: string) {
   const s = status.toLowerCase();
-  if (s.includes('resolved') || s.includes('qualified') || s.includes('synced')) {
+  if (s.includes('resolved') || s.includes('triaged') || s.includes('qualified') || s.includes('synced')) {
     return 'bg-[#bbe2ef]/10 text-[#bbe2ef] border-[#bbe2ef]/20';
   }
   if (s.includes('escalating') || s.includes('nurture') || s.includes('reviewing')) {
@@ -733,7 +735,7 @@ function AgentFlowVisual({ title }: { title: string }) {
     return () => observer.disconnect();
   }, []);
 
-  // Customer Service
+  // Ticket Ops
   const [csState, setCsState] = useState({ channel: 0, status: 'resolved' });
   useEffect(() => {
     if (!inView || reducedMotion) return;
@@ -787,17 +789,17 @@ function AgentFlowVisual({ title }: { title: string }) {
         }
       `}</style>
       
-      {title === 'Customer Service Agent' && (
+      {title === 'Ticket Ops Agent' && (
         <div className="flex items-center gap-1.5 w-full">
           <div className={`${boxClasses} ${csState.channel === 0 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" className="w-4 h-4 opacity-80" />
+            <img src="/integrations/icons/whatsapp.svg" alt="WhatsApp" width={32} height={32} className="w-4 h-4 opacity-80" />
           </div>
           <div className={`${boxClasses} ${csState.channel === 1 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
-            <img src="/integrations/icons/telegram.svg" alt="Telegram" className="w-4 h-4 opacity-80" />
+            <img src="/integrations/icons/telegram.svg" alt="Telegram" width={32} height={32} className="w-4 h-4 opacity-80" />
           </div>
           <div className={`${boxClasses} ${csState.channel === 2 && csState.status === 'processing' && !reducedMotion ? activePulseClasses : ''}`}>
             <div className="w-4 h-4 opacity-90 flex items-center justify-center">
-              <img src="/integrations/icons/gmail.svg" alt="Email" className="w-full h-full" />
+              <img src="/integrations/icons/gmail.svg" alt="Email" width={32} height={32} className="w-full h-full" />
             </div>
           </div>
           <div className="ml-0.5">{arrowRight}</div>
@@ -854,7 +856,7 @@ function AgentFlowVisual({ title }: { title: string }) {
               {reducedMotion && <div className="absolute top-0 left-full -translate-x-full h-full w-full bg-[#bbe2ef]/50" />}
            </div>
            <div className="w-8 h-8 flex items-center justify-center bg-[#111111] border border-white/5 rounded-xl z-10 shrink-0">
-              <img src="/integrations/icons/slack.svg" alt="Slack" className="w-4 h-4 opacity-80" />
+              <img src="/integrations/icons/slack.svg" alt="Slack" width={16} height={16} className="w-4 h-4 opacity-80" />
            </div>
         </div>
       )}
@@ -932,7 +934,7 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
               <span className="text-[10px] text-white/40 uppercase tracking-wider font-mono truncate mr-2">
                 {task.source}
               </span>
-              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${getBadgeColor(task.status)} font-medium uppercase tracking-wide`}>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${getBadgeColor(task.status)} font-light uppercase tracking-wide`}>
                 {task.status}
               </span>
             </div>
@@ -951,10 +953,10 @@ function TaskQueueAnimation({ tasks, offset }: { tasks: any[], offset: number })
                     <div className="w-1.5 h-1.5 bg-[#bbe2ef] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                     <div className="w-1.5 h-1.5 bg-[#bbe2ef] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-[10px] text-[#bbe2ef]/80 italic font-mono">{task.result}</span>
+                  <span className="text-[10px] text-[#bbe2ef]/80 font-mono">{task.result}</span>
                 </div>
               ) : (
-                <div className="text-[10px] text-[#bbe2ef] font-semibold truncate flex items-center gap-1.5">
+                <div className="text-[10px] text-[#bbe2ef] font-light truncate flex items-center gap-1.5">
                   <span className="text-[#bbe2ef]/60">→</span> {task.result}
                 </div>
               )}
@@ -970,10 +972,10 @@ function AgentCard({ agent }: { agent: typeof NEW_AGENTS[0] }) {
   return (
     <SpotlightCard className="group flex flex-col p-6 relative overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-white/10 hover:shadow-[0_0_30px_rgba(174,201,157,0.05)] cursor-default auto-spotlight h-full">
       <div className="relative z-10 mb-5 flex-shrink-0">
-        <h4 className="text-lg font-medium text-white mb-2" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <h4 className="text-lg font-light text-white mb-2" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
           {agent.title}
         </h4>
-        <p className="text-white/50 text-[13px] font-light leading-relaxed" style={{ fontFamily: "'Manrope', sans-serif" }}>
+        <p className="text-white/50 text-[13px] font-light leading-relaxed" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
           {agent.description}
         </p>
       </div>

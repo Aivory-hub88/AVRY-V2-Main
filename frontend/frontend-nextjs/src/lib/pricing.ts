@@ -74,15 +74,50 @@ export type Product = OneTimeProduct | SubscriptionProduct | CreditPackProduct;
 // PRODUCT IDS
 // ============================================================================
 
-/** Canonical product IDs for non-credit products. */
+/**
+ * Canonical product IDs for non-credit products.
+ *
+ * The subscription ids are the 2026 rebrand names and are the SAME strings
+ * used end to end: this catalogue, the id posted to avry-payments, the id
+ * granted in the backend's entitlements route, and the value stored in
+ * `identity.user_tiers.tier`. They replace the pre-rebrand `foundation`/`pro`
+ * ids, which avry-payments still accepts as read-only aliases so that orders
+ * placed before the rebrand stay resolvable.
+ *
+ * `enterprise` is intentionally NOT here: it is sold as "Custom / Talk to
+ * Sales" with no published figure, so it has no self-serve price and is not a
+ * sellable product. See {@link TIER_IDS} for the tier id itself.
+ */
 export const PRODUCT_IDS = {
   DEEP_DIAGNOSTIC: 'ai_snapshot',
   BLUEPRINT: 'ai_blueprint',
   FULL_STACK: 'full_stack',
-  FOUNDATION: 'foundation',
-  PRO: 'pro',
+  OPERATIONAL: 'operational',
+  BUSINESS: 'business',
+} as const;
+
+/**
+ * Subscription tier ids as stored against a user.
+ *
+ * A superset of the sellable subscription products: `enterprise` is a real
+ * tier a customer can hold (granted through the sales-assisted path) but is
+ * not something checkout can charge for.
+ */
+export const TIER_IDS = {
+  OPERATIONAL: 'operational',
+  BUSINESS: 'business',
   ENTERPRISE: 'enterprise',
 } as const;
+
+/** A subscription tier id. */
+export type TierId = (typeof TIER_IDS)[keyof typeof TIER_IDS];
+
+/** Customer-facing label for each tier — the one place plan names are spelt. */
+export const TIER_DISPLAY_NAMES: Readonly<Record<TierId, string>> = Object.freeze({
+  operational: 'Operational',
+  business: 'Business',
+  enterprise: 'Enterprise',
+});
 
 /**
  * Build the canonical product id for an Intelligence Credit pack.
@@ -128,27 +163,23 @@ export const ONE_TIME_PRODUCTS: OneTimeProduct[] = [
 // SUBSCRIPTION PRODUCTS (per month)
 // ============================================================================
 
+// Enterprise is absent by design: the pricing page presents it as
+// "Custom / Talk to Sales" and publishes no figure, so listing it here would
+// give checkout a price no customer was ever shown. avry-payments drops it
+// from its catalogue for the same reason, and rejects it with a 400.
 export const SUBSCRIPTION_PRODUCTS: SubscriptionProduct[] = [
   {
-    id: PRODUCT_IDS.FOUNDATION,
-    name: 'Operational Licence',
+    id: PRODUCT_IDS.OPERATIONAL,
+    name: 'Operational',
     price: 39,
     currency: PRICING_CURRENCY,
     kind: 'subscription',
     interval: 'month',
   },
   {
-    id: PRODUCT_IDS.PRO,
-    name: 'Business Licence',
+    id: PRODUCT_IDS.BUSINESS,
+    name: 'Business',
     price: 99,
-    currency: PRICING_CURRENCY,
-    kind: 'subscription',
-    interval: 'month',
-  },
-  {
-    id: PRODUCT_IDS.ENTERPRISE,
-    name: 'Enterprise Licence',
-    price: 499,
     currency: PRICING_CURRENCY,
     kind: 'subscription',
     interval: 'month',
@@ -159,7 +190,21 @@ export const SUBSCRIPTION_PRODUCTS: SubscriptionProduct[] = [
 // INTELLIGENCE CREDIT PACKS (one-time)
 // ============================================================================
 
-/** Credit-pack definitions as `[credits, price]` pairs, in published order. */
+/**
+ * Credit-pack definitions as `[credits, price]` pairs, in published order.
+ *
+ * These must equal `CREDIT_PACKS_USD` in avry-payments' `app/services/pricing.py`,
+ * which is what the gateway actually charges: the checkout call sends only a
+ * product id, so a price authored here that differs from the server's is a price
+ * we advertise and never collect. They must also match `creditPackages` in the
+ * dashboard's `components/settings/SettingsModal.tsx`, which is where customers
+ * pick a pack before being handed to this checkout.
+ *
+ * The previous values here (and on the server) sat 17-36% above what the
+ * dashboard advertised, which nobody had hit only because the dashboard's
+ * purchase button was still a mock alert. The curve declines with volume:
+ * $0.100/credit at the smallest pack down to $0.055 at the largest.
+ */
 const CREDIT_PACK_DEFINITIONS: ReadonlyArray<readonly [credits: number, price: number]> = [
   [50, 5],
   [100, 9],

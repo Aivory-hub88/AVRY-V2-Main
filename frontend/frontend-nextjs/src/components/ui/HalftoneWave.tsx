@@ -33,8 +33,30 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
     renderer.setSize(width, height);
     
     const isMobile = window.innerWidth < 1024;
-    const baseDPR = isMobile ? 1 : Math.min(window.devicePixelRatio, 2);
+    const hwConcurrency = (navigator as unknown as { hardwareConcurrency?: number }).hardwareConcurrency ?? 4;
+    const deviceMem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4;
+    let isLowEnd = hwConcurrency <= 4 || deviceMem <= 4;
+    let isOnBattery = false;
+    const baseDPR = isMobile ? 1 : isLowEnd ? 1 : Math.min(window.devicePixelRatio, 1.2);
     renderer.setPixelRatio(baseDPR);
+    const navigatorWithBattery = navigator as unknown as { getBattery?: () => Promise<{ charging: boolean; addEventListener: (type: string, cb: () => void) => void }> };
+    if (navigatorWithBattery.getBattery) {
+      navigatorWithBattery.getBattery().then((b) => {
+        isOnBattery = !b.charging;
+        if (isOnBattery) {
+          isLowEnd = true;
+          renderer.setPixelRatio(1);
+          uniforms.uResolution.value.set(width * 1, height * 1);
+        }
+        b.addEventListener('chargingchange', () => {
+          isOnBattery = !b.charging;
+          isLowEnd = hwConcurrency <= 4 || deviceMem <= 4 || isOnBattery;
+          const dpr = isMobile ? 1 : isLowEnd ? 1 : Math.min(window.devicePixelRatio, 1.2);
+          renderer.setPixelRatio(dpr);
+          uniforms.uResolution.value.set(width * dpr, height * dpr);
+        });
+      });
+    }
     
     // React runs this effect twice in development (StrictMode), and a canvas
     // left behind by the discarded pass keeps a live WebGL context on the GPU
@@ -140,33 +162,27 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
           vec2 local = fract(gl_FragCoord.xy / uPixelSize);
           vec2 p3 = floor(local * 3.0);
 
-          int charIndex = int(floor(density * 5.99));
+          // 8-level dispersed-dot growth (center -> corners -> edges) instead
+          // of the old 5-shape diagonal/X set. Same 3x3 sub-grid, same 3px
+          // cell, same one-fragment-shader-invocation-per-pixel cost -- this
+          // is purely a richer branch tree, so it reads denser/smoother with
+          // zero extra GPU work. Never reaches a fully-lit sub-cell (max is
+          // 7/9) so the halftone dot silhouette never collapses into a block.
+          int charIndex = int(floor(density * 8.99));
           if (charIndex == 0) discard; // empty cell: skip glyph branches
           float shape = 0.0;
 
-          // Coverage has to climb one sub-cell per level, or the top levels
-          // collapse onto the same brightness and the shading goes flat: 1/9,
-          // 2/9, 3/9, 4/9, 5/9. The ceiling is the X — filling the cell outright
-          // would read as a lit square and destroy the halftone.
-          if (charIndex == 1) {
-              // centre
-              if (p3.x == 1.0 && p3.y == 1.0) shape = 1.0;
-          } else if (charIndex == 2) {
-              // centre + one corner
-              if (p3.x == 1.0 && p3.y == 1.0) shape = 1.0;
-              if (p3.x == 0.0 && p3.y == 0.0) shape = 1.0;
-          } else if (charIndex == 3) {
-              // one diagonal
-              if (p3.x == p3.y) shape = 1.0;
-          } else if (charIndex == 4) {
-              // diagonal + opposite corner
-              if (p3.x == p3.y) shape = 1.0;
-              if (p3.x == 0.0 && p3.y == 2.0) shape = 1.0;
-          } else if (charIndex >= 5) {
-              // full X
-              if (p3.x == p3.y) shape = 1.0;
-              if (p3.x == (2.0 - p3.y)) shape = 1.0;
-          }
+          float rank;
+          if (p3.x == 1.0 && p3.y == 1.0) rank = 0.0;      // centre
+          else if (p3.x == 0.0 && p3.y == 0.0) rank = 1.0; // corners
+          else if (p3.x == 2.0 && p3.y == 2.0) rank = 2.0;
+          else if (p3.x == 0.0 && p3.y == 2.0) rank = 3.0;
+          else if (p3.x == 2.0 && p3.y == 0.0) rank = 4.0;
+          else if (p3.x == 1.0 && p3.y == 0.0) rank = 5.0; // edges
+          else if (p3.x == 1.0 && p3.y == 2.0) rank = 6.0;
+          else rank = 7.0;
+
+          if (rank < float(charIndex)) shape = 1.0;
           
           if (shape == 0.0) discard;
           
@@ -190,7 +206,7 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
           
           // Create a shimmering effect mixing the dynamic core color and Purple/#2a545b
           float purpleAmount = (1.0 - scrollT) * 0.977;
-          float coreShimmer = 0.5 + 0.5 * sin(uTime * 2.0 + vLocalPos.x * 6.0 - vLocalPos.y * 5.0 + cos(uTime + vLocalPos.z * 4.0));
+           float coreShimmer = 0.5 + 0.5 * sin(uTime * 1.8 + vLocalPos.x * 4.0);
           vec3 mixedCore = mix(dynamicCore, corePurple, coreShimmer * purpleAmount);
           
           // Keep the orange/purple transition smoothly fading towards the edge.
@@ -216,7 +232,7 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
           // Living color nuance - override violet accent with #2a545b
           vec3 accentA = mix(vec3(0.30, 0.16, 0.55), uCustomPurple * 1.1, uUseCustomPurple); 
           vec3 accentB = mix(vec3(0.08, 0.28, 0.42), uCustomPurple * 0.9, uUseCustomPurple); 
-          float shimmer = 0.5 + 0.5 * sin(uTime * 1.2 + vLocalPos.y * 5.0 + vLocalPos.x * 4.0 + sin(uTime * 0.8 + vLocalPos.z * 3.0));
+           float shimmer = 0.5 + 0.5 * sin(uTime * 1.2 + vLocalPos.y * 3.0);
           vec3 accent = mix(accentA, accentB, shimmer);
           float accentGate = mix(0.5, 1.0, indigoGradient);
           finalColor += accent * ((0.11 + uScroll * 0.12) * accentGate);
@@ -249,7 +265,8 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
     // 256 spends ~66k vertices on it, 128 spends ~17k. The output is quantised
     // to a 3.6px halftone cell downstream, which discards far more detail than
     // the extra subdivisions ever resolved.
-    const geometry = new THREE.SphereGeometry(1, 128, 128);
+    const segs = isMobile ? 64 : isLowEnd ? 64 : 96;
+    const geometry = new THREE.SphereGeometry(1, segs, segs);
     const material = new THREE.ShaderMaterial({
       uniforms,
       side: THREE.FrontSide, 
@@ -499,6 +516,8 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
     let smoothMouseX = 0;
     let smoothMouseY = 0;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const handleMouseMove = (event: MouseEvent) => {
       targetMouseX = (event.clientX / window.innerWidth) * 2 - 1;
       targetMouseY = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -513,23 +532,40 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
       isVisible = entry.isIntersecting;
     }, { threshold: 0.0 });
     observer.observe(renderer.domElement);
+    const onVisibility = () => {
+      if (document.hidden) isVisible = false;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    const onContextLost = (e: Event) => {
+      e.preventDefault();
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = 0;
+    };
+    const onContextRestored = () => {
+      if (!animationFrameId) renderLoop();
+    };
+    renderer.domElement.addEventListener('webglcontextlost', onContextLost);
+    renderer.domElement.addEventListener('webglcontextrestored', onContextRestored);
 
-    // Deliberately uncapped: the loop renders on every animation frame, so it
-    // runs at the display's native refresh (60Hz, 120Hz). Gating this to a
-    // fixed interval is what causes the stutter it looks like it should fix --
-    // 30fps means a 33.3ms budget against 8.33ms frame boundaries on a 120Hz
-    // panel, so frames land in a 4-5-4 pattern and the drift visibly judders.
-    // GPU headroom is bought elsewhere (halved tessellation, one live context,
-    // and the visibility gate below), not by dropping frames.
+    let batteryFrame = 0;
+    // Deliberately uncapped when plugged: renders at display refresh (60/120Hz).
+    // On battery (isOnBattery) we throttle to every 2nd frame (~60→30, 120→60)
+    // to keep motion smooth under macOS low-power GPU throttling.
     const renderLoop = () => {
       animationFrameId = requestAnimationFrame(renderLoop);
+      if (document.hidden) return;
+      if (isOnBattery) {
+        batteryFrame = (batteryFrame + 1) % 2;
+        if (batteryFrame === 0) return;
+      }
       // Skip the render (and all the per-frame math above it) while the
       // caller has faded this out (e.g. scrolled into a section that hides
       // it) -- this is the actual GPU-saving gate, IntersectionObserver
       // alone can't catch this since the canvas is a fixed full-viewport
       // background that's always "intersecting".
       if (isVisible && activeRef.current) {
-        const time = clock.getElapsedTime();
+        const rawTime = clock.getElapsedTime();
+        const time = rawTime % 1000;
         uniforms.uTime.value = time;
         
         // Immersive gentle floating motion when in Hero (progress = 0)
@@ -557,7 +593,7 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
         // motion instead comes from the elegant, continuous Z-axis turbine
         // spin below.
         group.rotation.y = (Math.PI / 1.5) + dragRotationY + smoothMouseX * 0.15;
-        group.rotation.z = time * 0.15; // Counter-clockwise turbine spin
+        group.rotation.z = rawTime * 0.15; // Counter-clockwise turbine spin
         
         uniforms.uScroll.value += (targetScroll - uniforms.uScroll.value) * 0.05;
         
@@ -573,6 +609,12 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
 
 
         renderer.render(scene, camera);
+
+        if (prefersReducedMotion) {
+          // Serve a single static frame and stop the GPU loop entirely
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = 0;
+        }
       }
     };
     renderLoop();
@@ -592,6 +634,9 @@ export function HalftoneWave({ active = true, purpleColor }: { active?: boolean;
       cancelAnimationFrame(animationFrameId);
       clearTimeout(anchorTimer);
       observer.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+      renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('pointerdown', onPointerDown);

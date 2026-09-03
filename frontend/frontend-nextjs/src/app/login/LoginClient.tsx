@@ -3,7 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { isAuthenticated, login as authLogin } from "@/lib/auth";
+import { isAuthenticated, login as authLogin, PaymentRequiredError } from "@/lib/auth";
 
 /**
  * Login Page Component
@@ -52,6 +52,10 @@ export default function LoginClient() {
       await authLogin(email, password);
       router.push("/");
     } catch (err) {
+      if (err instanceof PaymentRequiredError) {
+        router.push(`/complete-payment?deadline=${encodeURIComponent(err.deadlineAt)}`);
+        return;
+      }
       setError(
         err instanceof Error ? err.message : "Login failed. Please try again."
       );
@@ -89,9 +93,9 @@ export default function LoginClient() {
 
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <img src="/Aivory_logo_2_2026.svg" alt="Aivory" className="h-[32px] w-auto opacity-90" />
+            <img src="/Aivory_logo_2_2026.svg" alt="Aivory" width={383} height={79} className="h-[32px] w-auto opacity-90" />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
             Welcome back
           </h2>
           <p className="text-[#b2cca2] text-sm font-light">
@@ -120,7 +124,7 @@ export default function LoginClient() {
               <label htmlFor="login-password" className="block text-[13px] font-medium text-white/85">
                 Password
               </label>
-              <a href="#" onClick={(e) => e.preventDefault()} className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
+              <a href="/forgot-password" className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
                 Forgot password?
               </a>
             </div>

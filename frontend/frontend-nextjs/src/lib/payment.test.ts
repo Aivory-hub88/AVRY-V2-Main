@@ -22,30 +22,28 @@ import {
 
 describe("PAYMENT_CONFIG sourced from pricing.ts", () => {
   it("uses the corrected subscription prices from pricing.ts (Req 8.2)", () => {
-    expect(PAYMENT_CONFIG.foundationPrice).toBe(20);
-    expect(PAYMENT_CONFIG.proPrice).toBe(44);
-    expect(PAYMENT_CONFIG.enterprisePrice).toBe(499);
+    expect(PAYMENT_CONFIG.operationalPrice).toBe(39);
+    expect(PAYMENT_CONFIG.businessPrice).toBe(99);
 
-    expect(PAYMENT_CONFIG.foundationPrice).toBe(getProductPrice(PRODUCT_IDS.FOUNDATION));
-    expect(PAYMENT_CONFIG.proPrice).toBe(getProductPrice(PRODUCT_IDS.PRO));
-    expect(PAYMENT_CONFIG.enterprisePrice).toBe(getProductPrice(PRODUCT_IDS.ENTERPRISE));
+    expect(PAYMENT_CONFIG.operationalPrice).toBe(getProductPrice(PRODUCT_IDS.OPERATIONAL));
+    expect(PAYMENT_CONFIG.businessPrice).toBe(getProductPrice(PRODUCT_IDS.BUSINESS));
   });
 
   it("keeps the already-correct one-time prices from pricing.ts (Req 8.3)", () => {
-    expect(PAYMENT_CONFIG.snapshotPrice).toBe(29);
-    expect(PAYMENT_CONFIG.blueprintPrice).toBe(85);
+    expect(PAYMENT_CONFIG.snapshotPrice).toBe(79);
+    expect(PAYMENT_CONFIG.blueprintPrice).toBe(249);
     expect(PAYMENT_CONFIG.snapshotPrice).toBe(getProductPrice(PRODUCT_IDS.DEEP_DIAGNOSTIC));
     expect(PAYMENT_CONFIG.blueprintPrice).toBe(getProductPrice(PRODUCT_IDS.BLUEPRINT));
   });
 
-  it("adds the Full Stack product ($99, full_stack) from pricing.ts (Req 8.4)", () => {
+  it("adds the Full Stack product ($299, full_stack) from pricing.ts (Req 8.4)", () => {
     expect(PAYMENT_CONFIG.products.FULL_STACK).toBe("full_stack");
-    expect(PAYMENT_CONFIG.fullStackPrice).toBe(99);
+    expect(PAYMENT_CONFIG.fullStackPrice).toBe(299);
     expect(PAYMENT_CONFIG.fullStackPrice).toBe(getProductPrice(PRODUCT_IDS.FULL_STACK));
   });
 
   it("resolves the Full Stack payment amount via getPaymentAmount", () => {
-    expect(getPaymentAmount(PAYMENT_CONFIG.products.FULL_STACK)).toBe(99);
+    expect(getPaymentAmount(PAYMENT_CONFIG.products.FULL_STACK)).toBe(299);
   });
 
   it("derives credit prices from the pricing.ts credit packs", () => {
@@ -70,34 +68,34 @@ describe("reconcileCatalog against pricing.ts (Req 8.6, 8.8)", () => {
     const divergent: CatalogProductDefinition[] = ALL_PRODUCTS.map((p) => ({
       id: p.id,
       name: p.name,
-      price: p.id === PRODUCT_IDS.PRO ? 500 : p.price,
+      price: p.id === PRODUCT_IDS.BUSINESS ? 500 : p.price,
     }));
     const result = reconcileCatalog(divergent, "midtrans");
     expect(result.reconciled).toBe(false);
 
     const priceDiff = result.discrepancies.find(
-      (d) => d.productId === PRODUCT_IDS.PRO && d.field === "price"
+      (d) => d.productId === PRODUCT_IDS.BUSINESS && d.field === "price"
     );
     expect(priceDiff).toBeDefined();
     expect(priceDiff?.found).toBe(500);
     // pricing.ts value is retained as the authoritative/expected price.
-    expect(priceDiff?.expected).toBe(getProductPrice(PRODUCT_IDS.PRO));
+    expect(priceDiff?.expected).toBe(getProductPrice(PRODUCT_IDS.BUSINESS));
     expect(priceDiff?.source).toBe("midtrans");
   });
 
   it("surfaces a name divergence identified by product id and field", () => {
     const divergent: CatalogProductDefinition[] = ALL_PRODUCTS.map((p) => ({
       id: p.id,
-      name: p.id === PRODUCT_IDS.FOUNDATION ? "Starter" : p.name,
+      name: p.id === PRODUCT_IDS.OPERATIONAL ? "Starter" : p.name,
       price: p.price,
     }));
     const result = reconcileCatalog(divergent, "backend");
     const nameDiff = result.discrepancies.find(
-      (d) => d.productId === PRODUCT_IDS.FOUNDATION && d.field === "name"
+      (d) => d.productId === PRODUCT_IDS.OPERATIONAL && d.field === "name"
     );
     expect(nameDiff).toBeDefined();
     expect(nameDiff?.found).toBe("Starter");
-    expect(nameDiff?.expected).toBe(getProductName(PRODUCT_IDS.FOUNDATION));
+    expect(nameDiff?.expected).toBe(getProductName(PRODUCT_IDS.OPERATIONAL));
   });
 
   it("flags a pricing.ts product missing from the downstream catalog", () => {
@@ -145,7 +143,7 @@ describe("describeReconciliation", () => {
       reconciled: false,
       discrepancies: [
         {
-          productId: PRODUCT_IDS.PRO,
+          productId: PRODUCT_IDS.BUSINESS,
           source: "midtrans",
           field: "price",
           found: 500,
@@ -153,7 +151,7 @@ describe("describeReconciliation", () => {
         },
       ],
     });
-    expect(message).toContain(PRODUCT_IDS.PRO);
+    expect(message).toContain(PRODUCT_IDS.BUSINESS);
     expect(message).toContain("price");
     expect(message).toContain("44");
   });
@@ -171,13 +169,13 @@ describe("assertCatalogReconciled", () => {
     const divergent: CatalogProductDefinition[] = ALL_PRODUCTS.map((p) => ({
       id: p.id,
       name: p.name,
-      price: p.id === PRODUCT_IDS.ENTERPRISE ? 1000 : p.price,
+      price: p.id === PRODUCT_IDS.BUSINESS ? 1000 : p.price,
     }));
     const result = assertCatalogReconciled(divergent, "backend");
     expect(result.reconciled).toBe(false);
     expect(console.error).toHaveBeenCalledOnce();
     // pricing.ts remains the authoritative published price (unchanged).
-    expect(getProductPrice(PRODUCT_IDS.ENTERPRISE)).toBe(499);
+    expect(getProductPrice(PRODUCT_IDS.BUSINESS)).toBe(99);
   });
 
   it("does not log when the catalog is reconciled", () => {

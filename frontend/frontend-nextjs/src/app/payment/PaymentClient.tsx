@@ -157,15 +157,15 @@ export default function PaymentClient() {
 
     switch (product) {
       case paymentConfig.products.SNAPSHOT:
-        return 'AI Snapshot';
+        return 'Business Operations Assessment';
       case paymentConfig.products.BLUEPRINT:
-        return 'AI Blueprint';
-      case paymentConfig.products.FOUNDATION:
-        return 'Foundation Plan';
-      case paymentConfig.products.PRO:
-        return 'Pro Plan';
-      case paymentConfig.products.ENTERPRISE:
-        return 'Enterprise Plan';
+        return 'Transformation Blueprint';
+      case paymentConfig.products.FULL_STACK:
+        return 'Complete Transformation Package';
+      case paymentConfig.products.OPERATIONAL:
+        return 'Operational Plan';
+      case paymentConfig.products.BUSINESS:
+        return 'Business Plan';
       default:
         return 'Product';
     }
@@ -181,12 +181,10 @@ export default function PaymentClient() {
         return 'One-time AI diagnostic report for your system';
       case paymentConfig.products.BLUEPRINT:
         return 'Comprehensive AI system architecture blueprint';
-      case paymentConfig.products.FOUNDATION:
-        return 'Monthly foundation tier subscription';
-      case paymentConfig.products.PRO:
-        return 'Monthly pro tier subscription';
-      case paymentConfig.products.ENTERPRISE:
-        return 'Monthly enterprise tier subscription';
+      case paymentConfig.products.OPERATIONAL:
+        return 'Monthly Operational plan subscription';
+      case paymentConfig.products.BUSINESS:
+        return 'Monthly Business plan subscription';
       default:
         return 'Product';
     }
@@ -202,12 +200,10 @@ export default function PaymentClient() {
         return paymentConfig.snapshotPrice;
       case paymentConfig.products.BLUEPRINT:
         return paymentConfig.blueprintPrice;
-      case paymentConfig.products.FOUNDATION:
-        return paymentConfig.foundationPrice;
-      case paymentConfig.products.PRO:
-        return paymentConfig.proPrice;
-      case paymentConfig.products.ENTERPRISE:
-        return paymentConfig.enterprisePrice;
+      case paymentConfig.products.OPERATIONAL:
+        return paymentConfig.operationalPrice;
+      case paymentConfig.products.BUSINESS:
+        return paymentConfig.businessPrice;
       default:
         return null;
     }
@@ -275,32 +271,25 @@ export default function PaymentClient() {
             <h2 className="text-2xl font-bold text-text-primary mb-6">Subscription Plans</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <ProductCard
-                product={paymentConfig.products.FOUNDATION}
-                name={getProductName(paymentConfig.products.FOUNDATION)}
-                description={getProductDescription(paymentConfig.products.FOUNDATION)}
-                price={paymentConfig.foundationPrice}
+                product={paymentConfig.products.OPERATIONAL}
+                name={getProductName(paymentConfig.products.OPERATIONAL)}
+                description={getProductDescription(paymentConfig.products.OPERATIONAL)}
+                price={paymentConfig.operationalPrice}
                 currency="USD"
                 type="subscription"
                 onSelect={handleProductSelect}
               />
               <ProductCard
-                product={paymentConfig.products.PRO}
-                name={getProductName(paymentConfig.products.PRO)}
-                description={getProductDescription(paymentConfig.products.PRO)}
-                price={paymentConfig.proPrice}
+                product={paymentConfig.products.BUSINESS}
+                name={getProductName(paymentConfig.products.BUSINESS)}
+                description={getProductDescription(paymentConfig.products.BUSINESS)}
+                price={paymentConfig.businessPrice}
                 currency="USD"
                 type="subscription"
                 onSelect={handleProductSelect}
               />
-              <ProductCard
-                product={paymentConfig.products.ENTERPRISE}
-                name={getProductName(paymentConfig.products.ENTERPRISE)}
-                description={getProductDescription(paymentConfig.products.ENTERPRISE)}
-                price={paymentConfig.enterprisePrice}
-                currency="USD"
-                type="subscription"
-                onSelect={handleProductSelect}
-              />
+              {/* Enterprise is sales-assisted: no published price, so no card
+                  here. A checkout for it is rejected by avry-payments. */}
             </div>
           </section>
 

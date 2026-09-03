@@ -43,38 +43,36 @@ function useCountUp(target: number, active: boolean, duration = 2000) {
   return value;
 }
 
-function StatCounter({ stat, active, delay }: { stat: StatItem; active: boolean; delay: number }) {
+function StatCounter({ stat, active, delay, index }: { stat: StatItem; active: boolean; delay: number; index: number }) {
   const value = useCountUp(stat.target, active);
+  const isLast = index === stats.length - 1;
 
   return (
     <div
-      className="flex-1 min-w-0 md:min-w-[180px] text-center py-6 md:py-10 px-0.5 sm:px-2 lg:px-4 transition-all duration-[800ms] ease-out"
+      className={`relative flex min-h-[132px] flex-col items-center justify-center bg-transparent px-2 py-4 text-center transition-[opacity,transform] duration-[800ms] ease-out sm:min-h-[150px] sm:px-4 sm:py-6 ${isLast ? 'col-span-2 sm:col-span-1' : ''}`}
       style={{
         opacity: active ? 1 : 0,
-        transform: active ? 'translateY(0)' : 'translateY(30px)',
+        transform: active ? 'translateY(0)' : 'translateY(20px)',
         transitionDelay: `${delay}ms`,
       }}
     >
       <div
-        className="font-light text-white leading-none mb-3"
-        style={{ fontFamily: "'Manrope', sans-serif", fontSize: 'clamp(1.4rem, 4vw, 5rem)', textShadow: '0 2px 16px rgba(0,0,0,0.55)' }}
+        className="flex h-[60px] items-center justify-center font-light leading-none tracking-[-0.055em] text-[#f3f4ef] [font-variant-numeric:tabular-nums] sm:h-[66px]"
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif", fontSize: 'clamp(2.45rem, 3.5vw, 3.65rem)' }}
       >
-        {value}{stat.suffix}
+        {value}
+        {stat.suffix && (
+          <span className="ml-1 self-start pt-1.5 text-[0.42em] font-light tracking-[-0.02em] text-white/50">
+            {stat.suffix}
+          </span>
+        )}
       </div>
       <div
-        className="font-light text-[8px] sm:text-[10px] md:text-[0.85rem] text-white/65 tracking-normal md:tracking-[0.08em] whitespace-nowrap"
-        style={{ fontFamily: "'Manrope', sans-serif", textShadow: '0 1px 10px rgba(0,0,0,0.6)' }}
+        className="mt-3 flex min-h-[20px] items-center justify-center text-[9px] font-light uppercase leading-relaxed tracking-[0.1em] text-white/48 sm:whitespace-nowrap sm:text-[10px] sm:tracking-[0.11em]"
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
       >
         {stat.label}
       </div>
-    </div>
-  );
-}
-
-function LaserDivider() {
-  return (
-    <div className="w-px self-stretch relative min-h-[120px] hidden md:block">
-      <div className="absolute top-0 bottom-0 left-0 w-px bg-transparent" />
     </div>
   );
 }
@@ -104,39 +102,20 @@ export default function StatsSection() {
 
   return (
     <div id="stats" ref={animRef} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} w-full relative overflow-hidden`} style={{ padding: '110px 0 120px 0' }}>
-
-
-
-      <div className="relative z-[1] max-w-[1340px] mx-auto px-4 lg:px-6">
-        {/* Stats Row */}
+      <div className="relative z-[1] mx-auto max-w-[1180px] px-5 lg:px-8">
         <div
           ref={ref}
-          className="flex flex-nowrap justify-center items-start relative flex-row"
+          className="grid grid-cols-2 items-stretch gap-x-4 gap-y-10 sm:grid-cols-5 sm:gap-x-0 sm:gap-y-0"
         >
           {stats.map((stat, i) => (
-            <div key={stat.label} className="contents">
-              <StatCounter stat={stat} active={active} delay={i * 100} />
-              {i < stats.length - 1 && <LaserDivider />}
-            </div>
+            <StatCounter
+              key={stat.label}
+              stat={stat}
+              active={active}
+              delay={i * 100}
+              index={i}
+            />
           ))}
-
-          {/* Horizontal laser lines */}
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-transparent">
-            <div className="absolute -top-px h-[3px] w-[120px] rounded-sm blur-[1px] animate-laser-right"
-              style={{
-                background: 'linear-gradient(90deg, transparent, #6b8f71, #c4c9b8, #6b8f71, transparent)',
-                boxShadow: '0 0 15px rgba(107,143,113,0.5), 0 0 35px rgba(196, 201, 184,0.25)',
-              }}
-            />
-          </div>
-          <div className="absolute top-0 left-0 right-0 h-px bg-transparent">
-            <div className="absolute -top-px h-[3px] w-[120px] rounded-sm blur-[1px] animate-laser-left"
-              style={{
-                background: 'linear-gradient(90deg, transparent, #6b8f71, #c4c9b8, #6b8f71, transparent)',
-                boxShadow: '0 0 15px rgba(107,143,113,0.5), 0 0 35px rgba(196, 201, 184,0.25)',
-              }}
-            />
-          </div>
         </div>
       </div>
     </div>

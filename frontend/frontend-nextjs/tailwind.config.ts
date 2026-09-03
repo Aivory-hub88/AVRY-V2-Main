@@ -20,7 +20,8 @@ const config: Config = {
         tight: '0em',
       },
       colors: {
-        background: '#050505',
+        // Warm near-black (matches okara.ai's rgb(17,15,14)) instead of a cold pure-black.
+        background: '#110f0e',
         surface: '#0a0a0a',
         'surface-hover': '#111111',
         accent: '#c4c9b8',
@@ -31,6 +32,10 @@ const config: Config = {
       fontFamily: {
         manrope: ['var(--font-manrope)', 'sans-serif'],
         sans: ['var(--font-manrope)', 'sans-serif'],
+        arabic: ['var(--font-arabic)', 'sans-serif'],
+        japanese: ['var(--font-japanese)', 'sans-serif'],
+        korean: ['var(--font-korean)', 'sans-serif'],
+        chinese: ['var(--font-chinese)', 'sans-serif'],
       },
       animation: {
         marquee: 'marquee 30s linear infinite',

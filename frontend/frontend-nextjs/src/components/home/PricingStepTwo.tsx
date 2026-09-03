@@ -70,7 +70,7 @@ const plans: Plan[] = [
       'Multilingual',
     ],
     cta: 'Request Licence',
-    productId: PRODUCT_IDS.FOUNDATION,
+    productId: PRODUCT_IDS.OPERATIONAL,
   },
   {
     name: 'Business',
@@ -89,7 +89,7 @@ const plans: Plan[] = [
       'Usage Analytics',
     ],
     cta: 'Request Licence',
-    productId: PRODUCT_IDS.PRO,
+    productId: PRODUCT_IDS.BUSINESS,
     mostPopular: true,
   },
   {
@@ -169,7 +169,7 @@ export default function PricingStepTwo({ currency }: { currency?: 'IDR' | 'USD' 
             </div>
             <div className="w-full h-[3px] bg-[#c4c9b8] mt-2 rounded-full" />
           </div>
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-normal tracking-tight mb-6">License the operational capability your organisation needs.</h2>
+          <h2 className="text-[35px] sm:text-[37px] md:text-[37px] lg:text-[43px] font-normal tracking-tight mb-6">License the operational capability your organisation needs.</h2>
           <p className="text-xl text-[#494949] font-light leading-relaxed">
             Continue your transformation with Aivory's Operational Intelligence Platform. Modernise operations, orchestrate intelligent workflows, and deploy governed AI across your organisation.
           </p>

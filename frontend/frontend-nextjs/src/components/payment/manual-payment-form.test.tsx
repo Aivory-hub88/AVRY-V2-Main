@@ -36,7 +36,7 @@ describe('Manual Payment Form Component', () => {
       );
 
       expect(screen.getByText('Manual Payment')).toBeInTheDocument();
-      expect(screen.getByText('$29.99 for ai_snapshot')).toBeInTheDocument();
+      expect(screen.getByText(/\$29\.99 for ai_snapshot/)).toBeInTheDocument();
     });
 
     it('should render payment proof upload field', () => {
@@ -146,7 +146,7 @@ describe('Manual Payment Form Component', () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
       
       expect(screen.getByText('Please upload an image file (PNG, JPG, etc.)')).toBeInTheDocument();
-      expect(fileInput.files).toBeNull();
+      expect(fileInput.value).toBe('');
     });
 
     it('should reject files larger than 5MB', () => {
@@ -165,7 +165,7 @@ describe('Manual Payment Form Component', () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
       
       expect(screen.getByText('File size must be less than 5MB')).toBeInTheDocument();
-      expect(fileInput.files).toBeNull();
+      expect(fileInput.value).toBe('');
     });
 
     it('should show selected file name after upload', () => {

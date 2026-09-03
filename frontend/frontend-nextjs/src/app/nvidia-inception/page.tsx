@@ -15,14 +15,13 @@ export const revalidate = 3600;
 
 const PAGE_TITLE = "NVIDIA Inception Program — Aivory";
 const PAGE_DESCRIPTION =
-  "Aivory AI is a member of the NVIDIA Inception Program (2026 cohort). The program supports startups advancing AI and data science with hardware, training, exposure, and technical go-to-market resources from NVIDIA.";
+  "Aivory AI is a member of the NVIDIA Inception Program (2026), gaining hardware, training and go-to-market support from NVIDIA.";
 
 export const metadata: Metadata = {
   title: PAGE_TITLE,
   description: PAGE_DESCRIPTION,
   alternates: {
     canonical: "/nvidia-inception",
-    languages: { en: "/nvidia-inception", id: "/nvidia-inception" },
   },
   openGraph: {
     type: "website",
@@ -114,17 +113,17 @@ export default function NvidiaInceptionPage() {
       <main
         className="flex-1 bg-[#efeee8] text-[#11110f]"
         style={{
-          fontFamily: "'Manrope', sans-serif",
+          fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
           fontWeight: 300,
           background:
             "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)",
         }}
       >
-        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 md:pb-24 md:pt-52">
+        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 lg:px-24 md:pb-24 md:pt-52">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
             Affiliations
           </p>
-          <h1 className="mt-5 max-w-[1180px] text-[52px] font-light leading-[0.95] tracking-[-0.055em] text-[#11110f] md:text-[82px] lg:text-[104px]">
+          <h1 className="mt-5 max-w-[1180px] text-[44px] font-light leading-[1.15] tracking-[-0.02em] text-[#11110f] md:text-[64px] lg:text-[80px]">
             NVIDIA Inception Program Member.
           </h1>
           <p className="mt-8 max-w-2xl text-[16px] font-light leading-[1.7] text-black/70 md:text-[17px]">
@@ -136,7 +135,7 @@ export default function NvidiaInceptionPage() {
           </p>
         </section>
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 md:pb-36">
+        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-36">
           <div className="grid border-t border-black/25 pt-8 lg:grid-cols-12 lg:gap-12">
             <div className="flex flex-col pb-10 lg:col-span-5 lg:min-h-[430px] lg:pb-0">
               <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
@@ -157,10 +156,10 @@ export default function NvidiaInceptionPage() {
             <figure className="lg:col-span-7">
               <div className="flex aspect-[16/10] items-center justify-center overflow-hidden bg-[#11110f] p-12 md:p-16 lg:p-20">
                 <img
-                  src="/images/badges/nvidia-inception-badge-v2.svg"
+                  src="/images/nvidia-inception/nvidia-inception-program-badge-rgb-for-screen-negative.svg"
                   alt="NVIDIA Inception Program 2026 badge — granted to Aivory AI"
-                  width={620}
-                  height={400}
+                  width={449}
+                  height={165}
                   className="h-full w-full max-w-2xl object-contain"
                   loading="eager"
                   fetchPriority="high"
@@ -175,7 +174,7 @@ export default function NvidiaInceptionPage() {
         </section>
 
         <section aria-labelledby="program-benefits-heading">
-          <div className="mx-auto max-w-[1480px] px-6 pb-8 md:px-12 md:pb-12">
+          <div className="mx-auto max-w-[1480px] px-6 pb-8 md:px-12 lg:px-24 md:pb-12">
             <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
               What the membership gives the product
             </p>
@@ -187,7 +186,7 @@ export default function NvidiaInceptionPage() {
             </h2>
           </div>
 
-          <div className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 md:pb-36">
+          <div className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-36">
             <div className="grid gap-px border-t border-black/25">
               {PROGRAM_BENEFITS.map((benefit, index) => (
                 <article
@@ -211,7 +210,7 @@ export default function NvidiaInceptionPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 md:pb-36">
+        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-36">
           <div className="grid border-t border-black/25 pt-10 lg:grid-cols-12 lg:gap-12">
             <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60 lg:col-span-3">
               Why it matters
@@ -234,7 +233,7 @@ export default function NvidiaInceptionPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 md:pb-36">
+        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-36">
           <div className="grid border-y border-black/25 py-10 md:grid-cols-[150px_minmax(0,1fr)_180px] md:items-center md:py-14">
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-black/60">
               Talk to us

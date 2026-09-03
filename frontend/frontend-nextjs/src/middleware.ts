@@ -61,6 +61,35 @@ function requestHostname(request: NextRequest): string {
 }
 
 export function middleware(request: NextRequest): NextResponse | undefined {
+  // Cloudflare's `aivory-uk-reverse-proxy` Worker canonicalizes public hosts
+  // at the edge and forwards the request to the origin with Host: aivory.id
+  // (the Traefik routing key) plus `x-aivory-skip-redirect: 1`. When this
+  // header is present, we MUST NOT touch the request here — otherwise we'd
+  // 308 it back to aivory.uk and form an infinite redirect loop with the
+  // edge. The check below preserves defense-in-depth for direct-origin hits
+  // (e.g. via VPS IP with Host: aivory.id) while staying invisible to the
+  // proxied production path.
+  if (request.headers.get('x-aivory-skip-redirect') === '1') {
+    return;
+  }
+
+  // Legacy path redirects: old URLs that moved to new canonical paths.
+  // /diagnostic was the old diagnostic entry point; it now lives at
+  // /free-diagnostic. Return a 301 so search engines transfer link equity
+  // and users are never stranded on a 404.
+  const LEGACY_PATH_REDIRECTS: Record<string, string> = {
+    '/diagnostic': '/free-diagnostic',
+    '/diagnostic/': '/free-diagnostic',
+  };
+
+  const pathname = request.nextUrl.pathname;
+
+  if (LEGACY_PATH_REDIRECTS[pathname]) {
+    const target = new URL(LEGACY_PATH_REDIRECTS[pathname], request.url);
+    target.search = request.nextUrl.search;
+    return NextResponse.redirect(target, 301);
+  }
+
   const hostname = requestHostname(request);
 
   // Always bypass local development origins.

@@ -2,6 +2,8 @@
 
 **Date:** July 16, 2026 (updated same day after deciding to fork; upgraded to execution plan same day)
 **Status:** **Execution plan (v2)** — decision made to fork; phased implementation plan below; implementation not yet started
+
+> **2026-08-09 revision:** the "10,000+ concurrent users" target scale referenced throughout this document (Goal #3, Requirements #3, Phase 8) is **cancelled** — user's explicit product-direction call, documented in [CERVEAU-STATUS.md](CERVEAU-STATUS.md)'s top entry. Cerveau now targets whatever concurrency ceiling is already established in production (see CERVEAU-STATUS.md §2b/§3 — a real ~80-90-concurrent-request-per-instance ceiling on `tencent-vps`, CPU/load-average bound), not a fresh 1,000–10,000 push. The already-built ADR-005 2-instance/HAProxy/Redis horizontal-scaling infrastructure stays live as available headroom. The architecture reasoning below (async model, RAM/disk budgets) is left as-is — it explains why the design has headroom to grow *if* a higher target is ever set again, not a still-active near-term goal.
 **Scope:** the deployable-Agent engine behind the user dashboard (Telegram/Slack/WhatsApp/Office Assistant agents), to be rebuilt as a fork of zeroclaw-labs/zeroclaw, product name **"Aivory Cerveau"**
 
 ---
@@ -37,7 +39,7 @@ Upgrade the deployable-Agent engine behind the user dashboard's Telegram/Slack/W
 
 1. Recall relevant context across a long-running conversation/relationship with a user, without stuffing everything into the LLM context window ("long context memory").
 2. Run a single task across multiple days, including being explicitly paused ("on hold") and resumed later, surviving process restarts.
-3. Run many of these tasks concurrently without one long-running task blocking others or degrading API responsiveness — **target scale: 10,000+ concurrent users, each with their own distinct, custom agent identity.**
+3. Run many of these tasks concurrently without one long-running task blocking others or degrading API responsiveness — ~~target scale: 10,000+ concurrent users~~ **target scale revised 2026-08-09: the already-established current-capacity ceiling (see the revision note above), each with their own distinct, custom agent identity.**
 4. Run tools smoothly and intelligently, actually using the third-party apps a user has connected via OAuth in the user dashboard.
 5. Support a voice agent, customizable per user.
 
@@ -74,7 +76,7 @@ This reverses the initial recommendation in this document (see the superseded re
 |---|---|---|
 | 1 | Long-context memory | Naively growing the prompt doesn't scale (cost, latency, model context limits); needs retrieval instead of raw recall |
 | 2 | Durable long-running tasks (hours → days, nonstop, with explicit on-hold) | **This is the requirement that motivated looking at Weft in the first place.** A task must be able to run for hours or days continuously, be explicitly paused ("on hold") and resumed later, and survive process restarts *mid-task* — not just have its status record survive. See [Durable Execution](#durable-execution--why-weft-was-considered-in-the-first-place) for the persistent-state vs. durable-execution distinction that decides whether zeroclaw's `control_plane` is enough |
-| 3 | Smooth concurrency at 10,000+ users | Many thousands of users' agents running at once, each with their own distinct custom identity, must not block each other, degrade API responsiveness, or require one OS process per user |
+| 3 | Smooth concurrency at current-capacity scale *(revised 2026-08-09, was 10,000+ users)* | Agents running at once, each with their own distinct custom identity, must not block each other, degrade API responsiveness, or require one OS process per user |
 | 4 | Smooth, smart tool use over OAuth-connected apps | OAuth + the tool API itself already work (Composio); the gap is orchestration quality — sequential-only execution, no approval gate, and a hard time limit on the loop |
 | 5 | Voice agent, customizable per user | Needs an STT/TTS pipeline and a per-user voice choice |
 | 6 | Hard tenant isolation (memory, credentials, task state) | Once 10k users share one daemon and one vector store, user A's memories/credentials/tasks must be *structurally* unable to leak into user B's context — enforced at the storage/query layer, not by prompt discipline. A single bug here is a cross-customer data leak. See [Tenant Isolation](#tenant-isolation) |
@@ -112,7 +114,7 @@ Previously flagged as worth evaluating standalone for Requirement #2. **Lower pr
 |---|---|---|
 | Long-context memory | zeroclaw's own `zeroclaw-memory` crate (vector store + knowledge graph + decay/consolidation), backed by `avry-postgres` via its existing Postgres backend (`vector_enabled = true`) | Reuse in place, don't rebuild in Python. Disk footprint governed by the lifecycle pipeline — see [Memory Storage Budget](#memory-storage-budget--long-term-memory-inside-180-gb-of-ssd) |
 | Durable long-running / on-hold tasks | zeroclaw's own `control_plane` (`task_registry` + `reaper`), backed by Postgres (decided — see Open Questions) | **Conditional on verifying `control_plane`'s checkpoint granularity** — if it only persists task status (not step-level progress), add Restate as the orchestration layer instead of accepting restart-from-scratch |
-| Smooth concurrency at 10,000+ users | **The core fork work:** replace/augment zeroclaw's file-based, config-provisioned agent-identity model with a database-backed, dynamically-resolved multi-tenant identity system — one shared daemon (or a small pool, not one process per user) resolves identity/persona/tools/voice per request from Postgres | This is the one piece with no existing reference implementation inside zeroclaw itself; see Open Questions |
+| Smooth concurrency at current-capacity scale *(revised 2026-08-09, was 10,000+ users)* | **The core fork work:** replace/augment zeroclaw's file-based, config-provisioned agent-identity model with a database-backed, dynamically-resolved multi-tenant identity system — one shared daemon (or a small pool, not one process per user) resolves identity/persona/tools/voice per request from Postgres | This is the one piece with no existing reference implementation inside zeroclaw itself; see Open Questions |
 | Smooth, smart tool use over OAuth-connected apps | zeroclaw's existing MCP server support (`[[mcp.servers]]`), adding Composio as another MCP server instead of the current bespoke REST calls in `telegram-agent.js` | Also inherits zeroclaw's `approval`/`trust` modules for a risk-tiered confirmation gate |
 | Voice agent | zeroclaw's existing `providers.transcription.groq` (Whisper) for Tier 1 STT, investigate `zeroclaw-gateway/src/voice_duplex.rs` for how much Tier 2 (real-time) plumbing already exists | Not yet confirmed how complete `voice_duplex.rs` is |
 | Hard tenant isolation | Tenant-scoped storage design on top of `zeroclaw-memory` + `control_plane`: every memory/task/credential row carries a tenant id enforced at the query layer, Composio entity per user | No reference implementation in zeroclaw (single-operator assumption baked in); part of the core fork work alongside identity resolution — see [Tenant Isolation](#tenant-isolation) |
@@ -308,7 +310,7 @@ Phase 0 (blocking questions)
               ├─► Phase 4 (tools: Composio-MCP, capability graph, approval gate)
               └─► Phase 5 (500-tenant load test — needs 2, benefits from 3+4)
                     └─► Phase 6 (channel migration, Telegram first)
-                          └─► Phase 8 (10k load test → cutover decision)
+                          └─► Phase 8 (current-capacity load test → cutover decision, revised 2026-08-09)
 Phase 7 (voice)  — parallel track, needs Phase 2 only; Tier 2 scoping can start anytime
 ```
 
@@ -400,9 +402,11 @@ Bridge stays the front layer (auth, credit gate, tier gating, superadmin bypass,
 
 ### Phase 8 — Scale validation + cutover *(gate for decommissioning the old system)*
 
-Full load test at the 10,000-concurrent target (including rate limiting under contention and memory-lifecycle behavior at fleet scale). Only after it passes: set a cutover date, flip remaining tenants, keep `telegram-agent.js` dormant for one more cycle, then decommission.
+*(Revised 2026-08-09 — the 10,000-concurrent target is cancelled; see the revision note at the top of this document and [CERVEAU-STATUS.md](CERVEAU-STATUS.md)'s top entry.)*
 
-**Exit gate:** 10k-concurrent load test passes all budgets; one full billing cycle on Aivory Cerveau with no rollback events.
+Full load test at the already-established current-capacity ceiling (including rate limiting under contention and memory-lifecycle behavior at that scale). Only after it passes: set a cutover date, flip remaining tenants, keep `telegram-agent.js` dormant for one more cycle, then decommission.
+
+**Exit gate:** current-capacity-concurrent load test passes all budgets; one full billing cycle on Aivory Cerveau with no rollback events.
 
 ### Standing items (not phase-bound)
 

@@ -56,7 +56,7 @@ const cards: PricingCard[] = [
   {
     title: 'Business Operations\nAssessment',
     price: 79,
-    frequency: 'One-time',
+    frequency: 'Per use',
     description: 'Gain a clear understanding of how your organisation operates before making AI decisions.',
     features: [
       '• Operational maturity assessment',
@@ -69,9 +69,9 @@ const cards: PricingCard[] = [
     productId: PRODUCT_IDS.DEEP_DIAGNOSTIC,
   },
   {
-    title: 'Transformation\nBlueprint',
+    title: 'Transformation\nBlueprint + Roadmap',
     price: 249,
-    frequency: 'One-time',
+    frequency: 'Per use',
     description: 'Transform operational insights into a practical blueprint for business transformation and governed AI deployment.',
     features: [
       '• Operational transformation blueprint',
@@ -87,7 +87,7 @@ const cards: PricingCard[] = [
     title: 'Complete Transformation Package',
     subtitle: 'Business Operations Assessment\n+\nTransformation Blueprint\n+\nTransformation Roadmap',
     price: 299,
-    frequency: 'One-time',
+    frequency: 'Per use',
     description: 'Everything required to move from operational assessment to a clear transformation strategy.',
     features: [
       '• Business Operations Assessment',
@@ -144,7 +144,7 @@ export default function PricingStepOne({ currency }: { currency?: 'IDR' | 'USD' 
             </div>
             <div className="w-full h-[3px] bg-[#c4c9b8] mt-2 rounded-full" />
           </div>
-          <h2 className="text-3xl md:text-5xl lg:text-6xl font-normal tracking-tight mb-6">Start With Clarity.</h2>
+          <h2 className="text-[35px] sm:text-[37px] md:text-[37px] lg:text-[43px] font-normal tracking-tight mb-6">Start With Clarity.</h2>
           <p className="text-xl text-[#494949] font-light leading-relaxed">
             Every transformation begins with understanding how your organisation operates. Assess first, build your transformation strategy, then deploy AI with confidence.
           </p>

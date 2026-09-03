@@ -1,6 +1,14 @@
-'use client';
+"use client";
 
-import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import { useScrollAnimation } from "@/hooks/useScrollAnimation";
+
+/**
+ * Keeps the first 64px dark so the transparent, white-text Navbar stays
+ * legible, then hands over to the ivory editorial canvas used by Careers,
+ * Company and About.
+ */
+const HERO_BACKGROUND =
+  "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)";
 
 interface HeroSectionProps {
   title: string;
@@ -14,59 +22,36 @@ export function HeroSection({ title, subtitle }: HeroSectionProps) {
     <section
       ref={ref}
       className={`animate-on-scroll ${
-        isVisible ? 'is-visible' : ''
-      } relative min-h-screen flex items-center justify-center overflow-hidden bg-black bg-grid-pattern border-b border-white/10`}
+        isVisible ? "is-visible" : ""
+      } relative text-[#11110f]`}
+      style={{
+        fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
+        fontWeight: 300,
+        background: HERO_BACKGROUND,
+      }}
     >
-      {/* Light gradient highlight to mimic x.ai top screen shine */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none opacity-20 blur-[100px]"
-        style={{
-          background: 'radial-gradient(ellipse 50% 50% at 50% 0%, #c4c9b8 0%, transparent 80%)',
-        }}
-      />
-
-      {/* Hero Content */}
-      <div className="relative z-10 text-center px-6 max-w-4xl mx-auto flex flex-col items-center">
-        {/* Monospaced Top Badge */}
-        <div
-          className="inline-flex items-center gap-2 px-3.5 py-1 border border-white/15 bg-white/5 rounded-full mb-8"
-          style={{ fontFamily: "'Doto', 'Courier New', monospace" }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-          <span className="text-[10px] tracking-[0.2em] text-[#dfe2d8] uppercase font-manrope font-light">
-            Aivory Suite | Architecture to Production
-          </span>
-        </div>
-
-        {/* Headline */}
-        <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-light text-white mb-6 leading-[1.15] tracking-tight max-w-3xl"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
+      <div className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 lg:px-24 md:pb-24 md:pt-52">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
+          Aivory Suite / Architecture to Production
+        </p>
+        <h1 className="mt-5 max-w-[1180px] text-[44px] font-light leading-[1.15] tracking-[-0.02em] text-[#11110f] md:text-[64px] lg:text-[80px]">
           {title}
         </h1>
-
-        {/* Subtitle */}
-        <p
-          className="text-base sm:text-lg text-white/75 max-w-2xl mx-auto mb-10 font-light leading-relaxed"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
-        >
-          {subtitle}
-        </p>
-
-
       </div>
 
-      {/* Wireframe Scroll Guide (Vertical line showing page flow) */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-        <div className="w-[1px] h-20 bg-gradient-to-b from-transparent to-white/15" />
-        <div
-          className="text-[9px] tracking-[0.15em] text-white/50 uppercase my-3 font-light"
-          style={{ fontFamily: "'Doto', 'Courier New', monospace" }}
-        >
-          SCROLL TO EXPLORE
+      <div className="mx-auto max-w-[1480px] px-6 pb-20 md:px-12 lg:px-24 md:pb-28">
+        <div className="grid border-t border-black/25 pt-8 lg:grid-cols-12 lg:gap-12">
+          <div className="pb-8 lg:col-span-4 lg:pb-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
+              The suite
+            </p>
+          </div>
+          <div className="lg:col-span-8">
+            <p className="max-w-2xl text-[16px] font-light leading-[1.7] text-black/70 md:text-[17px]">
+              {subtitle}
+            </p>
+          </div>
         </div>
-        <div className="w-[1px] h-12 bg-white/20" />
       </div>
     </section>
   );

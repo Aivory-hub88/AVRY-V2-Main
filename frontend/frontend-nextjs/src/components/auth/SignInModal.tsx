@@ -103,7 +103,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               className="h-[32px] w-auto opacity-90"
             />
           </div>
-          <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "'Manrope', sans-serif" }}>
+          <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
             Welcome back
           </h2>
           <p className="text-[#b2cca2] text-sm font-light">

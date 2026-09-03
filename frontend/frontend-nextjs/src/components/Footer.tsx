@@ -18,6 +18,7 @@ const companyLinks = [
   { label: 'About', href: '/about' },
   { label: 'Company', href: '/company' },
   { label: 'Blog', href: '/blog' },
+  { label: 'Glossary', href: '/glossary' },
   { label: 'Careers', href: '/careers' },
   { label: 'Investor Relations', href: '/investor-relations' },
   { label: 'Contact', href: '/contact' },
@@ -92,24 +93,24 @@ export default function Footer() {
               </ul>
             </div>
 
-            {/* Logo */}
-            <div className="col-span-2 md:col-span-1 flex md:justify-start items-start mt-8 md:mt-0">
-              <div className="flex flex-row flex-wrap items-center gap-3 md:gap-4">
+            {/* Logo + Badge */}
+            <div className="col-span-2 md:col-span-1 flex items-start mt-8 md:mt-0">
+              <div className="flex flex-row items-center gap-4">
                 <img
-                  src="/Aivory_logo_2_2026.svg"
+                  src="/Aivory_new_logo_white.svg"
                   alt="Aivory Logo"
-                  className="h-[28px] md:h-[36px] w-auto shrink-0 opacity-90"
+                  className="h-[56px] md:h-[72px] w-auto shrink-0 opacity-90"
                 />
                 <Link
                   href="/nvidia-inception"
-                  className="flex shrink-0 items-center justify-center transition-opacity hover:opacity-70"
+                  className="flex shrink-0 items-center transition-opacity hover:opacity-70"
                   aria-label="Aivory AI is a member of the NVIDIA Inception Program (2026 cohort)"
                   title="NVIDIA Inception Program — 2026 cohort"
                 >
                   <img
-                    src="/images/badges/nvidia-inception-badge-v2.svg"
+                    src="/images/nvidia-inception/nvidia-inception-program-badge-rgb-for-screen-negative.svg"
                     alt="NVIDIA Inception Program — Aivory AI is a member (2026 cohort)"
-                    className="h-[45px] w-auto shrink-0 md:h-[55px]"
+                    className="h-[34px] md:h-[40px] w-auto shrink-0"
                   />
                 </Link>
               </div>
@@ -117,8 +118,46 @@ export default function Footer() {
           </div>
 
           {/* Copyright + Divider */}
-          <div className="pb-6 text-sm text-white/80">
-            &copy; 2026 Aivory. All rights reserved.
+          <div className="pb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-5 text-sm text-white/80">
+            <span>&copy; 2026 Aivory. All rights reserved.</span>
+            {/* Product Hunt badge. Source SVG is 250x54, so h-[38px] renders
+                ~176px wide — enough room here to sit at its natural weight
+                without crowding the copyright line. */}
+            <a
+              href="https://www.producthunt.com/products/aivory-ai?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-aivory-ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex shrink-0 items-center transition-opacity hover:opacity-70"
+              aria-label="Aivory AI on Product Hunt"
+              title="Aivory AI — Make AI Make Sense® on Product Hunt"
+            >
+              <img
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1224888&theme=dark&t=1786964875314"
+                alt="Aivory AI — Make AI Make Sense® | Product Hunt"
+                width={250}
+                height={54}
+                loading="lazy"
+                className="h-[34px] md:h-[38px] w-auto shrink-0"
+              />
+            </a>
+            <a
+              href="https://www.instagram.com/aivorylab.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-white transition-colors text-sm"
+              aria-label="Follow Aivory AI on Instagram"
+            >
+              Instagram
+            </a>
+            <a
+              href="https://www.linkedin.com/company/aivoryai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-white transition-colors text-sm"
+              aria-label="Connect with Aivory AI on LinkedIn"
+            >
+              LinkedIn
+            </a>
           </div>
           {/* Scraper Trap - Invisible Link */}
           <a 

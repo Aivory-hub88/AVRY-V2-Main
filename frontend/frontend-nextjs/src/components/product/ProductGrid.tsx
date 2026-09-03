@@ -24,25 +24,25 @@ function ProductCard({ product, index }: { product: ProductCardData; index: numb
     >
       <h3
         className="text-xl font-normal text-white mb-3"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
       >
         {product.title}
       </h3>
       <p
         className="text-accent text-sm mb-3 font-light"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
       >
         {product.tagline}
       </p>
       <p
         className="text-white/85 text-sm mb-4 font-light leading-relaxed"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
       >
         {product.description}
       </p>
       <p
         className="text-white/70 text-xs font-light"
-        style={{ fontFamily: "'Manrope', sans-serif" }}
+        style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
       >
         {product.features.join(' • ')}
       </p>
@@ -62,13 +62,13 @@ export function ProductGrid({ products, sectionTitle = 'And much more' }: Produc
       <div className="max-w-6xl mx-auto">
         <h2
           className="text-5xl md:text-6xl font-normal text-white text-center mb-6"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
         >
           {sectionTitle}
         </h2>
         <p
           className="text-white/75 text-center max-w-2xl mx-auto mb-16 text-lg font-light"
-          style={{ fontFamily: "'Manrope', sans-serif" }}
+          style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}
         >
           Explore the full suite of tools designed to accelerate your AI adoption journey.
         </p>

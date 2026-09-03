@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   description: "Investor relations and investment information for Aivory.",
   alternates: {
     canonical: "/investor-relations",
-    languages: { en: "/investor-relations", id: "/investor-relations" },
   },
   openGraph: {
     title: "Investor Relations | Aivory",
@@ -36,7 +35,7 @@ export default function InvestorRelationsPage() {
       <main
         className="flex-1 bg-[#efeee8] text-[#11110f]"
         style={{
-          fontFamily: "'Manrope', sans-serif",
+          fontFamily: "var(--font-manrope), 'Manrope', sans-serif",
           fontWeight: 300,
           background:
             "linear-gradient(to bottom, #050505 0, #050505 64px, #efeee8 64px, #efeee8 100%)",
@@ -49,16 +48,16 @@ export default function InvestorRelationsPage() {
           ])}
         />
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 md:pb-24 md:pt-52">
+        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-40 md:px-12 lg:px-24 md:pb-24 md:pt-52">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-black/60">
             Investors
           </p>
-          <h1 className="mt-5 text-[52px] font-light leading-[0.95] tracking-[-0.055em] md:text-[82px] lg:text-[104px]">
+          <h1 className="mt-5 text-[44px] font-light leading-[1.15] tracking-[-0.02em] md:text-[64px] lg:text-[80px]">
             Investor Relations
           </h1>
         </section>
 
-        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 md:pb-36">
+        <section className="mx-auto max-w-[1480px] px-6 pb-24 md:px-12 lg:px-24 md:pb-36">
           <div className="max-w-3xl space-y-14">
             <section className="space-y-5">
               <p className={`${leadClass} text-[17px] leading-[1.7]`}>
