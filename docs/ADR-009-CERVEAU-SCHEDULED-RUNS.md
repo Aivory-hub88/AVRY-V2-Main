@@ -208,3 +208,31 @@ The goal is to accept **exactly** what the runtime accepts, not everything some 
 DDL validated against avry-postgres inside a rolled-back transaction before anything was created. After deploy: routes registered, `401` on the JWT routes and `403` on the internal ones without credentials, all five paths in the OpenAPI document, and `_ensure_schema` created the real table on first internal call.
 
 The exit gate itself was exercised against the real store under a synthetic `user_id`, with only the tier and engine gates stubbed (they read unrelated tables): **10/10** — create lands `pending_activation`; a duplicate name is `409`; the sixth schedule on a Business plan is refused with *"allows 5"*; pause clears `enabled` and returns the row to `pending_activation`; an unknown timezone and an every-minute expression are both rejected; the internal read sees live rows only; soft-delete frees the name for immediate reuse; `ack` marks the row `active`. All six test rows removed afterwards — the table is back to empty.
+
+## 11. Phase 2b — the reconcile that finally joins the two halves, 2026-09-05
+
+Phase 1 built the runtime half, Phase 2 built the store; §10 says plainly that nothing yet copied a row from one to the other. `crates/zeroclaw-runtime/src/cron/tenant_sync.rs` is that copy.
+
+**A reconcile, not an event feed.** avry-backend could push on create/update/delete, which is simpler right up until one push is lost — and then a schedule silently never runs, which is the exact failure mode §6 was written about. A periodic pass (60s) that makes Cerveau's `cron_jobs` match the backend's list is self-healing: a missed change costs one interval, not a support ticket.
+
+**Ownership of a row is explicit.** Everything the reconcile creates carries `source = "tenant_schedule"`, and `upsert_tenant_schedule_job` refuses outright to touch a row with any other source. The delete pass only ever considers that source, so an operator's own cron job or a declarative one from `config.toml` is never in scope no matter what the backend returns.
+
+**`next_run` is recomputed only when the schedule string actually changed.** The first draft recomputed it on every pass, which looks harmless and is not: a job that fires hourly would have its next firing pushed 60s further out every 60s and would never fire at all. Anything else — name, prompt, enabled — updates in place without touching the clock.
+
+**Fails open at every step**, like the rest of the tenant stack. An unreachable backend leaves the existing cron rows exactly as they are and retries next interval; deleting a working schedule because a read failed would take it offline over a transient outage. The one thing it will not do is guess: a row it cannot turn into a valid schedule is acked back as `failed` with the reason, so the tenant sees why rather than watching nothing happen. Acks are sent only when the backend's `status` is actually stale — re-acking an unchanged row every minute is pure write traffic.
+
+### The duplicate-billing problem, caught before deploy
+
+Production runs two Cerveau instances behind one HAProxy, sharing one backend but **not** one cron store. With the reconcile unconditionally on, both would have created a job for the same tenant schedule and it would have fired — and billed — twice per period, with nothing in either instance able to notice.
+
+Ownership is therefore declared, not inferred: `AVRY_TENANT_SCHEDULE_SYNC=1` on exactly one instance, off by default. The two ways of getting that wrong are not symmetric, which is what settles the default. An instance that wrongly stays off leaves the backend row at `pending_activation` — precisely what §10 built that column to announce. An instance that wrongly turns on produces silent duplicate LLM spend, the §8 risk. An unrecognised value means off for the same reason.
+
+A backend-side lease (owner column + TTL) would remove the manual step and survive the owner going down. It waits for a pool larger than two.
+
+### A stack overflow that was mine, not the framework's
+
+Wiring the spawn into `daemon::run` the same way the verifier sweep above it is wired turned `daemon::tests::registry_gateway_starter_can_trigger_daemon_reload` into a hard `stack overflow, aborting` / SIGABRT — reproducible alone, and gone the moment the spawn was reverted, so not a flake and not a parallelism artifact.
+
+The cause is not future *size* in the usual sense: the async block owns a `Config` and is built as a temporary before `spawn!` takes it, so built inline it sits in `run`'s poll frame for the whole of boot — and that frame was already close enough to the limit that one more was enough. Moving the spawn into its own `#[inline(never)]` fn puts the temporary in a frame that is released before the deep part of boot runs; `reconcile_loop` boxes its own body so the future it hands over is roughly a `Config` and a token rather than the whole loop. Both fixes are recorded in the code, because the next person to add a spawn to `run` will hit the same wall.
+
+**Tests:** 10 new (6 store, 4 sync), including the `next_run`-only-on-change contract, the source-ownership refusal, the ack-only-when-stale rule, and the ownership gate's asymmetric default. Full `zeroclaw-runtime` suite: 3593 passed, 0 failed.
