@@ -242,3 +242,24 @@ The cause is not future *size* in the usual sense: the async block owns a `Confi
 It survived a test because the test asserted `format!("{user_id}.{agent_type}")` against the literal `"u1.customer_service"` — it exercised the format macro and nothing else. Two more tests in the same set had the same shape (restating a condition inline and asserting on the copy). Both were replaced with tests that go through the real code: a round-trip through `apply_row` and the store asserting on `tenant_selector()`, and an extracted `ack_decision` the ack-suppression test can actually falsify. `CronJob::tenant_id`'s own doc now states raw-vs-composed outright, since the two are indistinguishable by type.
 
 **Tests:** 10 new (6 store, 4 sync), including the `next_run`-only-on-change contract, the source-ownership refusal, the ack-only-when-stale rule, and the ownership gate's asymmetric default. Full `zeroclaw-runtime` suite: 3593 passed, 0 failed.
+
+### Deployed and live-verified, 2026-09-05
+
+Commit `369fa357`, CI green (`cerveau-quick`, `cerveau-build`), binary swapped on both instances (sha256 verified end to end: `dfc9aa42…` artifact, old binary backed up as `zeroclaw-cerveau.bak-pre-adr009-phase2b-20260905`). Both healthy on `:3100`, `:3101` and the `:3105` front, zero warnings in the journal throughout.
+
+The full lifecycle was exercised against the real store and the real reconcile, with a January cron expression so nothing ever fired and the check cost no LLM spend:
+
+| | |
+|---|---|
+| Insert a row (`pending_activation`) | within one interval, a `source = 'tenant_schedule'` cron job appears on instance A |
+| Identity | `tenant_id = adr009-p2b-verify`, `tenant_agent_type = customer_service` — the raw user id, the bug above |
+| Timezone | `next_run = 2026-12-31T20:00Z` = 2027-01-01 03:00 `Asia/Jakarta`. The §6a requirement, proven rather than asserted |
+| Ack | row flips to `active`, `cerveau_job_id` set, `last_synced_at` stamped |
+| Steady state | `last_synced_at` and `next_run` both unchanged across two further passes — zero writes, no clock drift |
+| Pause | cron job `enabled = 0`, `next_run` untouched, row acked back to `paused` |
+| Soft-delete | cron job removed; the store is back to zero rows |
+| Instance B | no cron store at all, no duplicate job, silent throughout — the ownership gate holds |
+
+The test row was deleted afterwards; `product.tenant_scheduled_runs` is empty again.
+
+**Still open (Phase 3):** the dashboard UI. §10's warning stands with one clause removed — the sync now exists, so surfacing schedules no longer risks "appears to work and silently never runs". What remains unbuilt is the tenant-facing view and the approval-parking UX for an unattended run that hits an `Irreversible` tool (Decision 5).
