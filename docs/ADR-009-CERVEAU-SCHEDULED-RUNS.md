@@ -1,6 +1,6 @@
 # ADR-009 — Scheduled Runs: a capable scheduler that cannot see a tenant
 
-**Status:** Phase 1 (Decisions 1–3) ✅ **DEPLOYED + live-verified 2026-09-04**. Phases 2–4 (backend API/quota, dashboard) remain proposed only — see §5.
+**Status:** Phase 1 (Decisions 1–3) ✅ **DEPLOYED + live-verified 2026-09-04** (§9). Phase 2 (store, API, quota) ✅ **DEPLOYED + exit gate met 2026-09-05** (§10). **Nothing runs these schedules yet** — the sync from the Phase 2 store into Cerveau's cron store does not exist, so a row stays `pending_activation`; that sync, and Phase 3's dashboard, are still open.
 **Date:** 2026-09-03 (§6 revised 2026-09-03 late — the "does not execute jobs" finding did not survive a fresh re-test; §2's tenant-blindness gap closed 2026-09-04, see §9)
 
 **Context:** "Scheduled Runs" was the remaining LobeHub-inspired candidate — let a customer say "every Monday, summarise last week's tickets" and have their agent do it unattended. This ADR reports what Cerveau already has, the one thing it lacks, and what it would actually take.
