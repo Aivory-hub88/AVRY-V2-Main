@@ -72,7 +72,7 @@ That last point matters more than the rest of this ADR: **there is no point scop
 
 **Phase 1 — Tenant-scoped execution (Rust, Cerveau).** `tenant_id` + `agent_type` on `CronJob`; `TENANT_CONTEXT.scope(...)` in `run_agent_job`; resolver call at fire time. *Exit gate:* a job created for a real tenant fires unattended and demonstrably reaches that tenant's memory and graph — verified by `SELECT` on `cognee.graph_node` for that tenant's `source_user`, the ADR-007 §14 method. No dashboard needed yet; the CLI is enough to prove it.
 
-**Phase 2 — Backend API + quota (avry-backend).** `product.tenant_scheduled_runs` (mirroring `tenant_custom_mcp_servers`), JWT-authenticated CRUD, tiered per-tenant cap, internal endpoint for Cerveau. *Exit gate:* a tenant creates/pauses/deletes a schedule through the API and cannot exceed their tier's cap.
+**Phase 2 — Backend API + quota (avry-backend).** `product.tenant_scheduled_runs` (mirroring `tenant_custom_mcp_servers`), JWT-authenticated CRUD, tiered per-tenant cap, internal endpoint for Cerveau. *Exit gate:* a tenant creates/pauses/deletes a schedule through the API and cannot exceed their tier's cap. — ✅ **DEPLOYED + exit gate met, 2026-09-05** (`avry-backend@7d94e7b`). See §10.
 
 **Phase 3 — Dashboard UI.** Schedule list with next/last run and status, create/pause/delete, and — the load-bearing part — **parked approvals from unattended runs surfaced in the Notification Centre**, reusing the existing approval card. *Exit gate:* a tenant sees a 3am run's result, and resolves an approval it parked.
 
@@ -173,3 +173,38 @@ Decisions 1–3 from §4 shipped as designed, with one implementation detail the
 All test cron jobs and all four test graph rows were deleted after verification (`DELETE FROM cognee.graph_node WHERE id IN (...)`, confirmed 4 rows removed) — no synthetic data was left in a real table.
 
 **What Phase 1 does not yet do (by design — see §5):** nothing outside Cerveau itself can create a tenant-scoped job (no dashboard, no self-serve API — Phase 2); no per-tenant quota (Decision 4); no approval-parking UX for an unattended job that hits an `Irreversible` tool (Decision 5, still exactly as hard as §4 describes — untouched by this phase). Phase 1 only proves the mechanism is real and correctly gated; Phases 2–4 are what make it a product feature.
+
+## 10. Phase 2 — the store, the API and the quota, 2026-09-05
+
+`app/routes/tenant_scheduled_runs.py` (`avry-backend@7d94e7b`), mirroring `tenant_mcp_servers.py` throughout: same connection helper, same idempotent `_ensure_schema`, same tier and engine gates, same internal-token seam.
+
+| | |
+|---|---|
+| Dashboard (JWT) | `POST` create · `GET` list · `PATCH` pause/resume/edit · `DELETE` soft-delete |
+| Internal (`X-Internal-Token`) | `GET /internal/all` · `GET /internal/{user_id}/{agent_type}` · `POST /internal/{run_id}/ack` |
+| Gates | paid tier (Operational+), `engine = 'cerveau'` |
+| Quota | Operational 1 · Business 5 · Enterprise 20 |
+
+### These schedules do not run yet — and the design refuses to pretend otherwise
+
+Phase 1 built the runtime half; what is still missing is the sync that copies rows from this table into Cerveau's own cron store. Until it exists a row stays `pending_activation` and nothing fires.
+
+That is why `status` is a real column with an internal `ack` route rather than a derived boolean: **the record can never claim to be live before Cerveau has said it owns it.** Any content change, and pausing, drop the row back to `pending_activation` — a paused schedule must not keep reporting `active` while Cerveau still holds the old job. `GET /internal/all` deliberately returns disabled rows too, so the future reconcile can tell *"pause this"* apart from *"this no longer exists"*, and `DELETE` is soft for the same reason.
+
+**Do not surface this in the dashboard (Phase 3) before that sync lands.** "Appears to work in the UI and silently never runs" is the exact failure §6 was written about.
+
+### Two hard requirements, both learned the expensive way
+
+**`timezone` is required and must be a real IANA zone.** Cerveau resolves a tz-less cron expression against the *runtime host's* zone — `Asia/Shanghai` on this VPS — which is meaningless to a tenant and silently lands the schedule hours from where they asked. §6a spent an investigation on exactly that. A tenant-facing schedule may never inherit it, so the boundary rejects a missing or unknown zone outright.
+
+**Quotas are small and the minute field is floored.** Recurring unattended runs are the easiest way to generate surprise LLM spend (§8), so the ladder sits below the custom-MCP one — an MCP server costs nothing until a turn calls it; a schedule bills whether or not anyone reads the result — and `_reject_runaway_frequency` refuses `*` or any step under `*/15` in the minute field. That check is documented as what it is: a floor on the two shapes that actually cause runaway spend, not a general minimum-interval calculation, which would need full schedule expansion.
+
+### The cron validator is hand-written on purpose
+
+The goal is to accept **exactly** what the runtime accepts, not everything some parser tolerates. That cut both ways: a first draft capped day-of-week at 6 and rejected day names, which is *stricter* than Cerveau and would have refused perfectly valid schedules. Probed against the live instance to settle it rather than reasoning about it — `0 9 * * 7` accepted by both, `0 9 * * MON-FRI` accepted by both, `0 9 * * 8` rejected by both (`Invalid weekday value: 8 (expected 0-7)`).
+
+### Verified
+
+DDL validated against avry-postgres inside a rolled-back transaction before anything was created. After deploy: routes registered, `401` on the JWT routes and `403` on the internal ones without credentials, all five paths in the OpenAPI document, and `_ensure_schema` created the real table on first internal call.
+
+The exit gate itself was exercised against the real store under a synthetic `user_id`, with only the tier and engine gates stubbed (they read unrelated tables): **10/10** — create lands `pending_activation`; a duplicate name is `409`; the sixth schedule on a Business plan is refused with *"allows 5"*; pause clears `enabled` and returns the row to `pending_activation`; an unknown timezone and an every-minute expression are both rejected; the internal read sees live rows only; soft-delete frees the name for immediate reuse; `ack` marks the row `active`. All six test rows removed afterwards — the table is back to empty.
