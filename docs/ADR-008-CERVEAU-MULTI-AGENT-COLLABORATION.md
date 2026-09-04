@@ -178,12 +178,36 @@ Live-verified per instance with a synthetic Irreversible-tier row inserted direc
 
 Both well inside the 20s sweep interval's first tick, both coherent and correctly scoped to the tool actually being reviewed. The "cannot resolve its own approval" property was not re-tested live (there is nothing to click — approval resolution is an HTTP route with no matching `Tool`, and `verifier_brain`'s `allowed_tools` is `[]` in both live configs, confirmed by parsing both TOML files after the edit); that is a structural guarantee, not a behavioral one, so static confirmation is the correct proof, not a second LLM call to watch it fail to do something it has no way to attempt.
 
-### Phase 3b — A2A task vocabulary (Rust) — investigated 2026-09-03, deliberately NOT started
+### Phase 3b — A2A task vocabulary — ✅ **resolved 2026-09-05, narrowed to one state** (`AVRY-Cerveau@14c0e88e`)
+
+Revisited after the investigation below, and the answer changed shape: **one of A2A's seven states earned its place, and adopting the rest would have been ceremony.**
+
+`InputRequired` shipped, because it fixes a wrong answer. A background delegate whose sub-agent parked an `Irreversible` tool call finished as `Completed` — the model's prose usually said it was waiting for approval, but the machine-readable status said the work was done, and the status is what a caller reads to decide whether it is.
+
+The seam already existed and was simply unused on this path: `approval_gate` calls `record_pending_approval` whenever it creates a `Pending` row, but that is a no-op unless something scoped `LAST_PENDING_APPROVAL`, and nothing did for a background delegate. Scoping it around the turn is what makes the state observable at all; the result then carries the approval id and tool name instead of a bare success.
+
+Three judgement calls, each pinned by a test rather than left implicit:
+
+| Decision | Why |
+|---|---|
+| **Not pending** | `await_sessions` must return on it. What it waits on is a *person*; blocking the parent turn until someone opens the dashboard would hang it for hours. |
+| **Not a failure** | `is_failure`'s old `!matches!(self, Running \| Completed)` body would have swept the new state in the moment it was added. A parked approval is a pause — calling it an error is a *worse* answer than the `Completed` it replaces. |
+| **Maps to control-plane `Paused`** | `Paused` is the one non-terminal outcome, so the reaper keeps reconciling a task waiting on a person instead of writing it off as finished. |
+
+**The other three states were not adopted, and that is the deliberate part.** `submitted` cannot occur — a background task is written `Running` and spawned in the same breath, so there is no queue for it to sit in. `working` is `Running` under another name. `rejected` (refused up front) versus `failed` (tried and failed) *is* a real distinction Cerveau makes — a `forbidden` delegation policy, a denied approval — but it is flattened into the error string today and its only consumer would be the Phase 4 dashboard, which does not exist. §5 defers the A2A *wire protocol* until a real customer or partner trigger rather than internal aesthetics; taking its vocabulary wholesale while the protocol waits would be exactly that.
+
+On the migration risk the investigation flagged: adding one variant to a `#[serde(rename_all = "snake_case")]` enum is safe in the direction that matters. Old files never contain the new spelling, so a new binary reads them fine; only an *old* binary reading a *new* file breaks, which is a rollback concern rather than a forward one. The three-enum fan-out turned out to be three small, mechanical additions once the semantics above were settled — the hard part was never the plumbing.
+
+<details><summary>Original investigation (2026-09-03) — why this was deferred rather than patched</summary>
 
 - Extend `BackgroundTaskStatus` to the A2A 7-state set; surface `InputRequired` through the existing tenant-scoped approval/notification path (it is the same UX as an approval prompt).
 - Cheap layer unchanged: the risk gate still fires on 100% of traffic.
 
 **Why this stopped at investigation instead of proceeding straight into code, unlike Phase 3a:** `BackgroundTaskStatus` is not one enum with one call site — it is the on-disk JSON format for every background delegate task's result file (`#[derive(Serialize, Deserialize)]`, `#[serde(rename_all = "snake_case")]`, 4 variants: `Running`/`Completed`/`Failed`/`Cancelled`), which a *second*, richer runtime-only enum (`BackgroundResultState`, 6 variants — adds `Lost`/`TimedOut` for reaper-detected orphans) derives from via `from_file_status`, which itself gets mapped to a *third* enum (`crate::control_plane::TaskStatus`, the SQLite-persisted task-registry status) at task completion — all three kept in sync by hand across roughly 30 call sites in one 8,000-line file (`delegate.rs`). Extending to A2A's 7 states (`submitted`/`working`/`input-required`/`completed`/`canceled`/`failed`/`rejected`) means deciding a compatibility story for all three representations at once, including whatever background delegate task result files are sitting on disk *right now* in production with the current 4-variant format — a live-data-format change, not an additive one. Phase 3a's `verifier_finding` column was purely additive (new nullable column, new independent module, zero changes to any existing serialization format), which is why it was safe to design-and-ship in one pass; this is not that shape of change, and doing it well needs a real design pass (three-enum unification strategy, on-disk migration/tolerance plan, and an honest answer to whether `InputRequired` even makes sense for a background delegate task today, since nothing currently pauses one mid-flight for approval) rather than a plausible-looking patch applied overnight with no one available to review the trade-offs. Deferred until that design pass happens, not abandoned.
+
+**One premise above was wrong, and it is worth naming rather than quietly leaving in the record.** The investigation questioned "whether `InputRequired` even makes sense for a background delegate task today, since nothing currently pauses one mid-flight for approval". Something does: the approval gate parks the call as a durable `Pending` row and the turn carries on. What was missing was never the pause — it was any way to *see* it, because nothing scoped `LAST_PENDING_APPROVAL` on that path. Deferring was still the right call (the semantics needed deciding, and they were the hard part), but the reason given for doubting the state was not.
+
+</details>
 
 ### Phase 4 — Mission Control as a real multi-agent surface (dashboard)
 
