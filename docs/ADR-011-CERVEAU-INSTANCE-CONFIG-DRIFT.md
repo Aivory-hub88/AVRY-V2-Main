@@ -63,3 +63,11 @@ Five of the six differences arose the same way: an edit applied to one instance 
 **Proven to fail, not just to pass.** A checker only ever seen returning green is not yet known to work, so both code paths were exercised against a deliberately drifted copy: a scalar difference (`browser.enabled: A=false | B=true`) and a list-membership one (`risk_profiles.agent_analyst_brain.auto_approve: only on A: [enrich_lead_contact]`). Both were caught, both exited 1. Production run afterwards: `drift: none (1807 keys compared)`.
 
 **One thing the test surfaced, worth recording** because it looks like a bug and is not: instance B's *file* is missing `tool_search` from `risk_profiles.default.auto_approve`, which A's file has — but the checker stays green, correctly. The runtime appends `tool_search` when absent (the deferred-MCP mechanism needs it), so the two *resolved* values hold the same members and differ only in order. Comparing file text would have raised a false alarm here; comparing resolved values does not. That is the whole reason for the method.
+
+## 7. One difference between the instances is deliberate — do not harmonise it
+
+`AVRY_TENANT_SCHEDULE_SYNC=1` is set on **instance A only**, via `/etc/systemd/system/zeroclaw-cerveau.service.d/tenant-schedule-sync.conf`. Instance B must stay unset.
+
+This is not drift. Both instances read the same avry-backend but keep separate cron stores, so a tenant schedule reconciled on both would fire — and bill — twice per period, with nothing in either instance able to notice (ADR-009 §11). Ownership has to be declared somewhere, and the systemd unit is where.
+
+The hourly checker does not see this, and should not: it compares resolved Cerveau `config list` values, not process environment. The note exists so nobody "fixes" the asymmetry by hand later. If the pool ever grows past two, replace the manual flag with a backend-side lease rather than adding a second owner.
