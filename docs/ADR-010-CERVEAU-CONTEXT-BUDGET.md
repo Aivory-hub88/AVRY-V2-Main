@@ -74,8 +74,10 @@ Everything backed up first (`config.toml.bak-pre-obscura-rename-20260904`, `SKIL
 
 **Live-verified:** a tenant-scoped turn logged `MCP server obscura connected — 23 tool(s) available` (was 37) and `MCP deferred: 32 tool stub(s) from 3 server(s)` (was 46), with `Registered 0 skill tool(s) from 2 skill(s): ticket-triage, browser-tool-priority` unchanged and the job completing `ok`. Test job deleted afterwards.
 
-## 6. Follow-ups
+## 6. Follow-ups — all three closed, 2026-09-05
 
-- The warning text in `agent/turn/mod.rs` says "system prompt and tool definitions" but measures only system messages. Misleading in exactly the way that cost this investigation its first hour — worth correcting in the Cerveau fork.
-- `/home/ubuntu/open-skills` is still on disk (408 KB, now unread). Harmless, but it can go.
-- The fork's workspace version reads `0.1.0` while the binary it replaced reported `0.2.1` (upstream builds releases from tags). Cosmetic, but `obscura --version` is now less informative than it was.
+**The misleading warning text** (`AVRY-Cerveau@e9380741`). It read *"system prompt and tool definitions (N tokens) alone meet or exceed the context budget"* and advised reducing the tool surface — pointing at the one thing `estimate_system_floor_tokens` never measured. It now states what it counts, states what it does not, and names `[skills] open_skills_enabled` / `prompt_injection_mode` *before* the budget knob. Applied to all five locales, which all carried the same untranslated English string. `estimate_system_floor_tokens` gained a doc comment explaining why the distinction is load-bearing, and the existing regression test now asserts both that `"tool definitions"` is **absent** and that `"[skills]"` is **present** — the misleading wording cannot come back quietly.
+
+**`/home/ubuntu/open-skills` removed** (956 KB on disk, not the 408 KB of `SKILL.md` alone). Checked first that `ensure_open_skills_repo` returns `None` before touching the directory when the flag is off, so nothing re-clones it and nothing errors on its absence; both instances restarted clean afterwards. It was a plain clone of `github.com/besoeasy/open-skills`, so re-enabling the feature would simply fetch it again.
+
+**Fork version** now `0.2.1-aivory.1` (`AVRY-obscura@894570f`). Upstream tags releases without bumping `workspace.package.version` on `main`, so building from main reported `0.1.0`. That mattered more than cosmetics: `obscura --version` is the only thing distinguishing the binary Cerveau runs — with its 23-tool surface — from a stock upstream one. The suffix states the real relationship rather than borrowing a version this fork no longer matches.
