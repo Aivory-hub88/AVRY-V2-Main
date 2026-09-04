@@ -63,10 +63,19 @@ Before measuring, this investigation forked `h4ckf0r0day/obscura` → [`Aivory-h
 
 That work is real, tested (12/12), and worth keeping: a smaller, better-shaped surface under Aivory's own control. But measured honestly it saves **~120 tokens per turn (3.8% of obscura's own footprint, ~0.1% of the problem)**. It was not the fix, and it is not presented as one. The lesson worth keeping: the tool-count number was visible and intuitive, the skills number was neither — and the intuitive one was wrong by three orders of magnitude.
 
-**It is not yet deployed.** The fork's consolidated binary is built but not swapped in on the VPS — the live `obscura` is still upstream's 37-tool build. Deploying it requires updating, in lockstep: `tool_risk_tiers.irreversible`/`reversible`, the `auto_approve` lists that pin obscura tool names, and the five copies of `browser-tool-priority/SKILL.md` whose lightpanda→obscura fallback table names the old tools. Tracked as follow-up, not urgent.
+**Deployed 2026-09-04**, in lockstep across four surfaces, because Cerveau pins obscura tool names by string in three of them:
+
+1. **Binary** — built by a new `aivory-cd.yml` workflow in the fork that compiles only the variant the VPS actually runs (Linux x86_64, `--features render,stealth`, confirmed against the deployed binary's impersonation symbols), smoke-tests the V8 snapshot and render path, **asserts the surface is exactly 23 tools**, and publishes to a rolling `aivory-cd` tag for token-free pull — the same CD shape AVRY-Cerveau already uses. Upstream's own `release.yml` builds 5 targets × 4 variants on tag pushes, which is right for a general release and wrong for one server.
+2. **`tool_risk_tiers`** — 64 obscura references collapsed to the 23 new names, deduped (several old names map to one new one). Verified afterwards: 7 irreversible (`click`, `input`, `press_key`, `evaluate`, `fill_form`, `cookies_write`, `set_storage_state`) and 16 reversible, with an empty intersection — the tier split the consolidation was designed around, intact.
+3. **`auto_approve` lists** — same rename, same dedupe.
+4. **`browser-tool-priority/SKILL.md`** — 10 copies (5 bundles × 2 instances), rewritten so the lightpanda→obscura fallback table names the consolidated tools and their discriminator arguments (`browser_elements` with `kind`, `browser_wait` with `selector`/`text`, `browser_capture` with `format`, …), plus a new note that reading cookies is ungated while writing them is not.
+
+Everything backed up first (`config.toml.bak-pre-obscura-rename-20260904`, `SKILL.md.bak-20260904`, `obscura-deploy/backup-20260904/*.upstream`). Both instances restarted, healthy, zero journal warnings.
+
+**Live-verified:** a tenant-scoped turn logged `MCP server obscura connected — 23 tool(s) available` (was 37) and `MCP deferred: 32 tool stub(s) from 3 server(s)` (was 46), with `Registered 0 skill tool(s) from 2 skill(s): ticket-triage, browser-tool-priority` unchanged and the job completing `ok`. Test job deleted afterwards.
 
 ## 6. Follow-ups
 
-- Deploy the consolidated obscura fork (needs the lockstep config/skill rename above).
-- The warning text in `agent/turn/mod.rs` says "system prompt and tool definitions" but measures only system messages. Misleading in exactly the way that cost this investigation its first hour — worth correcting upstream in the fork.
+- The warning text in `agent/turn/mod.rs` says "system prompt and tool definitions" but measures only system messages. Misleading in exactly the way that cost this investigation its first hour — worth correcting in the Cerveau fork.
 - `/home/ubuntu/open-skills` is still on disk (408 KB, now unread). Harmless, but it can go.
+- The fork's workspace version reads `0.1.0` while the binary it replaced reported `0.2.1` (upstream builds releases from tags). Cosmetic, but `obscura --version` is now less informative than it was.
