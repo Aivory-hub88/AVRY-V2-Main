@@ -191,6 +191,22 @@ Only meaningful once Phases 1–3 produce something to show: live delegation gra
 
 **Exit gate:** a logged-in tenant can watch a delegation happen live and see the resulting verifier finding without reading a log file.
 
+#### Phase 4a — verifier findings on approvals — ✅ **DEPLOYED 2026-09-04** (`avry-user-dashboard@a97aa15`)
+
+The half of the exit gate that Phase 3a had already made possible but nothing rendered: the finding was stored, the gateway returned it, avry-backend passed it through untouched — and reading one still meant querying SQLite. No backend change was needed; this was entirely the dashboard.
+
+- **The approval card's subtitle** now carries the finding instead of the standing *"Waiting for your decision."*, prefixed **"Automated check:"**. The prefix is load-bearing, not decoration: the reasoning is a model's summary of *untrusted tool arguments*, and must never read as the product asserting a fact.
+- **A `flag` verdict takes over the badge** ("Flagged"). That badge is the only element strong enough to say "open this one first" without inventing a second colour language next to `NotificationCard`'s deliberately restrained one. An `ok` verdict keeps the standing badge — the verifier has zero tools and cannot approve anything, so it must never look like it did.
+- **An `error` verdict** says the check didn't complete and to use your own judgement; it never prints the internal failure string at a tenant.
+- **`confidence` is deliberately not rendered.** Nothing calibrates it, and an uncalibrated `0.85` beside a sentence reads as precision the number does not have.
+- **Mission Control's status line** says "Flagged" when any of an agent's pending approvals is flagged, reading the approvals already passed in — that view's "no new data source" rule is intact.
+
+**Found while verifying it — a real pre-existing bug, now fixed in the same change.** `useAgentApprovals` memoised its exclude-set on the *identity* of `excludeIds`, and the Console page passes a freshly-derived array every render (`messages.filter(...).map(...)`). So `refetch` was new every render → the effect re-ran every render → it set state → render again. It only bites once at least one approval exists, which is exactly why zero-approval production never surfaced it: as React's *"Maximum update depth exceeded"* against a fast response, and as **silent, continuous polling of avry-backend** against a real one. Now keyed on the ids themselves. The other caller (`Sidebar`, no args) was never affected.
+
+**Verified live** against stubbed approvals in the dev server: the loop is gone (0 errors where the identical data previously produced hundreds), and all four card states render correctly — `flag` (badge FLAGGED), `ok`, `error`, and no-finding. Deployed and confirmed present in the production bundle.
+
+**Still open for Phase 4:** the live delegation graph, background-task list, per-agent cost/latency, and the read-only Skills listing. The exit gate's *"watch a delegation happen live"* half is not met yet.
+
 ### Phase 5 (deferred, only on a real trigger) — A2A wire protocol
 
 Implement Agent Card + JSON-RPC/SSE task transport against `a2a.proto`, so agents on *different* Cerveau instances — or a client's own A2A-speaking agent — can participate. **Trigger:** a concrete customer or partner requirement, not internal aesthetics. Would likely build on `rig` (`rig-core`/`rig-agent`'s `AgentRun` state machine, `rig-rmcp` for MCP) since no Rust crate implements A2A today, and would sit naturally on AGNTCY's directory/identity layer.
