@@ -54,6 +54,12 @@ All three health endpoints (`:3100`, `:3101`, `:3105`) report `ok`; no journal w
 
 The Lead Enrichment add-on is **on hold** — the backend is built but no provider API keys are configured, so the tool costs nothing and does nothing today. Aligning B to A does not activate it; it only ensures that if it is ever switched on, both instances behave the same. Nothing here should be read as resuming that feature.
 
-## 6. Follow-up
+## 6. Guarding against recurrence — done
 
-Nothing enforces this. The two configs can drift again the moment an edit is applied to one and not the other — which is how five of these six arose. A small periodic check (the same `config list` set-comparison used here, run from cron, alerting on non-empty real drift) would catch it in hours instead of months. Worth doing; not done here.
+Five of the six differences arose the same way: an edit applied to one instance and not the other. Nothing prevented that, so the same comparison used above now runs on a schedule.
+
+`scripts/cerveau-config-drift-check.py` (deployed to `/usr/local/bin/`, driven by `cerveau-config-drift.timer` hourly, matching the existing `cerveau-health-check` pattern) runs the same method: resolved values from `config list`, `Vec<String>` compared as sets, the per-instance `obscura`/`pdf-oxide` paths excluded by an explicit allow-list. Quiet on success (one journal line), exit 1 with the offending keys on stderr when it finds drift, exit 2 if the check itself cannot run.
+
+**Proven to fail, not just to pass.** A checker only ever seen returning green is not yet known to work, so both code paths were exercised against a deliberately drifted copy: a scalar difference (`browser.enabled: A=false | B=true`) and a list-membership one (`risk_profiles.agent_analyst_brain.auto_approve: only on A: [enrich_lead_contact]`). Both were caught, both exited 1. Production run afterwards: `drift: none (1807 keys compared)`.
+
+**One thing the test surfaced, worth recording** because it looks like a bug and is not: instance B's *file* is missing `tool_search` from `risk_profiles.default.auto_approve`, which A's file has — but the checker stays green, correctly. The runtime appends `tool_search` when absent (the deferred-MCP mechanism needs it), so the two *resolved* values hold the same members and differ only in order. Comparing file text would have raised a false alarm here; comparing resolved values does not. That is the whole reason for the method.
