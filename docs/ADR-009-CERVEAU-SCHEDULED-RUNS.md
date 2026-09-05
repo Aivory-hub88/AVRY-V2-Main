@@ -389,6 +389,21 @@ What the episode did surface is a genuine gap, fixed in ADR-011 §8: `rolling` k
 
 The other half of the claim stands: `resolved_by = "system:expiry"` on the row is the durable audit trail, and it survives any logging configuration at all.
 
-### Still not done, and deliberately
+### Deployed and live-verified end to end, 2026-09-05
 
-The tenant sees a lapsed approval as a notification that quietly disappears. The signal actually worth having is on the *schedule* — "last run raised a question that lapsed" — which means a new status on `product.tenant_scheduled_runs` and somewhere to show it. That is a feature, not the gap this closes, and it is not pretended otherwise.
+Cerveau `efb23fa2`, avry-backend `5324d06`, dashboard `6f3c409`. All three CI/build clean (3606 runtime + 450 gateway tests; 286 dashboard tests), sha256 matched end to end on the Cerveau artifact, old binary backed up, both instances swapped and healthy.
+
+**avry-backend, verified before Cerveau even shipped.** A real schedule row, flagged through the actual `POST .../internal/{id}/lapsed-approval` route: `status` stayed `active`, `last_lapsed_at`/`last_lapsed_tool` populated. The dismiss route's exact `UPDATE` proven in a rolled-back transaction against the live row — clears both columns, touches nothing else. A 404 on a made-up id confirmed. Row deleted afterwards.
+
+**Cerveau, the real end-to-end path — not two halves checked separately.** A schedule row on the backend, a stale (100h-old) `pending_approvals` row on Cerveau carrying `session_id = cron-e2e-run` and `schedule_id` pointing at that row, then a restart to fire the sweep's first tick immediately:
+
+| side | before | after |
+|---|---|---|
+| Cerveau `pending_approvals` | `pending` | `expired`, `resolved_by = system:expiry` |
+| avry-backend schedule row | `last_lapsed_at = NULL` | `last_lapsed_at` set, `last_lapsed_tool = GMAIL__SEND_EMAIL`, `status` still `active` |
+
+Repeated on **instance B** with a second schedule and tool (`SLACK__POST_MESSAGE`) — deliberately, because B is *not* the tenant-schedule-sync owner (ADR-011 §7) and the expiry-report path must not be gated the same way the reconcile is: expiry acts on each instance's own local `pending_approvals`, so both instances have to report or half of all lapses would go unrecorded. Confirmed identical behaviour on B. All probe rows removed from both SQLite stores and Postgres; final health checks green on `:3100`/`:3101`/`:3105`, and the owner flag confirmed still set on A only.
+
+### What is left, and it is genuinely small
+
+The dismiss button's live click-through is the one piece checked against a local stub rather than a logged-in production session — the same honest limit every dashboard phase in this ADR has carried. The API contract itself was proven directly (above), which is the part that could actually be wrong.
