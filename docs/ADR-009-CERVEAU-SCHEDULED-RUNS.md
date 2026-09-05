@@ -365,6 +365,24 @@ The row is **retired, never deleted** — `resolved_by = "system:expiry"` so an 
 
 **Tests:** 7 new, covering each refusal above plus the two user-visible effects (drops out of `status=pending`, stays out of the redelivery sweep). Full suites: 3602 runtime, 450 gateway, 0 failures.
 
+### Deployed and live-verified, 2026-09-05
+
+Cerveau `6b2de884`, CI green, sha256 matched end to end (`a5ab4547…`), old binary backed up as `zeroclaw-cerveau.bak-pre-approval-expiry-20260905`, both instances stopped together and restarted healthy on `:3100`/`:3101`/`:3105`.
+
+Three probe rows on instance A, then a restart so the first interval tick fired at once:
+
+| row | session | age | result |
+|---|---|---|---|
+| `exp-stale-cron` | `cron-run-1` | 100h | **`expired`**, `resolved_by = system:expiry` |
+| `exp-fresh-cron` | `cron-run-2` | 1h | `pending` — inside the window |
+| `exp-stale-live` | `sess-42` | 100h | `pending` — attended, never touched |
+
+Read back through the real `GET /webhook/approvals?status=pending`, the list returned exactly the two survivors with their `unattended` flags intact; the expired row was gone. All probe rows deleted afterwards, both stores back to zero.
+
+**Instance B was checked separately**, because it is *not* the tenant-schedule owner (ADR-011 §7) and a reader could reasonably assume the expiry is gated the same way. It is not, deliberately: the reconcile is gated because both instances read one shared backend and would duplicate each other's work, while expiry acts only on rows in its own local `control_plane.db`, so both instances must sweep or half the approvals never lapse. A probe row on B expired correctly.
+
+**One honest gap in the verification:** this install has `[observability] backend = "none"`, so the sweep's `INFO` line has no sink and could not be observed — the same dead-observability finding as §7. What *is* observable, and was, is `resolved_by = "system:expiry"` on the row itself. That column being a real string rather than `NULL` is the whole reason the audit trail survives a configuration that throws the logs away.
+
 ### Still not done, and deliberately
 
 The tenant sees a lapsed approval as a notification that quietly disappears. The signal actually worth having is on the *schedule* — "last run raised a question that lapsed" — which means a new status on `product.tenant_scheduled_runs` and somewhere to show it. That is a feature, not the gap this closes, and it is not pretended otherwise.
