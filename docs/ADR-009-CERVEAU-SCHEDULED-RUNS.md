@@ -263,3 +263,50 @@ The full lifecycle was exercised against the real store and the real reconcile, 
 The test row was deleted afterwards; `product.tenant_scheduled_runs` is empty again.
 
 **Still open (Phase 3):** the dashboard UI. §10's warning stands with one clause removed — the sync now exists, so surfacing schedules no longer risks "appears to work and silently never runs". What remains unbuilt is the tenant-facing view and the approval-parking UX for an unattended run that hits an `Irreversible` tool (Decision 5).
+
+## 12. Phase 3 — the tenant-facing half, 2026-09-05
+
+Everything up to here was infrastructure a customer could not reach. Phase 3 is the part they touch: a **Schedules** tab in Customise Agent, and two things the Notification Centre could not previously say.
+
+### Nobody is asked to write cron — and that is a safety property
+
+The form offers four shapes (daily, weekdays, weekly, monthly) plus a time, and builds the expression itself. Every shape writes a *literal* minute, so the UI has no way to express the every-minute schedule §10's `_reject_runaway_frequency` exists to refuse. The cheapest way never to generate a schedule that bills every minute is to have no way to say one. Day-of-month stops at 28 for a related reason: a run set for the 31st would quietly not happen in most months, and a schedule that silently does not run is worse than one that never offered the date.
+
+An expression the builder could not have written (`0 9 * * MON`, `*/15 * * * *`, `0 9 * * 7`) parses back as `null` and is shown verbatim. Approximating it into the nearest shape would silently rewrite the tenant's schedule the next time they pressed Save on an unrelated field.
+
+The timezone is taken from the browser rather than asked for, which closes §6a at the only place it can actually be closed — the moment the schedule is written.
+
+### Status is rendered, never derived
+
+A schedule the tenant has switched on reads **"Waiting for the agent"** until the reconcile has created the job and acked it. This is the whole reason §10 made `status` a real column, and the UI would have thrown it away by rendering `enabled` instead. Backend refusals are passed through verbatim: the quota message already names the plan and its allowance, the timezone message already explains why one is required.
+
+### The Notification Centre: two things it could not say
+
+**A schedule that has stopped.** The reconcile acks an unusable row back as `failed` with a reason, but the only place that showed it was the tab behind Customise Agent — the last place anyone looks when they have not noticed anything is wrong. `useScheduleAlerts` surfaces those in the office feed, in `error` tone (this is not a decision waiting for someone; it is work the customer believes is happening that is not) and with no action button, since fixing it means editing the schedule and a button that only opens another screen is worse than the sentence saying where to go. Only `failed` is surfaced — `pending_activation` is normal and transient during the reconcile's interval, and a notification for it would fire on every edit and train people to ignore the feed.
+
+**Whether anyone is actually waiting.** An approval raised by a run that fired at 03:00 blocks nobody; one raised in a live conversation is holding a person up. The card said *"Waiting for your decision"* over both, which for the first is not merely uninformative, it is wrong.
+
+### The runtime gap that made the second one possible — and a real bug it exposed
+
+`run_agent_job` scoped `TENANT_CONTEXT` but never `TURN_ORIGIN_CONTEXT`. Two consequences, one cosmetic and one not:
+
+- **Not cosmetic:** an approval a scheduled run created carried no `origin_message`, so resolving it later resumed the turn with the literal text *"(original message not captured)"* — the model asked to continue a conversation it cannot see. It now carries the schedule's own instruction. The session id is the real session path, not a synthetic label, because the resumed turn's memory recall is scoped by it and must land on the session the original run used.
+- **The signal:** the isolated-cron session prefix (`cron-`) is the only thing on a stored row that distinguishes unattended from live. It is now a named constant with exactly one reader (`is_unattended_session`) and a test pinning the writer to it — changed alone, either side would silently stop the office telling the two apart. A `Main`-target cron job shares the interactive session by design and reads as attended; that is the safe direction of the error, since a missing badge costs nothing and claiming nobody is waiting when someone is costs them the wait.
+
+The gateway exposes `unattended` and `origin_message` on the approvals JSON. avry-backend's proxy passes rows through verbatim, so it needed no change at all.
+
+### Verified
+
+Rust: 3595 runtime + 450 gateway, 0 failures — including 3 new gateway tests on the JSON (a scheduled row marks unattended; `None`/`sess-42`/`main` do not; a missing origin serialises as `null`, not an empty string that would render as a blank line) and the writer/reader pinning test.
+
+Dashboard: 286 tests, 0 failures, production build clean. 7 of those are new, on the builder/parser: the literal-minute invariant across every cadence and every minute, the round-trip, the 28th clamp, and the refusal to approximate.
+
+Rendered against a throwaway local stand-in for avry-backend rather than monkey-patched in the page, so the real fetch path and hook ordering ran. All three states confirmed live in the rail: `SCHEDULED RUN` + the schedule's own instruction, `NEEDS APPROVAL` + "Waiting for your decision" unchanged, and `NOT RUNNING` + the backend's reason + where to fix it. The Schedules tab was checked for all four status pills, the cadence sentences, and the conditional day/day-of-month controls.
+
+Deployed: Cerveau `b11c720a`, dashboard `7d3be9d` (both `Ran on a schedule` and `Waiting for the agent` confirmed present in the served production bundle).
+
+**Honest limit:** the click-through was done against a stub, not a logged-in production session — the same open item ADR-009's earlier phases and the Deep Diagnostic language work carry. The API contract itself was read from `tenant_scheduled_runs.py` directly and exercised 10/10 against the real store in §10.
+
+### What is left
+
+Decision 4's quota is enforced but not *shown* — a tenant learns their allowance by hitting it. Decision 5's approval parking is now legible but not yet complete: an unattended approval that nobody ever resolves has no expiry, so a schedule can accumulate them silently. Both are small, and neither is a correctness gap.
