@@ -381,7 +381,13 @@ Read back through the real `GET /webhook/approvals?status=pending`, the list ret
 
 **Instance B was checked separately**, because it is *not* the tenant-schedule owner (ADR-011 §7) and a reader could reasonably assume the expiry is gated the same way. It is not, deliberately: the reconcile is gated because both instances read one shared backend and would duplicate each other's work, while expiry acts only on rows in its own local `control_plane.db`, so both instances must sweep or half the approvals never lapse. A probe row on B expired correctly.
 
-**One honest gap in the verification:** this install has `[observability] backend = "none"`, so the sweep's `INFO` line has no sink and could not be observed — the same dead-observability finding as §7. What *is* observable, and was, is `resolved_by = "system:expiry"` on the row itself. That column being a real string rather than `NULL` is the whole reason the audit trail survives a configuration that throws the logs away.
+**Correction (same day).** This paragraph originally claimed the sweep's `INFO` line "has no sink and could not be observed" because `[observability] backend = "none"`. That was wrong, and wrong in exactly the way §7 warned about: I looked in the systemd journal and for `*.log` files, found nothing, and concluded the sink was dead. `backend` selects the *metrics* sink; the JSONL event log is written by a separate crate (`zeroclaw-log`) whose `log_persistence` defaulted to `rolling` the whole time. The event was there, at the path §7 names — `<config-dir>/data/state/runtime-trace.jsonl` — with `approval_id`, `tool`, `requested_at` and `tenant_id` attributes intact, on both instances.
+
+§7 had already written down this precise lesson ("Tracing was never broken; the dead config section made it look that way") and it was not applied. Recorded rather than quietly edited, because the failure was re-reading the system through an assumption instead of looking where the previous investigation said to look.
+
+What the episode did surface is a genuine gap, fixed in ADR-011 §8: `rolling` keeps only the newest 200 entries and discards everything older permanently — about seven hours on a quiet day.
+
+The other half of the claim stands: `resolved_by = "system:expiry"` on the row is the durable audit trail, and it survives any logging configuration at all.
 
 ### Still not done, and deliberately
 
