@@ -71,3 +71,28 @@ Five of the six differences arose the same way: an edit applied to one instance 
 This is not drift. Both instances read the same avry-backend but keep separate cron stores, so a tenant schedule reconciled on both would fire — and bill — twice per period, with nothing in either instance able to notice (ADR-009 §11). Ownership has to be declared somewhere, and the systemd unit is where.
 
 The hourly checker does not see this, and should not: it compares resolved Cerveau `config list` values, not process environment. The note exists so nobody "fixes" the asymmetry by hand later. If the pool ever grows past two, replace the manual flag with a backend-side lease rather than adding a second owner.
+
+## 8. Event history was seven hours deep and had no archive — fixed 2026-09-05
+
+Found while trying to confirm a log line from ADR-009 §14. The line was there; what was not there was any way to look further back than the same afternoon.
+
+`log_persistence` was at its default, `rolling`, which keeps the newest `log_persistence_max_entries` (200) in the active file and **discards everything older permanently** — no archive, nothing to recover. Measured on the day: 200 entries spanned about seven hours on instance A and six on B, on a quiet day with almost no tenant traffic. Under the load that actually produces incidents that window collapses, and the `approval_resume` billing leak found the same day is the shape of the problem — a fail-open path that had been silently wrong for weeks with nothing to read back.
+
+Both instances now use the `rotating` mode the runtime already supports, which the default never enabled:
+
+```toml
+[observability]
+backend = "prometheus"
+log_persistence = "rotating"
+log_persistence_max_bytes = 33554432        # 32 MiB
+log_persistence_rotate_daily = true
+log_persistence_retention_max_files = 14
+```
+
+**Why these numbers.** At the observed ~509 bytes/event, 32 MiB is roughly 66k events — enough that a traffic spike rotates rather than producing one unreadable file, while an ordinary day rotates on the daily boundary instead. Fourteen files is a fortnight of history; at current volume that is single-digit megabytes, and even at a hundred times the traffic the size trigger bounds the worst case near 450 MB against 60 GB free. `retention_max_age_days` is left at `0` deliberately — the file count already bounds growth, and two overlapping retention caps are harder to reason about than one.
+
+**`backend = "prometheus"` is a separate axis, not a side effect.** It selects the *metrics* sink, and `/metrics` was until now answering every request with *"Prometheus backend not enabled"*. The feature is compiled into the production binary (`observability-prometheus` is in the dist feature set), so this is a real exporter rather than the silent noop fallback the code falls back to on a build without it. Nothing scrapes it yet; the value today is that it can be read during an incident instead of returning a apology. Crucially it does **not** touch the JSONL: that is written by the separate `zeroclaw-log` crate, so the two settings cannot switch each other off — checked in the source before changing either.
+
+**Verified:** identical one-hunk diffs on both configs (backups taken first), both restarted healthy on `:3100`/`:3101`/`:3105`, resolved `config list` values identical across the two, `/metrics` now returning real counters (2824 bytes vs 88), the trace file past the old 200-line ceiling, and the hourly drift checker green — *drift: none (1807 keys compared)*.
+
+The edit script was scoped to the `[observability]` section and refuses to run if that section holds a key it does not recognise. `backend =` is an unremarkable string in a config with hundreds of sections, and an unanchored match is how you rewrite six risk profiles by accident — which had already happened once earlier in the same session.
