@@ -229,7 +229,37 @@ The half of the exit gate that Phase 3a had already made possible but nothing re
 
 **Verified live** against stubbed approvals in the dev server: the loop is gone (0 errors where the identical data previously produced hundreds), and all four card states render correctly — `flag` (badge FLAGGED), `ok`, `error`, and no-finding. Deployed and confirmed present in the production bundle.
 
-**Still open for Phase 4:** the live delegation graph, background-task list, per-agent cost/latency, and the read-only Skills listing. The exit gate's *"watch a delegation happen live"* half is not met yet.
+#### Phase 4b — per-agent cost was wrong before it was missing — ✅ **DEPLOYED 2026-09-05** (`AVRY-Cerveau@641037c8`)
+
+Started as "build the cost/latency panel", became "the panel would have shown confident nonsense".
+
+**First, the finding that reframes the whole phase: delegation had never run in production.** Zero `delegate` events in the runtime trace, zero rows in `tasks`, zero delegation nodes in cognee — despite the 6-agent mesh being live with `delegation_policy.mode = "allow"` since 2026-09-03. The exit gate *"watch a delegation happen live"* was not merely unmet, it was **untestable**. One cheap turn settled that the mechanism works: `delegate` start→complete in 1.06s, verified in the trace rather than taken from the model's own claim that it had delegated.
+
+That turn is what exposed two independent cost defects, both measured against production rather than inferred:
+
+| path | before | after |
+|---|---|---|
+| agentic target (`security_brain`) | sub-turn's 3,731 tokens filed as **`analyst_brain`** | `security_brain 3718 tok` |
+| non-agentic target (`comms_brain`) | **no cost row at all** | `comms_brain 1797 tok` |
+
+**Agentic delegation misattributed** because the sub-turn inherits the *caller's* `TOOL_LOOP_COST_TRACKING_CONTEXT` — a task-local, inherited because `delegate` wraps the sub-loop in `tokio::time::timeout` rather than spawning it. The sub-turn's own `agent_alias` was already threaded into `ToolLoop`; the cost label simply was not.
+
+**Non-agentic delegation recorded nothing** because that path calls `chat_with_system`, which returns a bare `String`. The recorder lives in `agent::turn::execution`, inside the tool loop this path deliberately skips, so the provider's usage was dropped on the floor. It now goes through `chat` — same completion, plus the usage the provider already returned — booked before anything downstream can fail, matching `execution`'s own ordering.
+
+**Only the label moves.** `reattributed_cost_context` clones the ambient context and swaps the alias, keeping the same tracker, pricing table and turn-usage `Arc`s. Daily totals, the context-window readout and budget enforcement are unchanged — enforcement never reads the alias (`check_tool_loop_budget` calls `tracker.check_budget` directly), which is precisely what makes re-labelling safe rather than a change to who gets throttled. Two new tests pin that contract, including `Arc::ptr_eq` on the tracker and the accumulator.
+
+This is not bookkeeping pedantry: `runtime_profiles` carry `max_cost_per_day_cents` per agent, and every delegation since the mesh went live has been charging sub-agent spend to whoever called them.
+
+**Still open for Phase 4, with what each is actually blocked on:**
+
+| item | data | state |
+|---|---|---|
+| Live delegation graph | runtime trace has caller (`zeroclaw.risk_profile`), target (`arguments.agent`), `duration_ms`, `outcome`, `trace_id` | buildable — but only retained since ADR-011 §8 fixed rotation, and no API exposes the trace |
+| Background-task list | `tasks` table, `principal_id` already stamped from the tenant context | schema ready, **zero rows ever** — only *background* delegation writes there and it has never been used |
+| Per-agent cost/latency | `costs.jsonl` | data now correct; still has no tenant attribution, so it is operator-facing until that changes |
+| Read-only Skills listing | `api_skills::handle_agent_skills` already exists | needs tenant-scoped exposure |
+
+**A scope note worth stating rather than quietly building past.** The delegation graph would today render an empty set for every tenant, because no tenant flow delegates. Building it now is building a screen for data nobody produces. The defensible order is Skills listing (real data today), then the background-task list, and the graph once delegation is actually part of a tenant path — not before.
 
 ### Phase 5 (deferred, only on a real trigger) — A2A wire protocol
 
