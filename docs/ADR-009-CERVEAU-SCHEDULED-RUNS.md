@@ -315,7 +315,7 @@ The reconcile was re-exercised after the swap, since `scheduler.rs` changed unde
 
 ### What is left
 
-Decision 5's approval parking is now legible but not yet complete: an unattended approval that nobody ever resolves has no expiry, so a schedule can accumulate them silently. Small, and not a correctness gap.
+Decision 5's approval parking is now legible but not yet complete: an unattended approval that nobody ever resolves has no expiry, so a schedule can accumulate them silently. Small, and not a correctness gap. **Closed in §14.**
 
 ## 13. Phase 3a — the allowance, and what a run actually spends, 2026-09-05
 
@@ -336,3 +336,35 @@ Backend helpers exercised against the real identity tables inside the running co
 UI checked in five states against a throwaway local stand-in (2 of 5 with credits; 5 of 5 in amber with the form withdrawn and the hint in its place; a Free plan reading "doesn't include scheduled runs"; a superadmin showing the quota with no credits line; a low balance turning amber at the shared 15% threshold). 286 dashboard tests, 0 failures, clean production build.
 
 Deployed: avry-backend `b65038b` (rebuilt, healthy, routes and auth gates intact), dashboard `e5be2f0` (`Intelligence Credits left` confirmed in the served production bundle).
+
+
+## 14. Phase 3b — retiring an approval nobody answered, 2026-09-05
+
+The last open item in Decision 5. A live approval is self-limiting: a person is looking at it, and either they decide or they close the tab and the question dies with the conversation. One raised by a scheduled run has neither. It was created at 03:00 by a job nobody watched, and nothing retired it — so a weekly schedule that keeps hitting the same `Irreversible` tool grew a pile indexed by nothing and read by no one.
+
+### Expiry is not denial, and the difference costs money
+
+A denial is a decision someone made, and the caller is owed a reply. That is why `resolve` feeds `sweep_undelivered_approvals`, which synthesises a **continuation turn** — an LLM call — per row. An expiry is the *absence* of a decision on a run nobody was watching. There is no one to reply to, and buying a turn to say "nobody answered" would be spend with no reader, which is the §8 risk arriving through a side door.
+
+So expiry gets its own terminal status rather than reusing `denied`. The redelivery sweep's existing `status IN ('approved','denied')` filter is what makes that separation load-bearing rather than a naming choice, and a test pins it: a lapsed row must not appear in `list_undelivered_resolved` while a real denial still does.
+
+`expire()` is a separate method, not `resolve(id, "expired", …)`. The tenant API's vocabulary is `approve`/`deny` and it rejects everything else; a status it must never accept should not travel through the doorway it uses. Here the status and the actor are both fixed by the function, so there is no argument a caller can get wrong.
+
+### What it will not do
+
+- **Touch an attended row, at any age.** That is somebody's open question, and retiring it would be this module deciding something it has no standing to decide. Unattended is read through `is_unattended_session` — the single reader of the session prefix established in §12 — not a second `LIKE 'cron-%'` in SQL that could drift away from it silently.
+- **Act on a timestamp it cannot parse.** Retiring is the one irreversible move here; doing it off an unreadable `requested_at` would be guessing, so such a row is left pending.
+- **Win a race against a person.** The `UPDATE` is guarded on `status = 'pending'`, so a decision made moments before a tick stands and the sweep's `false` return is simply ignored.
+- **Approve anything, ever.** The only transition it can perform is `pending → expired`.
+
+**72 hours**, chosen to survive a weekend: a job that fires late on Friday still has its question waiting when someone reads their notifications on Monday morning (Fri 23:00 → Mon 09:00 is 58h). Much longer and the tool call stops being connected to the situation that produced it — approving on Thursday an email a Sunday-night run wanted to send is its own kind of wrong, and the safer failure is that it lapsed rather than that it was still there to be clicked. A constant, not a config key: ADR-011 exists because per-instance config drifts, and a knob nobody will turn is not worth that risk.
+
+The row is **retired, never deleted** — `resolved_by = "system:expiry"` so an audit read can tell a lapse from an unknown resolver, and a future UI that wants to show "this one lapsed" already has everything it needs.
+
+**The background task needed nothing.** `InputRequired` (ADR-008 Phase 3b) is already non-pending and `await_sessions` returns on it, so the delegating turn got its answer when the approval was raised. Expiring the approval leaves no task hanging — checked rather than assumed.
+
+**Tests:** 7 new, covering each refusal above plus the two user-visible effects (drops out of `status=pending`, stays out of the redelivery sweep). Full suites: 3602 runtime, 450 gateway, 0 failures.
+
+### Still not done, and deliberately
+
+The tenant sees a lapsed approval as a notification that quietly disappears. The signal actually worth having is on the *schedule* — "last run raised a question that lapsed" — which means a new status on `product.tenant_scheduled_runs` and somewhere to show it. That is a feature, not the gap this closes, and it is not pretended otherwise.
