@@ -261,6 +261,27 @@ This is not bookkeeping pedantry: `runtime_profiles` carry `max_cost_per_day_cen
 
 **A scope note worth stating rather than quietly building past.** The delegation graph would today render an empty set for every tenant, because no tenant flow delegates. Building it now is building a screen for data nobody produces. The defensible order is Skills listing (real data today), then the background-task list, and the graph once delegation is actually part of a tenant path — not before.
 
+#### Phase 4c — the read-only Skills listing — ✅ **DEPLOYED 2026-09-05** (`AVRY-Cerveau@9df58d8a`, `avry-backend@a8f9d79`, `avry-user-dashboard@c1a67e4`)
+
+New `GET /webhook/skills` (Cerveau), proxied by `GET /api/v1/agent-skills` (avry-backend), rendered as a new tab in Customise Agent between MCP and Schedules (dashboard). Read-only end to end — nothing here for a tenant to create, edit, or delete, since every skill exists because an operator configured it.
+
+**A real design question the naive version would have gotten wrong.** A tenant's `X-Agent-Type` header (`customer_service`, `leads_qualifier`, …) is a product-facing persona label, not a Cerveau config alias — this install's `config.toml` has no `[agents.customer_service]` section at all, only the delegation-mesh brains (`analyst_brain`, `security_brain`, …). Confirmed by reading how a live `/webhook` turn resolves its own agent with no override: `config.resolved_runtime_agent_alias()`, the same call `cron::tenant_sync`'s reconcile already uses. `handle_webhook_skills` resolves the identical alias rather than taking one from the caller — asking a tenant to name a Cerveau-internal alias they have no way to know would only 400.
+
+**Trimmed on purpose.** The loopback route's full `AgentSkillEntry` also carries `directory` (a server filesystem path) and `editable`; neither means anything on a route with no write surface, and a path is exactly the implementation detail an external-facing API shouldn't leak. The tenant-facing shape is `{name, description, origin}` only.
+
+**A fourth copy of the same two-layer auth check, and a decision not to fix that now.** `api_tenant_memory.rs`'s own doc comment already flagged the duplication risk at two copies; a third got written anyway (`api_tenant_approvals.rs` duplicates it twice within its own file). This is now a fourth, in `api_tenant_skills.rs`. Followed the codebase's own established precedent rather than doing an unplanned cross-file refactor in the middle of an unrelated feature — noted as a real cleanup candidate (extract to a shared `tenant_auth` module) rather than repeated silently a fifth time.
+
+**Found in passing, while wiring the avry-backend proxy:** `main.py`'s router registration is a fail-open `try/except` per router, and it already had `from app.routes.discord import router as discord_router` — printing `[!] Discord routes failed: No module named 'app.routes.discord'` on every single boot since whoever started that work, unread. Not news (Discord's unfinished state was already recorded, parked on `wip/discord-deployable-agent`) but a more precise diagnosis of the exact mechanism than "the file was never committed" — the app was telling anyone watching its own logs the whole time.
+
+**Verified:**
+
+- Cerveau, directly: valid tenant headers return `{"skills": []}` — cross-checked against the pre-existing loopback route for the same alias (`GET /api/agents/analyst_brain/skills`, also empty), confirming this install genuinely has no skill bundles configured for the alias every tenant turn resolves to, not a bug in the new route. All three auth-rejection paths return 401: no secret, wrong secret, missing tenant headers.
+- avry-backend: route registered (`[OK] Agent skills routes registered`), 401 without a JWT.
+- Dashboard: 8 new Cerveau-side tests plus a local click-through against a stand-in backend covering the populated list (including an unrecognised `origin` string falling back to a generic pill rather than rendering blank), the empty state, and the error state. 458 gateway + 3606 runtime + 286 dashboard tests, 0 failures.
+- Binary swapped on both instances, sha256 matched end to end, zero warnings in the journal post-swap.
+
+**Honest limit:** the avry-backend proxy's ownership check (`agent_type` must be one of the caller's own `product.agent_profiles` rows) was read and reasoned through but not exercised against a real JWT — the same limit every JWT-gated dashboard route in this project has carried. The route it borrows from (`agent_approvals.py`) is already live and tested in production, which is what makes reusing its exact helpers the safer choice here rather than a second untested copy.
+
 ### Phase 5 (deferred, only on a real trigger) — A2A wire protocol
 
 Implement Agent Card + JSON-RPC/SSE task transport against `a2a.proto`, so agents on *different* Cerveau instances — or a client's own A2A-speaking agent — can participate. **Trigger:** a concrete customer or partner requirement, not internal aesthetics. Would likely build on `rig` (`rig-core`/`rig-agent`'s `AgentRun` state machine, `rig-rmcp` for MCP) since no Rust crate implements A2A today, and would sit naturally on AGNTCY's directory/identity layer.
