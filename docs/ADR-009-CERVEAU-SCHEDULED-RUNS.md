@@ -315,4 +315,24 @@ The reconcile was re-exercised after the swap, since `scheduler.rs` changed unde
 
 ### What is left
 
-Decision 4's quota is enforced but not *shown* — a tenant learns their allowance by hitting it. Decision 5's approval parking is now legible but not yet complete: an unattended approval that nobody ever resolves has no expiry, so a schedule can accumulate them silently. Both are small, and neither is a correctness gap.
+Decision 5's approval parking is now legible but not yet complete: an unattended approval that nobody ever resolves has no expiry, so a schedule can accumulate them silently. Small, and not a correctness gap.
+
+## 13. Phase 3a — the allowance, and what a run actually spends, 2026-09-05
+
+Decision 4's quota was enforced but invisible: a tenant learned it by hitting it, after writing a whole schedule.
+
+**The number travels with the list.** `GET /api/v1/tenant-scheduled-runs` now returns `quota: {per_agent_limit, tier, tier_label}`. The dashboard keeps no copy of the ladder — a second copy would drift the first time a plan's allowance changed, and it would drift *silently*: the UI would keep promising an allowance the API no longer grants, and the tenant would find out by being refused. It is `per_agent_limit`, not `limit`, because the cap is per (user, agent_type) and a caller listing every agent at once must not read it as a total.
+
+`_effective_tier` is `_require_paid_tier` with the judgement removed. The list route must not reject a caller it exists to serve: a tenant on a plan without scheduled runs still gets their (empty) list, and telling them what their allowance *is* is the entire point of showing a quota. `_quota_for_tier` returns `0` below the minimum — not an error, just nothing allowed, which is a thing the UI can render.
+
+**At the limit the form is not offered at all**, and the reason takes its place next to the way to free a slot. The backend's refusal is well-written but arrives *after* the work; this is the same information before it. A plan with no scheduled runs reads as exactly that, never as "0 of 0".
+
+**Intelligence Credits sit on the same line**, because a scheduled run spends them: deciding whether to add one is deciding whether to spend. Omitted for a superadmin, whose balance is unlimited and whose number would be noise. The low-balance threshold is the same 15% the existing credits pill on the Agents page uses, so the two never disagree about what "low" means.
+
+### Verified
+
+Backend helpers exercised against the real identity tables inside the running container: a user with no plan resolves to `free` / limit `0` — a path that previously would have raised `403` from `_require_paid_tier`, which is exactly the change — and a superadmin resolves to `enterprise` / limit `20`. `identity.user_tiers` currently holds no paid rows, so operational and business could not be exercised live; that ladder is unchanged from §10, where "the sixth schedule on a Business plan is refused with *allows 5*" was part of the 10/10 exit gate.
+
+UI checked in five states against a throwaway local stand-in (2 of 5 with credits; 5 of 5 in amber with the form withdrawn and the hint in its place; a Free plan reading "doesn't include scheduled runs"; a superadmin showing the quota with no credits line; a low balance turning amber at the shared 15% threshold). 286 dashboard tests, 0 failures, clean production build.
+
+Deployed: avry-backend `b65038b` (rebuilt, healthy, routes and auth gates intact), dashboard `e5be2f0` (`Intelligence Credits left` confirmed in the served production bundle).
