@@ -305,6 +305,12 @@ Rendered against a throwaway local stand-in for avry-backend rather than monkey-
 
 Deployed: Cerveau `b11c720a`, dashboard `7d3be9d` (both `Ran on a schedule` and `Waiting for the agent` confirmed present in the served production bundle).
 
+**Binary swapped and live-verified, 2026-09-05.** sha256 matched end to end (`38f45637…` artifact → upload → extract), old binary backed up as `zeroclaw-cerveau.bak-pre-adr009-phase3-20260905`, both instances stopped together (one shared `/usr/local/bin/zeroclaw-cerveau`) and restarted healthy on `:3100`, `:3101`, `:3105` with zero warnings in the journal.
+
+The new API fields were checked against the running gateway rather than inferred from the unit tests: two synthetic pending-approval rows under a throwaway principal, one with `session_id = cron-abc123` and one with `sess-42`, read back through `GET /webhook/approvals` — `"unattended": true` and `"unattended": false` respectively, both carrying `origin_message`. Rows deleted afterwards.
+
+The reconcile was re-exercised after the swap, since `scheduler.rs` changed underneath it: a row inserted for a synthetic tenant produced a `source = 'tenant_schedule'` cron job with the correct raw `tenant_id` and a `next_run` honouring `Asia/Jakarta`, the backend row went `active` with `cerveau_job_id` set, and deleting the row removed the job. Cron store back to zero rows, `product.tenant_scheduled_runs` back to empty.
+
 **Honest limit:** the click-through was done against a stub, not a logged-in production session — the same open item ADR-009's earlier phases and the Deep Diagnostic language work carry. The API contract itself was read from `tenant_scheduled_runs.py` directly and exercised 10/10 against the real store in §10.
 
 ### What is left
