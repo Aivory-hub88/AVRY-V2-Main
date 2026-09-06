@@ -2,7 +2,21 @@
 
 **Looking for the current state of Cerveau, not its history?** See `docs/CERVEAU-TECHNICAL-REFERENCE.md` (engineering reference) and `docs/CERVEAU-PRODUCT-OVERVIEW.md` (plain-language overview) — both describe Cerveau as it stands today. This file stays the dated changelog: every bug, patch, and decision, in the order it happened.
 
-**Last updated:** 2026-09-06 (`finance_invoice_ops` pilot: a product agent_type resolves directly to its own `[agents.<type>]` identity — DEPLOYED + LIVE-VERIFIED on `:3100`.)
+**Last updated:** 2026-09-06 (All 5 Aivory product agent_types — `finance_invoice_ops`, `customer_service`, `leads_qualifier`, `office_assistant`, `autonomous` — now resolve directly to their own `[agents.<type>]` identity. DEPLOYED + LIVE-VERIFIED on `:3100`.)
+
+## 2026-09-06, later same day — the remaining 4 agent types migrated: all 5 product types now have their own identity
+
+**Rollout of the pilot below to the other 4 types**, after the pilot's mechanism proved out live with zero regressions. User confirmed: do all 4 at once (not one-by-one), and give `autonomous` (Generalist) its own identity too even though it can't be meaningfully shrunk — it needs every toolkit by design, so the value is the isolated persona/workspace, not a narrower risk profile.
+
+**`customer_service`** (`[risk_profiles.agent_customer_service]`): its own native ticketing tools, Zendesk (read + create, not the irreversible `ZENDESK_REPLY_ZENDESK_TICKET`), HubSpot, Slack channel listing, browsing (lightpanda+obscura), PDF. **`leads_qualifier`**: its own native lead tools, HubSpot, Slack, browsing, PDF, Gmail/Outlook (read + draft, not send). **`office_assistant`**: OfficeCLI, its own native meeting-summary tool, Slack, Asana, browsing, PDF, ERPNext (read-only), Gmail/Outlook, Google Calendar, Trello, Linear. **`autonomous`**: the full union of all four other types' tools (by design) — the one place this migration does not shrink anything, since Generalist's whole point is covering everything a tenant might ask for.
+
+**One security invariant applied uniformly across all 5 types, deliberately:** none of them get `delegate` in `allowed_tools`/`auto_approve`, none get a `delegation_policy` override (all default `forbidden`), and none have a `[[agents.<type>.delegates]]` entry — including `autonomous`, even though it's the broadest type. Delegation/mesh reach is an internal-brain concern (`analyst_brain`, `security_brain`, …), not something any tenant-facing product type gains as a side effect of getting its own identity.
+
+**Deployment was config + reload only — no new binary.** The tenant-header resolver (`Config::resolved_runtime_agent_alias_for_tenant_type`) deployed for the pilot is fully generic; adding four more `[agents.<type>]` entries and calling `/admin/reload` was sufficient for all four to become live-reachable via their real `X-Agent-Type` header immediately, with zero code change.
+
+**Live-verified on `:3100`** (same rigor as the pilot, `doctor` clean at 87 ok/18 warnings/0 errors before reload): all 4 new types return their correct persona and specialization when asked "who created you, what do you specialize in" via real tenant headers, no `?agent=` override; `costs.jsonl` attributes each to its own `agent_alias`/`tenant_id`; a delegate attempt from every one of the 4 (including `autonomous`) is correctly refused; `GET /webhook/skills` returns each type's own bundle (`autonomous` correctly shows the union of all four skills). 0 daemon restarts, no panics, same PID throughout (`/admin/reload` doesn't restart the process). Test tenant rows cleaned from `cerveau.agents`/`cerveau.memories` after.
+
+**What this means going forward:** every Aivory product agent_type a tenant can deploy now has a real, separately-scoped Cerveau identity. `analyst_brain` (and the other internal mesh brains) remain the fallback only for a genuinely unrecognized `agent_type` — which should not occur in practice, since avry-backend only ever sends one of the 5 known types. `[agent_type_mcp_bundles.*]`/`[agent_type_skill_bundles.*]` and `[risk_profiles.agent_analyst_brain]`'s original superset were left in place for every type, same as the pilot — not retired, kept as the fallback's safety net.
 
 ## 2026-09-06 — Give each Aivory product agent_type its own real Cerveau identity: `finance_invoice_ops` pilot deployed
 
