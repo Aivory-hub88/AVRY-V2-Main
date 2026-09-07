@@ -18,4 +18,5 @@ uuid = { version = "1", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 yrs = "0.17"
+jsonwebtoken = "9"
 sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres"] }

@@ -2,7 +2,7 @@ use axum::{
     body::Bytes,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Path, State,
+        Path, Query, State,
     },
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
@@ -12,7 +12,7 @@ use axum::{
 use dashmap::DashMap;
 use futures::{sink::SinkExt, stream::StreamExt};
 use sqlx::Row;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc};
 use tracing::{info, warn};
 use yrs::{updates::decoder::Decode, Doc, ReadTxn, StateVector, Transact, Update};
@@ -30,6 +30,194 @@ struct Room {
 struct AppState {
     rooms: Arc<DashMap<RoomId, Room>>,
     pg: Option<sqlx::postgres::PgPool>,
+    auth: AuthConfig,
+}
+
+// ---- AuthZ: JWT (HS256, shared JWT_SECRET) + service token + per-doc RBAC ----
+//
+// Credential transport: `Authorization: Bearer <jwt>` on HTTP, `?token=<jwt>`
+// on the WS upgrade (browsers cannot set WS headers). The dashboard's
+// server-side proxy attaches `X-Service-Token: <COLLAB_SERVICE_TOKEN>` for
+// agent-originated calls that carry no user session — only then is the
+// client-asserted `X-Agent-Type` trusted.
+//
+// Effective access for a doc (closed by default):
+//   service credential / account_type admin|superadmin / doc owner  → write
+//   workspace_doc_acl(doc, user) = editor                            → write
+//   workspace_doc_acl(doc, user) = viewer                            → read-only
+//   workspace_members(doc workspace, user) = editor|owner            → write
+//   workspace_members(doc workspace, user) = viewer                  → read-only
+//   no doc row yet (new doc)                                         → write (first writer claims owner)
+//   otherwise                                                        → deny
+// Viewers: HTTP PUT → 403; WS sync updates from them are dropped server-side
+// (they still receive broadcasts + awareness, i.e. read-only sync).
+
+#[derive(Debug, serde::Deserialize)]
+struct Claims {
+    #[serde(default)]
+    sub: Option<String>,
+    #[serde(default)]
+    user_id: Option<String>,
+    #[serde(default)]
+    account_type: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct AuthConfig {
+    jwt_secret: Option<Vec<u8>>,
+    service_token: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+enum Identity {
+    Service,
+    Admin { user_id: String },
+    User { user_id: String },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Role {
+    Owner,
+    Editor,
+    Viewer,
+    Deny,
+}
+
+#[derive(Clone, Debug)]
+struct Access {
+    role: Role,
+    user_id: String,
+}
+
+impl Access {
+    fn can_read(&self) -> bool {
+        self.role != Role::Deny
+    }
+    fn can_write(&self) -> bool {
+        matches!(self.role, Role::Owner | Role::Editor)
+    }
+    fn role_name(&self) -> &'static str {
+        match self.role {
+            Role::Owner => "owner",
+            Role::Editor => "editor",
+            Role::Viewer => "viewer",
+            Role::Deny => "deny",
+        }
+    }
+}
+
+fn parse_role(s: &str) -> Role {
+    match s {
+        "owner" => Role::Owner,
+        "editor" => Role::Editor,
+        "viewer" => Role::Viewer,
+        _ => Role::Deny,
+    }
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Verify a credential string → Identity. Service token first, then HS256 JWT
+/// (exp enforced, 60s leeway). Returns None for missing/invalid credentials.
+fn verify_credential(auth: &AuthConfig, credential: Option<&str>) -> Option<Identity> {
+    let tok = credential.filter(|s| !s.is_empty())?;
+    if let Some(svc) = &auth.service_token {
+        if !svc.is_empty() && tok == svc {
+            return Some(Identity::Service);
+        }
+    }
+    let secret = auth.jwt_secret.as_ref()?;
+    let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.leeway = 60;
+    let data = jsonwebtoken::decode::<Claims>(
+        tok,
+        &jsonwebtoken::DecodingKey::from_secret(secret),
+        &validation,
+    )
+    .ok()?;
+    let c = data.claims;
+    let user_id = c.user_id.or(c.sub).filter(|s| !s.is_empty())?;
+    match c.account_type.as_deref() {
+        Some("admin") | Some("superadmin") => Some(Identity::Admin { user_id }),
+        _ => Some(Identity::User { user_id }),
+    }
+}
+
+/// Split a WS room (`workspace:{id}`, `workspace:db:{id}`, bare) into the
+/// room key (CRDT identity) and the bare doc id (authz identity).
+fn room_doc_ids(room: &str) -> (String, String) {
+    let bare = room
+        .trim_start_matches("workspace:")
+        .trim_start_matches("db:")
+        .to_string();
+    (room.to_string(), bare)
+}
+
+/// Resolve effective access. Called BEFORE ensure_room so denied callers never
+/// create rooms (or persist rows) as a side effect.
+async fn resolve_access(state: &AppState, doc_id: &str, room_key: &str, id: &Identity) -> Access {
+    let user_id = match id {
+        Identity::Service => return Access { role: Role::Owner, user_id: "service".into() },
+        Identity::Admin { user_id } => return Access { role: Role::Owner, user_id: user_id.clone() },
+        Identity::User { user_id } => user_id.clone(),
+    };
+    let Some(pg) = &state.pg else {
+        warn!("authz degraded: no pg store, authenticated user gets write (in-memory mode)");
+        return Access { role: Role::Editor, user_id };
+    };
+    // doc row: prefer the room-keyed (OctoBase) row, fall back to legacy bare-id row
+    let rows = sqlx::query(
+        "SELECT id, owner, workspace_id FROM dashboard.workspace_docs WHERE id = $1 OR id = $2",
+    )
+    .bind(room_key)
+    .bind(doc_id)
+    .fetch_all(pg)
+    .await
+    .unwrap_or_default();
+    let row = rows.iter().find(|r| r.get::<String, _>("id") == room_key).or_else(|| rows.first());
+    let Some(row) = row else {
+        // new doc — any authenticated user may create it (first writer claims owner)
+        return Access { role: Role::Editor, user_id };
+    };
+    let owner: Option<String> = row.try_get("owner").ok().flatten();
+    if owner.as_deref() == Some(user_id.as_str()) {
+        return Access { role: Role::Owner, user_id };
+    }
+    let workspace_id: String = row
+        .try_get("workspace_id")
+        .ok()
+        .filter(|s: &String| !s.is_empty())
+        .unwrap_or_else(|| "default".to_string());
+    // per-doc override wins over workspace membership
+    if let Ok(Some(role)) = sqlx::query_scalar::<_, String>(
+        "SELECT role FROM dashboard.workspace_doc_acl WHERE doc_id = $1 AND user_id = $2",
+    )
+    .bind(doc_id)
+    .bind(&user_id)
+    .fetch_optional(pg)
+    .await
+    {
+        return Access { role: parse_role(&role), user_id };
+    }
+    if let Ok(Some(role)) = sqlx::query_scalar::<_, String>(
+        "SELECT role FROM dashboard.workspace_members WHERE workspace_id = $1 AND user_id = $2",
+    )
+    .bind(&workspace_id)
+    .bind(&user_id)
+    .fetch_optional(pg)
+    .await
+    {
+        return Access { role: parse_role(&role), user_id };
+    }
+    Access { role: Role::Deny, user_id }
 }
 
 /// Load a Yjs update (V1) from OctoBase pg store and apply it into `doc`.
@@ -144,9 +332,18 @@ async fn info() -> impl IntoResponse {
 async fn http_get_doc(
     Path(id): Path<String>,
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
-    let room_id = format!("workspace:{}", id);
-    let room = state.clone().ensure_room(&room_id).await;
+    let Some(identity) = verify_credential(&state.auth, bearer_token(&headers).as_deref()) else {
+        return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
+    };
+    let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
+    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    if !access.can_read() {
+        warn!(id=%id, user=%access.user_id, "GET /api/workspace/:id/doc denied");
+        return (StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    let room = state.clone().ensure_room(&room_key).await;
     let txn = room.doc.transact();
     let upd = txn.encode_state_as_update_v1(&StateVector::default());
     // if doc empty, return 404 to let caller fallback to localStorage
@@ -173,13 +370,40 @@ async fn http_put_doc(
     if body.is_empty() {
         return (StatusCode::BAD_REQUEST, "empty").into_response();
     }
-    let room_id = format!("workspace:{}", id);
-    let room = state.clone().ensure_room(&room_id).await;
-    let agent = headers
-        .get("x-agent-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("user")
-        .to_string();
+    let Some(identity) = verify_credential(&state.auth, bearer_token(&headers).as_deref()) else {
+        return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
+    };
+    let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
+    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    if !access.can_write() {
+        warn!(id=%id, user=%access.user_id, role=%access.role_name(), "PUT /api/workspace/:id/doc denied");
+        return (StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    // X-Agent-Type is client-asserted: trust it only for the service identity
+    // (dashboard proxy with COLLAB_SERVICE_TOKEN). Everyone else is "user".
+    let trusted_agent = matches!(identity, Identity::Service);
+    let agent = if trusted_agent {
+        headers
+            .get("x-agent-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("user")
+            .to_string()
+    } else {
+        "user".to_string()
+    };
+    let room = state.clone().ensure_room(&room_key).await;
+    // first writer claims ownership of ownerless docs (closed-by-default model).
+    // NOTE: run BEFORE touching the yjs update — yrs `Update` is !Send and must
+    // not be alive across an await.
+    if let Some(pg) = &state.pg {
+        let _ = sqlx::query(
+            "UPDATE dashboard.workspace_docs SET owner = $2 WHERE id = $1 AND owner IS NULL",
+        )
+        .bind(&room_key)
+        .bind(&access.user_id)
+        .execute(pg)
+        .await;
+    }
     // apply update to doc
     if let Ok(update) = Update::decode_v1(&body) {
         {
@@ -194,7 +418,7 @@ async fn http_put_doc(
         fwd.extend_from_slice(&body);
         let _ = room.tx.send(fwd);
         let _ = room.flush_tx.send(()); // OctoBase persist (debounced)
-        info!(id=%id, agent=%agent, bytes=%body.len(), "http PUT /api/workspace/:id/doc via y-octo");
+        info!(id=%id, user=%access.user_id, role=%access.role_name(), agent=%agent, bytes=%body.len(), "http PUT /api/workspace/:id/doc via y-octo");
         return (StatusCode::OK, axum::Json(serde_json::json!({ "id": id, "agent": agent, "bytes": body.len() }))).into_response();
     }
     (StatusCode::BAD_REQUEST, "invalid yjs update").into_response()
@@ -204,23 +428,38 @@ async fn ws_handler(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
     Path(room): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    let agent = headers
-        .get("x-agent-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("user")
-        .to_string();
-    info!(room=%room, agent=%agent, "ws upgrade /yjs/:room");
-    ws.on_upgrade(move |socket| handle_socket(socket, room, state))
+    // browsers cannot set WS headers → credential travels as ?token= (or the
+    // service token for server-side agent peers). Checked BEFORE ensure_room
+    // so denied callers never create rooms as a side effect.
+    let credential = params
+        .get("token")
+        .cloned()
+        .or_else(|| bearer_token(&headers));
+    let Some(identity) = verify_credential(&state.auth, credential.as_deref()) else {
+        warn!(room=%room, "ws upgrade denied: missing or invalid credential");
+        return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
+    };
+    let (room_key, doc_id) = room_doc_ids(&room);
+    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    if !access.can_read() {
+        warn!(room=%room, user=%access.user_id, "ws upgrade denied: forbidden");
+        return (StatusCode::FORBIDDEN, "forbidden").into_response();
+    }
+    let can_write = access.can_write();
+    info!(room=%room, user=%access.user_id, role=%access.role_name(), write=%can_write, "ws upgrade /yjs/:room");
+    ws.on_upgrade(move |socket| handle_socket(socket, room, state, can_write))
 }
 
 async fn ws_handler_root(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws_handler(ws, headers, Path("default".to_string()), State(state)).await
+    ws_handler(ws, headers, Path("default".to_string()), Query(params), State(state)).await
 }
 
 fn encode_var_uint(mut n: usize, out: &mut Vec<u8>) {
@@ -252,7 +491,7 @@ fn decode_var_uint(buf: &[u8]) -> (usize, usize) {
     (0, 0)
 }
 
-async fn handle_socket(socket: WebSocket, room: String, state: AppState) {
+async fn handle_socket(socket: WebSocket, room: String, state: AppState, can_write: bool) {
     let room_obj = state.clone().ensure_room(&room).await;
     let doc = room_obj.doc.clone();
     let tx = room_obj.tx.clone();
@@ -339,6 +578,12 @@ async fn handle_socket(socket: WebSocket, room: String, state: AppState) {
                         let _ = mpsc_tx.send(reply);
                     }
                     1 => {
+                        // syncStep2 / update from peer = a write: viewers are
+                        // read-only, their updates are dropped (no apply, no
+                        // broadcast, no persist) while they keep receiving sync.
+                        if !can_write {
+                            continue;
+                        }
                         if let Ok(update) = Update::decode_v1(update_bytes) {
                             let mut txn = doc.transact_mut();
                             txn.apply_update(update);
@@ -347,6 +592,10 @@ async fn handle_socket(socket: WebSocket, room: String, state: AppState) {
                         }
                     }
                     2 => {
+                        // update from peer = a write (see above for viewers)
+                        if !can_write {
+                            continue;
+                        }
                         if let Ok(update) = Update::decode_v1(update_bytes) {
                             let mut txn = doc.transact_mut();
                             txn.apply_update(update);
@@ -405,6 +654,15 @@ async fn main() {
     let state = AppState {
         rooms: Arc::new(DashMap::new()),
         pg,
+        auth: AuthConfig {
+            jwt_secret: std::env::var("JWT_SECRET")
+                .ok()
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.into_bytes()),
+            service_token: std::env::var("COLLAB_SERVICE_TOKEN")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
+        },
     };
 
     let app = Router::new()
