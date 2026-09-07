@@ -447,7 +447,7 @@ session_ttl_hours = 0
 # across both :3100 and :3101 config-dirs -- that is what makes the limiter
 # state genuinely shared, not per-instance.
 rate_limit_backend = "redis"
-redis_url = "redis://:rFW15GMrylS4+v4xbWIONWBu56QFi9Lp@127.0.0.1:6379"
+redis_url = "redis://:***@127.0.0.1:6379"
 redis_key_prefix = "cerveau:ratelimit:"
 max_concurrent_llm_requests = 40
 admission_queue_timeout_secs = 15
