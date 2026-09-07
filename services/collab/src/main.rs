@@ -202,6 +202,10 @@ async fn resolve_access(state: &AppState, doc_id: &str, room_key: &str, id: &Ide
     if owner.as_deref() == Some(user_id.as_str()) {
         return Access { role: Role::Owner, user_id };
     }
+    if owner.is_none() {
+        // ownerless doc (new or backfill miss) — first writer claims ownership
+        return Access { role: Role::Editor, user_id };
+    }
     let workspace_id: String = row
         .try_get("workspace_id")
         .ok()
@@ -404,11 +408,17 @@ async fn http_put_doc(
     };
     let room = state.clone().ensure_room(&room_key).await;
     // first writer claims ownership of ownerless docs (closed-by-default model).
-    // NOTE: run BEFORE touching the yjs update — yrs `Update` is !Send and must
-    // not be alive across an await.
+    // INSERT-OR-CLAIM: the flush task creates the row ~300ms later, so a plain
+    // UPDATE here would match nothing for brand-new docs. COALESCE keeps an
+    // existing owner (no ownership theft). NOTE: must run BEFORE touching the
+    // yjs update — yrs `Update` is !Send and must not be alive across an await.
     if let Some(pg) = &state.pg {
         let _ = sqlx::query(
-            "UPDATE dashboard.workspace_docs SET owner = $2 WHERE id = $1 AND owner IS NULL",
+            "INSERT INTO dashboard.workspace_docs (id, workspace_id, owner, yjs_update, updated_at)
+             VALUES ($1, 'default', $2, ''::bytea, now())
+             ON CONFLICT (id) DO UPDATE
+               SET owner = COALESCE(dashboard.workspace_docs.owner, EXCLUDED.owner),
+                   updated_at = now()",
         )
         .bind(&room_key)
         .bind(&access.user_id)
