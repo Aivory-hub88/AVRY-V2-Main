@@ -125,6 +125,17 @@ fn bearer_token(headers: &HeaderMap) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// Credential from request headers: `X-Service-Token` (dashboard→collab agent
+/// calls) first, then `Authorization: Bearer <jwt>` (users).
+fn extract_credential(headers: &HeaderMap) -> Option<String> {
+    if let Some(v) = headers.get("x-service-token").and_then(|v| v.to_str().ok()) {
+        if !v.trim().is_empty() {
+            return Some(v.trim().to_string());
+        }
+    }
+    bearer_token(headers)
+}
+
 /// Verify a credential string → Identity. Service token first, then HS256 JWT
 /// (exp enforced, 60s leeway). Returns None for missing/invalid credentials.
 fn verify_credential(auth: &AuthConfig, credential: Option<&str>) -> Option<Identity> {
@@ -334,7 +345,7 @@ async fn http_get_doc(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let Some(identity) = verify_credential(&state.auth, bearer_token(&headers).as_deref()) else {
+    let Some(identity) = verify_credential(&state.auth, extract_credential(&headers).as_deref()) else {
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
     };
     let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
@@ -370,7 +381,7 @@ async fn http_put_doc(
     if body.is_empty() {
         return (StatusCode::BAD_REQUEST, "empty").into_response();
     }
-    let Some(identity) = verify_credential(&state.auth, bearer_token(&headers).as_deref()) else {
+    let Some(identity) = verify_credential(&state.auth, extract_credential(&headers).as_deref()) else {
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
     };
     let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
@@ -437,7 +448,7 @@ async fn ws_handler(
     let credential = params
         .get("token")
         .cloned()
-        .or_else(|| bearer_token(&headers));
+        .or_else(|| extract_credential(&headers));
     let Some(identity) = verify_credential(&state.auth, credential.as_deref()) else {
         warn!(room=%room, "ws upgrade denied: missing or invalid credential");
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
