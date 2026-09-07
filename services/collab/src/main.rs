@@ -1,11 +1,12 @@
 use axum::{
+    body::Bytes,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path, State,
     },
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::get,
+    routing::{get, put},
     Router,
 };
 use dashmap::DashMap;
@@ -52,8 +53,67 @@ async fn info() -> impl IntoResponse {
         "crdt": "y-octo (yrs 0.17, yjs 13 compat)",
         "store": "OctoBase in-memory skeleton",
         "ws": "/yjs/:room — 101 y-websocket compat",
-        "health": "/health"
+        "health": "/health",
+        "api": "/api/workspace/:id/doc (GET/PUT octet-stream, X-Agent-Type)"
     }))
+}
+
+async fn http_get_doc(
+    Path(id): Path<String>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let room_id = format!("workspace:{}", id);
+    let room = state.room_for(&room_id);
+    let txn = room.doc.transact();
+    let upd = txn.encode_state_as_update_v1(&StateVector::default());
+    // if doc empty, return 404 to let caller fallback to localStorage
+    if upd.len() <= 2 {
+        return (StatusCode::NOT_FOUND, "empty").into_response();
+    }
+    (
+        StatusCode::OK,
+        [
+            (axum::http::header::CONTENT_TYPE, "application/octet-stream"),
+            (axum::http::header::CACHE_CONTROL, "no-store"),
+        ],
+        upd,
+    )
+        .into_response()
+}
+
+async fn http_put_doc(
+    Path(id): Path<String>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> impl IntoResponse {
+    if body.is_empty() {
+        return (StatusCode::BAD_REQUEST, "empty").into_response();
+    }
+    let room_id = format!("workspace:{}", id);
+    let room = state.room_for(&room_id);
+    let agent = headers
+        .get("x-agent-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("user")
+        .to_string();
+    // apply update to doc
+    if let Ok(update) = Update::decode_v1(&body) {
+        {
+            let mut txn = room.doc.transact_mut();
+            txn.apply_update(update);
+        }
+        // broadcast as sync update to ws peers
+        let mut fwd = Vec::with_capacity(2 + body.len() + 8);
+        fwd.push(0);
+        fwd.push(2);
+        encode_var_uint(body.len(), &mut fwd);
+        fwd.extend_from_slice(&body);
+        let _ = room.tx.send(fwd);
+        info!(id=%id, agent=%agent, bytes=%body.len(), "http PUT /api/workspace/:id/doc via y-octo");
+        return (StatusCode::OK, axum::Json(serde_json::json!({ "id": id, "agent": agent, "bytes": body.len() }))).into_response();
+    }
+    (StatusCode::BAD_REQUEST, "invalid yjs update").into_response()
 }
 
 async fn ws_handler(
@@ -241,6 +301,9 @@ async fn main() {
         .route("/yjs", get(ws_handler_root))
         .route("/yjs/", get(ws_handler_root))
         .route("/yjs/:room", get(ws_handler))
+        .route("/api/workspace/:id/doc", get(http_get_doc).put(http_put_doc))
+        // y-websocket compat: also handle /yjs/:room via http GET for fallback
+        .route("/api/workspace/:id/doc/", get(http_get_doc).put(http_put_doc))
         .with_state(state)
         .layer(tower_http::cors::CorsLayer::permissive())
         .layer(tower_http::trace::TraceLayer::new_for_http());
