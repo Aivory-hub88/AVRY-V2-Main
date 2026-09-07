@@ -454,6 +454,43 @@ services:
       - "traefik.http.routers.avry-careers.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-careers.loadbalancer.server.port=8089"
 
+  # ── Collab (y-octo + OctoBase) — aivory-collab:3200 ──────────────────────
+  aivory-collab:
+    build:
+      context: ./services/collab
+      dockerfile: Dockerfile
+    container_name: aivory-collab
+    restart: unless-stopped
+    networks:
+      - aivory-network
+    ports:
+      - "3200:3200"
+    environment:
+      - PORT=3200
+      - RUST_LOG=${RUST_LOG:-info}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - OCTOBASE_PATH=/data
+    volumes:
+      - collab_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3200/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      # PathPrefix only + priority 100 ensures /yjs wins over y-websocket (37) & main-app (1) for aivory.uk
+      # VPS host 3200 is taken by cerveau-server (host), so VPS maps 3201:3200 — keep 3200:3200 in repo for local
+      - "traefik.http.routers.collab.rule=PathPrefix(`/yjs`)"
+      - "traefik.http.routers.collab.entrypoints=web,websecure"
+      - "traefik.http.routers.collab.tls=true"
+      - "traefik.http.routers.collab.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.collab.priority=100"
+      - "traefik.http.services.collab.loadbalancer.server.port=3200"
+
   # ── Frontend Applications ──────────────────────────────────────────────────
 
   avry-website:
@@ -683,6 +720,7 @@ volumes:
   prometheus_data:
   grafana_data:
   mail_storage:
+  collab_data:
 
 networks:
   aivory-network:
