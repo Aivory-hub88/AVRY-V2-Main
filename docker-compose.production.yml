@@ -586,6 +586,11 @@ services:
       - BACKEND_SERVICE_URL=http://avry-backend:8081
       - COLLAB_URL=${COLLAB_URL:-http://aivory-collab:3200}
       - COLLAB_SERVICE_TOKEN=${COLLAB_SERVICE_TOKEN}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://avry-minio:9000}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-https://s3.aivory.uk}
+      - WORKSPACE_BLOB_BUCKET=${WORKSPACE_BLOB_BUCKET:-workspace-blobs}
       - NEXT_PUBLIC_API_URL=https://backend.aivory.id
       - NEXT_PUBLIC_ZEROCLAW_URL=https://api.aivory.id
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
