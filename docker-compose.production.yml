@@ -475,11 +475,11 @@ services:
       - aivory-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.avry-minio.rule=Host(`s3.aivory.id`)"
+      - "traefik.http.routers.avry-minio.rule=Host(`s3.aivory.uk`)"
       - "traefik.http.routers.avry-minio.entrypoints=websecure"
       - "traefik.http.routers.avry-minio.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-minio.loadbalancer.server.port=9000"
-      - "traefik.http.routers.avry-minio-console.rule=Host(`s3-console.aivory.id`)"
+      - "traefik.http.routers.avry-minio-console.rule=Host(`s3-console.aivory.uk`)"
       - "traefik.http.routers.avry-minio-console.entrypoints=websecure"
       - "traefik.http.routers.avry-minio-console.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-minio-console.loadbalancer.server.port=9001"
