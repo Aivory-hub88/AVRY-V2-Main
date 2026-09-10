@@ -1,8 +1,8 @@
 # Cerveau ERP Scaling Plan — Eval Harness, SAP/OData, Generic Adapter
 
-**Status:** draft — awaiting user approval of scope, nothing executed yet
+**Status:** draft — awaiting user approval of scope, nothing executed yet. Phase 1.1/1.5 research completed 2026-09-09 (Composio catalog checked live, self-hosted candidate measured) — implementation still not started.
 **Created:** 2026-08-23
-**Related:** `CERVEAU-ERP-INTEGRATION-PLAN.md` (ERPNext, the precedent this plan extends), `CERVEAU-APPROVAL-UX-PLAN.md` (F-1 approval surface the eval harness must simulate), `ADR-007-INTEGRATION-OAUTH-DIRECTORY.md` (Composio-vs-self-hosted decision pattern), `WORKFLOW-VERSIONING-AND-FIXTURES-OVERVIEW.md` (dashboard's existing fixture/replay system — a different layer, referenced for what to reuse and what not to copy)
+**Related:** `CERVEAU-ERP-INTEGRATION-PLAN.md` (ERPNext, the precedent this plan extends), `CERVEAU-APPROVAL-UX-PLAN.md` (F-1 approval surface the eval harness must simulate), `ADR-007-INTEGRATION-OAUTH-DIRECTORY.md` (Composio-vs-self-hosted decision pattern), `WORKFLOW-VERSIONING-AND-FIXTURES-OVERVIEW.md` (dashboard's existing fixture/replay system — a different layer, referenced for what to reuse and what not to copy), `ADR-012-CERVEAU-ODOO-SHARED-MCP.md` (the shared-multi-tenant-hosting pattern this SAP path may end up following, same underlying tension)
 
 ## Goal
 
@@ -62,12 +62,14 @@ New job in `cerveau-build.yml` (or a sibling workflow), Tier A on every PR touch
 
 ## Phase 1 — SAP/OData connector
 
-### 1.1 Catalog check first — mirror ERPNext's Phase 0, don't assume the answer
+### 1.1 Catalog check — ✅ resolved 2026-09-09, self-hosted branch confirmed
 
-Before any design commitment: query the live Composio catalog for a SAP toolkit (`GET /api/v3/tools` filtered to a SAP-related `toolkit_slug`) exactly as done for `ERPNEXT`. Two branches, and this plan cannot pick between them without that data:
+Live query against Composio's catalog (`GET /api/v3/toolkits?search=...`, run from `tencent-vps` using the production `COMPOSIO_API_KEY`, read-only): searched `sap`, `s4hana`, `odata`, `sap erp`. Only two hits, neither usable:
 
-- **If Composio has a maintained SAP OData toolkit**: this phase collapses to a near-repeat of the ERPNext integration — catalog curation, risk tiering, config wiring, verification — same shape, same standing rules, same "zero new processes on `tencent-vps`" constraint satisfied for free (Composio-hosted, external HTTP).
-- **If Composio does not cover SAP**: a self-hosted OData bridge is needed, and that **directly conflicts** with the zero-new-processes constraint that has governed every Cerveau integration to date. This is a real open decision (see below), not something to resolve by picking a default.
+- `sap_successfactors` (64 tools) — this is the **HCM/HR product** (Employee Central, Recruiting, Performance, Learning, Compensation), not general business-object ERP. Not what this phase needs.
+- `saperly` — unrelated (AI-agent phone/SMS carrier), a name-collision false positive.
+
+`s4hana` / `odata` / `sap erp` returned **zero results**. Confirmed: **Composio has no SAP OData/S4HANA/ECC business-object toolkit.** The self-hosted branch is the one this phase executes — see §1.5, now resolved with measured data rather than left as an unestimated unknown.
 
 ### 1.2 Scope discipline — OData now, BAPI/RFC explicitly not now
 
@@ -81,9 +83,30 @@ Same `[risk_profiles.*]` supervised-mode pattern from `CERVEAU-ERP-INTEGRATION-P
 
 Exact replay of the ADR-007/ERP-plan negative-path protocol (fail-closed → synthetic connection → full-chain proof → isolation → cleanup) — **and** the new Phase 0 eval harness scenario for SAP gets authored alongside this phase, not after, so SAP ships with the same regression coverage ERPNext is retrofitting in Phase 0.
 
-### 1.5 Open decision this phase cannot resolve in advance
+### 1.5 Self-hosted OData bridge — candidate evaluated, measured, not yet placed
 
-**If Composio has no SAP toolkit, where does a self-hosted OData bridge run without adding a process to `tencent-vps`?** Candidate answers to weigh with the user, none picked here: (a) fold it into an existing already-running process (e.g. extend `vps-bridge`'s Node process rather than spawning a new one — same discipline as "OfficeCLI needed no new process, just a new MCP bundle"), (b) host it off-VPS entirely (serverless function, matching Composio's own "external HTTP, zero VPS load" shape), (c) revisit the constraint itself if SAP demand justifies it. This is the single highest-variance unknown in the whole plan — resolve it with real catalog data before estimating effort.
+**Confirmed by §1.1: Composio has no SAP toolkit, so a self-hosted OData bridge is required.** Resource footprint was the first thing checked — not assumed — mirroring the Odoo research in `CERVEAU-ODOO-INTEGRATION-PLAN.md`.
+
+**Candidate evaluated: `GutjahrAI/sap-odata-mcp-server`** (TypeScript/Node.js, MIT, most actively maintained of the OData-capable options found — `midasol/sap-mcp-server` was also checked but is read-only, no create/update, so it alone doesn't cover this phase's bounded-write scope).
+
+**Measured 2026-09-09** (built and run as a throwaway, unexposed container on `tencent-vps`, image removed immediately after, no trace left):
+
+- Idle RAM: **19.26 MB** — lighter than the Odoo bridge (53.5 MB), consistent with it being a thin HTTP/REST wrapper doing no local data processing.
+- CPU: ~0%, effectively idle.
+- Confirms the README's own claim: **no SAP RFC SDK required** — pure HTTP/REST to SAP's OData endpoints. The usual "SAP integration needs a heavy NetWeaver/RFC runtime" assumption does not apply to the OData-only scope this phase already committed to (§1.2).
+
+**Real finding, not anticipated in the draft plan — this changes the "where does it run" question from a hosting-location problem into a transport-shape problem:**
+
+`GutjahrAI/sap-odata-mcp-server` uses **`StdioServerTransport`** only (confirmed by reading `src/server.ts`) — it is built to be spawned per-session by a local MCP client, not to run as a standing, network-reachable daemon the way `erpipe-org/mcp-odoo`'s `streamable-http` mode does for Odoo. Folding it into an existing process (option (a) below) or running it standalone both need a **stdio-to-HTTP wrapper** in front of it (e.g. `mcp-proxy` / `supergateway`) before it can serve requests over a network at all — this is a real, if small, piece of new plumbing, not a resource cost.
+
+**Also worth flagging**: unlike `erpipe-org/mcp-odoo`, this server has **no built-in preview/validate-before-execute gate** — CRUD calls execute directly against SAP. Cerveau's own mandatory Irreversible-tier approval gate on custom-MCP tool calls still covers this (§1.3), but it means Cerveau's gate is the *only* safety layer here, with no server-side defense-in-depth backing it up the way Odoo's candidate has.
+
+**Where it runs — candidate answers, still to weigh with the user, now grounded in real numbers instead of an unknown:**
+(a) fold the wrapped bridge into an existing already-running process (e.g. extend `vps-bridge`'s Node process) — cheap given the measured 19 MB footprint, same discipline as "OfficeCLI needed no new process, just a new MCP bundle";
+(b) host it off-VPS entirely (serverless function, matching Composio's own "external HTTP, zero VPS load" shape) — sidesteps the wrapper-process question by moving it off `tencent-vps` altogether;
+(c) revisit the zero-new-processes constraint itself, now that a new process would cost ~19 MB idle, not an unknown/unbounded amount.
+
+No longer the single highest-variance unknown in the plan — the variance was in resource cost, which is now measured and small. The remaining open call is (a) vs (b) vs (c), a placement decision, not a feasibility one.
 
 ---
 
@@ -122,7 +145,7 @@ Reuse Phase 0's eval harness: same seed-scenario shape, run once against a tenan
 
 1. **Approve the sequencing** (eval harness → SAP → generic adapter) or reorder.
 2. **Phase 0 Tier B cadence** — scheduled (e.g. nightly) or pre-release-tag-only for the real-LLM-cost replay tier.
-3. **Phase 1.5** — cannot be decided without live Composio catalog data; needs a follow-up query before this phase can be estimated or scheduled.
+3. **Phase 1.5** — catalog data and resource measurement now in hand (§1.1, §1.5): self-hosted OData bridge confirmed necessary, ~19 MB idle, needs a stdio-to-HTTP wrapper. Remaining call is placement: (a) fold into `vps-bridge`, (b) host off-VPS, or (c) accept a new small VPS process.
 4. **Phase 2 Option A vs. B** — recommendation is A-first, but confirm before any implementation.
 
 ## Success criteria
