@@ -534,7 +534,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
-      # PathPrefix only + priority 100 ensures /yjs wins over y-websocket (37) & main-app (1) for aivory.uk
+      # PathPrefix only + priority 100 ensures /yjs is handled by collab (single y-octo engine) for aivory.uk
       # VPS host 3200 is taken by cerveau-server (host), so VPS maps 3201:3200 — keep 3200:3200 in repo for local
       - "traefik.http.routers.collab.rule=PathPrefix(`/yjs`)"
       - "traefik.http.routers.collab.entrypoints=web,websecure"

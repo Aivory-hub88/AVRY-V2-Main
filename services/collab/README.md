@@ -67,7 +67,7 @@ Compose (repo `docker-compose.production.yml`, VPS `docker-compose.prod.yml`):
 - `ports: ["3201:3200"]` di VPS (konflik host `3200` dengan `cerveau-server`); repo `3200:3200` untuk lokal.
 - Traefik: `PathPrefix(/yjs)` `priority=100` `web,websecure` + `tls certresolver=letsencrypt` → internal `3200`.
   PathPrefix-only (tanpa Host) karena CF Worker me-rewrite Host origin menjadi `aivory.id`.
-- `y-websocket:3220` tetap Up sebagai fallback sampai 1 release stabil.
+- `y-websocket:3220` sudah dihapus (2026-09-10) — `aivory-collab` kini single engine untuk `/yjs`.
 
 ## Cloudflare edge
 
