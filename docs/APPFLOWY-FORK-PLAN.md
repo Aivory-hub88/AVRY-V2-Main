@@ -154,6 +154,11 @@ filter `assignee == agent:{type}` = task list per agent.
 
 ### Fase 3 — Paritas database AppFlowy (M, bisa diparalel per sub-fitur)
 
+> ✅ FASE 3a DIEKSEKUSI 2026-09-11: move atomik + row history + CSV import
+> + WIP pre-check client. `tsc` 0 error, `vitest` 335 passed,
+> e2e production 8/8 ALL-PASS. Sisa Fase 3 (custom field types —
+> select/checkbox/date/url — butuh perubahan skema Row, direncanakan terpisah).
+
 1. Field types: `select` (multi), `checkbox`, `date`, `url` — skema Row
    diperluas dengan migrasi Yjs yang backward-compatible (unknown → text).
 2. Template gallery + CSV/Markdown import (referensi algoritma
