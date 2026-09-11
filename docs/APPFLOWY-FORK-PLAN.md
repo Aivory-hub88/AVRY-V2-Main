@@ -156,8 +156,13 @@ filter `assignee == agent:{type}` = task list per agent.
 
 > ✅ FASE 3a DIEKSEKUSI 2026-09-11: move atomik + row history + CSV import
 > + WIP pre-check client. `tsc` 0 error, `vitest` 335 passed,
-> e2e production 8/8 ALL-PASS. Sisa Fase 3 (custom field types —
-> select/checkbox/date/url — butuh perubahan skema Row, direncanakan terpisah).
+> e2e production 8/8 ALL-PASS.
+> ✅ FASE 3b DIEKSEKUSI 2026-09-11: custom fields (text/number/select/
+> multi/checkbox/date/url) — defs di props.dbFields, values di row cells
+> (plain-object, Yjs-safe terverifikasi). `tsc` 0 error, `vitest` 342 passed,
+> `next build` lokal lolos (menangkap + memperbaiki import server-di-client),
+> e2e production 6/6 ALL-PASS. Project board kini mencakup doc project itu
+> sendiri bila di-pin sebagai member.
 
 1. Field types: `select` (multi), `checkbox`, `date`, `url` — skema Row
    diperluas dengan migrasi Yjs yang backward-compatible (unknown → text).
