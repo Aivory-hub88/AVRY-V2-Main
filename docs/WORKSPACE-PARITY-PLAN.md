@@ -4,6 +4,11 @@
 > `docs/WORKSPACE-PARITY-HANDOFF.md` + verifikasi baseline. Handoff = state, file ini = rencana.
 > Keputusan user 2026-09-11: scope = bugfix + paritas AFFiNE penuh + tracker, **desktop-only
 > (mobile = Never)**, keep dashboard `5ce957c`, PLAN direkonstruksi.
+>
+> > SUPERSEDED 2026-09-11 (sore): user memutus pivot — BlockSuite/AFFiNE canvas
+> > DIHAPUS dari user dashboard (editor = `WorkspaceEditor` Yjs simpel + `WorkspaceDatabase`
+> > Table/Board/Calendar ala AppFlowy), MinIO DIHAPUS dari VPS/compose
+> > (cover upload disabled, `cover_url` lama tetap render). File ini tinggal arsip.
 
 ## 0. Baseline terverifikasi (2026-09-11)
 

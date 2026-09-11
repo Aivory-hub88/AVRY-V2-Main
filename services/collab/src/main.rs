@@ -162,6 +162,21 @@ fn verify_credential(auth: &AuthConfig, credential: Option<&str>) -> Option<Iden
     }
 }
 
+/// Trusted agent type for service callers only (X-Agent-Type header).
+/// Returns None for everyone else — client-asserted values from users
+/// must never scope (or expand) access.
+fn trusted_agent(headers: &HeaderMap, id: &Identity) -> Option<String> {
+    if !matches!(id, Identity::Service) {
+        return None;
+    }
+    headers
+        .get("x-agent-type")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
 /// Split a WS room (`workspace:{id}`, `workspace:db:{id}`, bare) into the
 /// room key (CRDT identity) and the bare doc id (authz identity).
 fn room_doc_ids(room: &str) -> (String, String) {
@@ -172,11 +187,61 @@ fn room_doc_ids(room: &str) -> (String, String) {
     (room.to_string(), bare)
 }
 
+/// Agent types the dashboard may invite to a doc (Fase 1 Opsi C).
+/// Must match `KNOWN_AGENT_TYPES` in dashboard lib/workspaceAccess.ts.
+fn is_known_agent(s: &str) -> bool {
+    matches!(
+        s,
+        "autonomous" | "customer_service" | "leads_qualifier" | "finance_invoice_ops" | "office_assistant"
+    )
+}
+
+/// Access for a service caller asserting a known agent type: scoped to the
+/// agent's grant in dashboard.workspace_agent_acl (editor/viewer).
+/// Not invited / revoked → Deny. Unknown table (pre-migration) → Deny
+/// (closed by default; fail-closed is the safe side for agents).
+async fn agent_access(state: &AppState, doc_id: &str, agent: &str) -> Access {
+    let user_id = format!("agent:{agent}");
+    let Some(pg) = &state.pg else {
+        warn!("authz degraded: no pg store, invited agent denied (in-memory mode)");
+        return Access { role: Role::Deny, user_id };
+    };
+    match sqlx::query_scalar::<_, String>(
+        "SELECT role FROM dashboard.workspace_agent_acl WHERE doc_id = $1 AND agent_type = $2",
+    )
+    .bind(doc_id)
+    .bind(agent)
+    .fetch_optional(pg)
+    .await
+    {
+        Ok(Some(role)) => Access { role: parse_role(&role), user_id },
+        _ => Access { role: Role::Deny, user_id },
+    }
+}
+
 /// Resolve effective access. Called BEFORE ensure_room so denied callers never
 /// create rooms (or persist rows) as a side effect.
-async fn resolve_access(state: &AppState, doc_id: &str, room_key: &str, id: &Identity) -> Access {
+///
+/// `agent` is the trusted agent type (Some only when the caller proved the
+/// service identity — X-Agent-Type header or ?agent= WS param). A known agent
+/// type scopes the service caller to that agent's grant; anything else keeps
+/// legacy full service access.
+async fn resolve_access(
+    state: &AppState,
+    doc_id: &str,
+    room_key: &str,
+    id: &Identity,
+    agent: Option<&str>,
+) -> Access {
     let user_id = match id {
-        Identity::Service => return Access { role: Role::Owner, user_id: "service".into() },
+        Identity::Service => {
+            if let Some(a) = agent.map(str::trim).filter(|s| !s.is_empty() && *s != "user") {
+                if is_known_agent(a) {
+                    return agent_access(state, doc_id, a).await;
+                }
+            }
+            return Access { role: Role::Owner, user_id: "service".into() };
+        }
         Identity::Admin { user_id } => return Access { role: Role::Owner, user_id: user_id.clone() },
         Identity::User { user_id } => user_id.clone(),
     };
@@ -353,7 +418,8 @@ async fn http_get_doc(
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
     };
     let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
-    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    let agent_hdr = trusted_agent(&headers, &identity);
+    let access = resolve_access(&state, &doc_id, &room_key, &identity, agent_hdr.as_deref()).await;
     if !access.can_read() {
         warn!(id=%id, user=%access.user_id, "GET /api/workspace/:id/doc denied");
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
@@ -389,23 +455,17 @@ async fn http_put_doc(
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
     };
     let (room_key, doc_id) = room_doc_ids(&format!("workspace:{}", id));
-    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    // X-Agent-Type is client-asserted: trust it only for the service identity
+    // (dashboard proxy with COLLAB_SERVICE_TOKEN). Everyone else is "user".
+    // Extracted BEFORE resolve_access so an asserted known agent is scoped
+    // to its workspace_agent_acl grant instead of getting full service access.
+    let agent_hdr = trusted_agent(&headers, &identity);
+    let access = resolve_access(&state, &doc_id, &room_key, &identity, agent_hdr.as_deref()).await;
     if !access.can_write() {
         warn!(id=%id, user=%access.user_id, role=%access.role_name(), "PUT /api/workspace/:id/doc denied");
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
     }
-    // X-Agent-Type is client-asserted: trust it only for the service identity
-    // (dashboard proxy with COLLAB_SERVICE_TOKEN). Everyone else is "user".
-    let trusted_agent = matches!(identity, Identity::Service);
-    let agent = if trusted_agent {
-        headers
-            .get("x-agent-type")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("user")
-            .to_string()
-    } else {
-        "user".to_string()
-    };
+    let agent = agent_hdr.unwrap_or_else(|| "user".to_string());
     let room = state.clone().ensure_room(&room_key).await;
     // first writer claims ownership of ownerless docs (closed-by-default model).
     // INSERT-OR-CLAIM: the flush task creates the row ~300ms later, so a plain
@@ -464,13 +524,23 @@ async fn ws_handler(
         return (StatusCode::UNAUTHORIZED, "missing or invalid credential").into_response();
     };
     let (room_key, doc_id) = room_doc_ids(&room);
-    let access = resolve_access(&state, &doc_id, &room_key, &identity).await;
+    // Server-side agent peers (Cerveau worker) assert their type via ?agent=
+    // — trusted only with the service token, like the X-Agent-Type header.
+    let ws_agent = if matches!(identity, Identity::Service) {
+        params
+            .get("agent")
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    let access = resolve_access(&state, &doc_id, &room_key, &identity, ws_agent.as_deref()).await;
     if !access.can_read() {
         warn!(room=%room, user=%access.user_id, "ws upgrade denied: forbidden");
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
     }
     let can_write = access.can_write();
-    info!(room=%room, user=%access.user_id, role=%access.role_name(), write=%can_write, "ws upgrade /yjs/:room");
+    info!(room=%room, user=%access.user_id, role=%access.role_name(), write=%can_write, agent=?ws_agent, "ws upgrade /yjs/:room");
     ws.on_upgrade(move |socket| handle_socket(socket, room, state, can_write))
 }
 

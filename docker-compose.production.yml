@@ -454,57 +454,6 @@ services:
       - "traefik.http.routers.avry-careers.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-careers.loadbalancer.server.port=8089"
 
-  # ── Storage (MinIO S3-compat for workspace blobs/covers/embeds) ────────
-  avry-minio:
-    image: minio/minio:latest
-    container_name: avry-minio
-    command: server /data --console-address ":9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-aivory}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-aivory-minio-123}
-    volumes:
-      - minio_data:/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - aivory-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.avry-minio.rule=Host(`s3.aivory.uk`)"
-      - "traefik.http.routers.avry-minio.entrypoints=websecure"
-      - "traefik.http.routers.avry-minio.tls.certresolver=letsencrypt"
-      - "traefik.http.services.avry-minio.loadbalancer.server.port=9000"
-      - "traefik.http.routers.avry-minio-console.rule=Host(`s3-console.aivory.uk`)"
-      - "traefik.http.routers.avry-minio-console.entrypoints=websecure"
-      - "traefik.http.routers.avry-minio-console.tls.certresolver=letsencrypt"
-      - "traefik.http.services.avry-minio-console.loadbalancer.server.port=9001"
-
-  avry-minio-init:
-    image: minio/mc:latest
-    container_name: avry-minio-init
-    depends_on:
-      avry-minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set local http://avry-minio:9000 $${MINIO_ROOT_USER:-aivory} $${MINIO_ROOT_PASSWORD:-aivory-minio-123} &&
-      /usr/bin/mc mb -p local/workspace-blobs 2>/dev/null || true &&
-      /usr/bin/mc anonymous set download local/workspace-blobs 2>/dev/null || true &&
-      echo 'MinIO bucket workspace-blobs ready' &&
-      exit 0
-      "
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-aivory}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-aivory-minio-123}
-    networks:
-      - aivory-network
-    restart: "no"
-
   # ── Collab (y-octo + OctoBase) — aivory-collab:3200 ──────────────────────
   aivory-collab:
     build:
@@ -586,11 +535,6 @@ services:
       - BACKEND_SERVICE_URL=http://avry-backend:8081
       - COLLAB_URL=${COLLAB_URL:-http://aivory-collab:3200}
       - COLLAB_SERVICE_TOKEN=${COLLAB_SERVICE_TOKEN}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://avry-minio:9000}
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL:-https://s3.aivory.uk}
-      - WORKSPACE_BLOB_BUCKET=${WORKSPACE_BLOB_BUCKET:-workspace-blobs}
       - NEXT_PUBLIC_API_URL=https://backend.aivory.id
       - NEXT_PUBLIC_ZEROCLAW_URL=https://api.aivory.id
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -780,7 +724,6 @@ volumes:
   grafana_data:
   mail_storage:
   collab_data:
-  minio_data:
 
 networks:
   aivory-network:

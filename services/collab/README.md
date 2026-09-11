@@ -41,7 +41,8 @@ Rooms in-memory (`DashMap`, `broadcast` per room) + persist per room (debounce 3
 |---|---|---|
 | `PORT` | no (3200) | listen port |
 | `DATABASE_URL` | no (in-memory saja bila kosong) | `postgresql://…@avry-postgres:5432/aivory`; pool `connect_lazy`, max 4 |
-| `JWT_SECRET` | no (belum di-enforce) | disiapkan untuk AuthZ per-workspace (scope tersisa) |
+| `JWT_SECRET` | untuk user JWT (HS256, exp + 60s leeway) | AuthZ per-doc di-enforce di `resolve_access` (closed-by-default); service callers via `COLLAB_SERVICE_TOKEN` |
+| `COLLAB_SERVICE_TOKEN` | untuk agent/service peers | Service tanpa `X-Agent-Type` = full access (legacy); dengan known agent type = scoped ke `dashboard.workspace_agent_acl` (editor/viewer, fail-closed). WS peers: `?agent=<type>` |
 | `OCTOBASE_PATH` | no (`/data`) | reserved; volume `collab_data:/data` sudah dipasang |
 | `RUST_LOG` | no (`info`) | log level |
 
