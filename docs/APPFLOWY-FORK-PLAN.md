@@ -137,6 +137,11 @@ filter `assignee == agent:{type}` = task list per agent.
 
 ### Fase 2 — Project room & multi-doc board (M)
 
+> ✅ DIEKSEKUSI 2026-09-11. `tsc` 0 error, `vitest` 329 passed,
+> e2e production 11/11 ALL-PASS (project create → rows → WIP 409 →
+> aggregate → row PATCH → comments → cleanup). Deploy: dashboard only
+> (no Rust changes). F2-1…F2-4 semua di bawah selesai.
+
 1. Konvensi room project: `workspace:room:{projectId}` (atau tipe doc `project`)
    — 1 file konvensi di `lib/workspaceDoc.ts` (`canonicalRoomId` sudah polanya).
 2. REST parity: `database/route.ts` baca/tulis **penuh** (`description`,
