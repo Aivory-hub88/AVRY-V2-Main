@@ -124,6 +124,7 @@ allowed_tools = ["tool_search", "web_search_tool", "web_fetch", "http_request", 
 agentic = true
 max_delegation_depth = 3
 max_tool_iterations = 10
+parallel_tools = true
 
 [skill_bundles.agent_diagnostic_brain]
 
