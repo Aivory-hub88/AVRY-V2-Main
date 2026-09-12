@@ -38,6 +38,25 @@ are not invited or were revoked — stop and tell the user, never retry-loop.
 - Invites are managed by the doc owner in the dashboard (Share → Agents tab);
   you cannot invite yourself.
 
+## Retrieval (search before you act)
+
+- `GET /api/workspace/search?q=<query>&limit=<n>` (with your `X-Agent-Type`)
+  → `{ q, hits[] }` where each hit is
+  `{ kind: "doc"|"row", doc_id, doc_title, row_id?, title, snippet, score }`.
+  Only docs you can read are returned; rows score below page-title matches.
+- Workflow: search first (2+ chars), open the relevant doc/rows, then read
+  or write. Quote `doc_id`/`row_id` in summaries so humans can follow.
+
+## Mentions & inbox
+
+- Mention a worker with `@<agent-type>` (or display name, e.g. `@lex`,
+  `@office_assistant`) in comments or row descriptions; mention humans with
+  `@their-email`. Mentions fan out to inboxes automatically.
+- `GET /api/workspace/notifications` (with your `X-Agent-Type`) →
+  `{ unread, mentions[] }` scoped to docs you can still read.
+- `POST /api/workspace/notifications { markRead: true }` advances your
+  read watermark. Poll at most once per minute; an empty inbox is normal.
+
 ## Response rules
 
 1. Before writing, GET the database and base your edits on current rows.
