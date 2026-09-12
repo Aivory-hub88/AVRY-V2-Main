@@ -1,6 +1,6 @@
 # ADR-013 — Cerveau Stage-2 learning: letting self-evolution run on real tenant turns
 
-**Status:** Proposed. Nothing in this ADR is implemented — Fase 1 (§5) is the recommended next PR, pending go-ahead.
+**Status:** Phase 1 (§5) deployed 2026-09-12 to source (`AVRY-Cerveau@95a42696`, `[skill_insights].enabled = false` by default — not yet turned on in any live config). Phases 2-4 remain proposed.
 **Date:** 2026-09-12
 **Context:** The ask was "self-evolution is host-only today — what if it could evolve from handling real users?" This ADR answers that, plus two design constraints added during the discussion: (1) take inspiration from Edge0-AI/edge0's MoE technique — stream only the active experts instead of loading everything — applied to cost control on a per-tenant learning loop; (2) label shipped skills by tier (A/B/C/D) and surface them as a browsable library.
 
