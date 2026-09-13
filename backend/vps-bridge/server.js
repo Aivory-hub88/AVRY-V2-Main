@@ -2274,6 +2274,41 @@ setInterval(warmPingBlueprintFailovers, FAILOVER_WARM_INTERVAL_MS);
 warmPingBlueprintFailovers();
 console.log(`[warm-ping] blueprint keep-warm armed: primary(${BLUEPRINT_MODEL_DEFAULT}) every 4m, failovers(${BLUEPRINT_FAILOVER_DEFAULTS.join(', ')}) every 45m`);
 
+// KEEP-WARM PING — CERVEAU AUTONOMOUS/PRODUCT AGENTS (2026-09-10) — Cerveau's
+// [agents.autonomous] (and the other 4 product-type agents) route through
+// openrouter.agent_analyst_brain, which uses ITS OWN OpenRouter API key —
+// separate from CONSOLE_MODEL/BLUEPRINT_MODEL above, so the existing pings
+// never kept it warm. Confirmed live: a cold call to Cerveau's /webhook took
+// 13.2s, three immediately-following warm calls took 4.7-6.4s — same
+// provider-side spin-up cost as CONSOLE_MODEL, paid on a separate key. Same
+// frugal shape (2-word prompt, max_tokens=1, best-effort, failures
+// swallowed). Primary (deepseek/deepseek-v4-flash-0731) on the 4-minute
+// cadence; the two per-fallback-keyed qwen models on the 45-minute cadence,
+// matching the blueprint failover pattern — they're rarely hit, just never
+// stone-cold if Cerveau's primary key ever fails over.
+const CERVEAU_ANALYST_MODEL = process.env.CERVEAU_ANALYST_MODEL || 'deepseek/deepseek-v4-flash-0731';
+const CERVEAU_ANALYST_FALLBACK_MODEL = process.env.CERVEAU_ANALYST_FALLBACK_MODEL || 'qwen/qwen3.5-flash-02-23';
+function warmPingWithKey(apiKey, model) {
+  if (!apiKey || !model) return;
+  fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }], max_tokens: 1, stream: false }),
+    signal: AbortSignal.timeout(20000),
+  }).catch(() => {});
+}
+function warmPingCerveauAnalyst() { warmPingWithKey(process.env.CERVEAU_ANALYST_API_KEY, CERVEAU_ANALYST_MODEL); }
+function warmPingCerveauAnalystFallbacks() {
+  warmPingWithKey(process.env.CERVEAU_ANALYST_FB2_API_KEY, CERVEAU_ANALYST_FALLBACK_MODEL);
+  warmPingWithKey(process.env.CERVEAU_ANALYST_FB3_API_KEY, CERVEAU_ANALYST_FALLBACK_MODEL);
+}
+setInterval(warmPingCerveauAnalyst, BLUEPRINT_WARM_INTERVAL_MS);
+warmPingCerveauAnalyst();
+setInterval(warmPingCerveauAnalystFallbacks, FAILOVER_WARM_INTERVAL_MS);
+warmPingCerveauAnalystFallbacks();
+console.log(`[warm-ping] cerveau analyst keep-warm armed: primary(${CERVEAU_ANALYST_MODEL}) every 4m, fallbacks(${CERVEAU_ANALYST_FALLBACK_MODEL} x2 keys) every 45m`);
+
+
 // ============================================================================
 // GRACEFUL SHUTDOWN
 // ============================================================================
