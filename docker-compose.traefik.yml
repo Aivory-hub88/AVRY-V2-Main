@@ -53,6 +53,7 @@ services:
       - "traefik-certs:/letsencrypt"
     networks:
       - aivory-network
+      - avry-mail-web-edge
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 30s
@@ -67,4 +68,7 @@ volumes:
 networks:
   aivory-network:
     name: aivory-network
+    external: true
+  avry-mail-web-edge:
+    name: avry-mail-web-edge
     external: true
