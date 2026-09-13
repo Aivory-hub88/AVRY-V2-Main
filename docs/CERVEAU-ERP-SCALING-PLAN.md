@@ -1,6 +1,6 @@
 # Cerveau ERP Scaling Plan — Eval Harness, SAP/OData, Generic Adapter
 
-**Status:** draft — awaiting user approval of scope, nothing executed yet. Phase 1.1/1.5 research completed 2026-09-09 (Composio catalog checked live, self-hosted candidate measured) — implementation still not started.
+**Status:** draft — awaiting user approval of scope, nothing executed yet. Phase 1.1/1.5 research completed 2026-09-09 (Composio catalog checked live, self-hosted candidate measured); Phase 1.5 candidate re-evaluated 2026-09-13, switched to a lighter/simpler-transport option (`oisee/odata_mcp_go`) — implementation still not started.
 **Created:** 2026-08-23
 **Related:** `CERVEAU-ERP-INTEGRATION-PLAN.md` (ERPNext, the precedent this plan extends), `CERVEAU-APPROVAL-UX-PLAN.md` (F-1 approval surface the eval harness must simulate), `ADR-007-INTEGRATION-OAUTH-DIRECTORY.md` (Composio-vs-self-hosted decision pattern), `WORKFLOW-VERSIONING-AND-FIXTURES-OVERVIEW.md` (dashboard's existing fixture/replay system — a different layer, referenced for what to reuse and what not to copy), `ADR-012-CERVEAU-ODOO-SHARED-MCP.md` (the shared-multi-tenant-hosting pattern this SAP path may end up following, same underlying tension)
 
@@ -87,26 +87,30 @@ Exact replay of the ADR-007/ERP-plan negative-path protocol (fail-closed → syn
 
 **Confirmed by §1.1: Composio has no SAP toolkit, so a self-hosted OData bridge is required.** Resource footprint was the first thing checked — not assumed — mirroring the Odoo research in `CERVEAU-ODOO-INTEGRATION-PLAN.md`.
 
-**Candidate evaluated: `GutjahrAI/sap-odata-mcp-server`** (TypeScript/Node.js, MIT, most actively maintained of the OData-capable options found — `midasol/sap-mcp-server` was also checked but is read-only, no create/update, so it alone doesn't cover this phase's bounded-write scope).
+**Candidate history:** `GutjahrAI/sap-odata-mcp-server` (TypeScript/Node.js, MIT) was the first candidate evaluated and measured 2026-09-09 — see superseded findings below. A broader sweep on 2026-09-13 (also checking `lemaiwo/btp-sap-odata-to-mcp-server` and re-confirming `midasol/sap-mcp-server`'s read-only limitation) surfaced a stronger candidate that supersedes it: **`oisee/odata_mcp_go`** (Go, MIT, single static binary, no runtime deps).
 
-**Measured 2026-09-09** (built and run as a throwaway, unexposed container on `tencent-vps`, image removed immediately after, no trace left):
+**Why `oisee/odata_mcp_go` supersedes the original pick:**
+- **Native `streamable-http` transport** (`--transport streamable-http`), not stdio-only — eliminates the stdio-to-HTTP wrapper plumbing (`mcp-proxy`/`supergateway`) that GutjahrAI's server required. This was the "real finding" flagged in the 2026-09-09 measurement; it no longer applies to this candidate.
+- Full CRUD (create/read/update/delete) same as GutjahrAI, **plus** built-in `--read-only` / `--disable "cud"` flags — a server-side defense-in-depth layer GutjahrAI's server lacked (its CRUD calls executed directly against SAP with no gate of its own). Cerveau's approval gate (§1.3) remains the binding control either way; this is additional, not a replacement.
+- Generic OData v2/v4 (not SAP-locked) with **built-in SAP-specific CSRF token handling** — works against on-prem/ECC/S4HANA via plain basic auth, unlike `lemaiwo/btp-sap-odata-to-mcp-server` which is built around SAP BTP Destination service / OAuth2 Principal Propagation (a fit for BTP-hosted tenants, not a generic self-host).
+- MIT license, actively maintained (v1.6.0 at evaluation time), Docker + Makefile included.
 
-- Idle RAM: **19.26 MB** — lighter than the Odoo bridge (53.5 MB), consistent with it being a thin HTTP/REST wrapper doing no local data processing.
-- CPU: ~0%, effectively idle.
-- Confirms the README's own claim: **no SAP RFC SDK required** — pure HTTP/REST to SAP's OData endpoints. The usual "SAP integration needs a heavy NetWeaver/RFC runtime" assumption does not apply to the OData-only scope this phase already committed to (§1.2).
+**Measured 2026-09-13** (built and run as a throwaway, unexposed container on `tencent-vps` — bound to `127.0.0.1:8080` inside the container, no host port published — pointed at the public Northwind OData v2 test service since no SAP test tenant was available; image and cloned source removed immediately after, no trace left):
 
-**Real finding, not anticipated in the draft plan — this changes the "where does it run" question from a hosting-location problem into a transport-shape problem:**
+- Idle RAM: **7.6 MiB** — less than half of GutjahrAI's 19.26 MB.
+- CPU: 0%, effectively idle, steady across two readings 20s apart.
+- Image size: 42.6 MB.
+- Functional sanity check: `streamable-http` endpoint confirmed live — a GET to `/mcp` correctly returned `405 Method Not Allowed` (the endpoint only accepts POST JSON-RPC, as expected for this transport), proving the daemon actually serves the MCP protocol rather than just holding a process open.
+- **Not yet verified**: behavior against a real SAP OData endpoint specifically (CSRF token round-trip, an actual write call). The Northwind test service confirms the binary runs and serves correctly; it does not exercise SAP's CSRF flow. That check still needs a SAP test tenant, same gap `GutjahrAI`'s eval had.
 
-`GutjahrAI/sap-odata-mcp-server` uses **`StdioServerTransport`** only (confirmed by reading `src/server.ts`) — it is built to be spawned per-session by a local MCP client, not to run as a standing, network-reachable daemon the way `erpipe-org/mcp-odoo`'s `streamable-http` mode does for Odoo. Folding it into an existing process (option (a) below) or running it standalone both need a **stdio-to-HTTP wrapper** in front of it (e.g. `mcp-proxy` / `supergateway`) before it can serve requests over a network at all — this is a real, if small, piece of new plumbing, not a resource cost.
-
-**Also worth flagging**: unlike `erpipe-org/mcp-odoo`, this server has **no built-in preview/validate-before-execute gate** — CRUD calls execute directly against SAP. Cerveau's own mandatory Irreversible-tier approval gate on custom-MCP tool calls still covers this (§1.3), but it means Cerveau's gate is the *only* safety layer here, with no server-side defense-in-depth backing it up the way Odoo's candidate has.
+**Superseded findings (`GutjahrAI/sap-odata-mcp-server`, 2026-09-09, kept for record):** 19.26 MB idle RAM, ~0% CPU, no SAP RFC SDK needed, `StdioServerTransport`-only (needs stdio-to-HTTP wrapper), no preview/validate gate. `midasol/sap-mcp-server` was checked both rounds and is read-only (no create/update) — still doesn't cover this phase's bounded-write scope regardless.
 
 **Where it runs — candidate answers, still to weigh with the user, now grounded in real numbers instead of an unknown:**
-(a) fold the wrapped bridge into an existing already-running process (e.g. extend `vps-bridge`'s Node process) — cheap given the measured 19 MB footprint, same discipline as "OfficeCLI needed no new process, just a new MCP bundle";
-(b) host it off-VPS entirely (serverless function, matching Composio's own "external HTTP, zero VPS load" shape) — sidesteps the wrapper-process question by moving it off `tencent-vps` altogether;
-(c) revisit the zero-new-processes constraint itself, now that a new process would cost ~19 MB idle, not an unknown/unbounded amount.
+(a) fold the bridge into an existing already-running process (e.g. extend `vps-bridge`'s Node process, or run the Go binary as a lightweight sidecar) — cheaper than ever given the measured 7.6 MiB footprint, same discipline as "OfficeCLI needed no new process, just a new MCP bundle";
+(b) host it off-VPS entirely (serverless function, matching Composio's own "external HTTP, zero VPS load" shape) — sidesteps the process question by moving it off `tencent-vps` altogether;
+(c) revisit the zero-new-processes constraint itself, now that a new standalone process would cost ~8 MB idle, not an unknown/unbounded amount — arguably an even easier case to make now than at 19 MB.
 
-No longer the single highest-variance unknown in the plan — the variance was in resource cost, which is now measured and small. The remaining open call is (a) vs (b) vs (c), a placement decision, not a feasibility one.
+No longer the single highest-variance unknown in the plan — the variance was in resource cost, which is now measured and smaller than the first pass found. The remaining open call is (a) vs (b) vs (c), a placement decision, not a feasibility one. The SAP-specific CSRF/write verification gap should be closed alongside Phase 1.4's negative-path proof, not before — it needs a real (or sandboxed) SAP tenant either way.
 
 ---
 
@@ -145,7 +149,7 @@ Reuse Phase 0's eval harness: same seed-scenario shape, run once against a tenan
 
 1. **Approve the sequencing** (eval harness → SAP → generic adapter) or reorder.
 2. **Phase 0 Tier B cadence** — scheduled (e.g. nightly) or pre-release-tag-only for the real-LLM-cost replay tier.
-3. **Phase 1.5** — catalog data and resource measurement now in hand (§1.1, §1.5): self-hosted OData bridge confirmed necessary, ~19 MB idle, needs a stdio-to-HTTP wrapper. Remaining call is placement: (a) fold into `vps-bridge`, (b) host off-VPS, or (c) accept a new small VPS process.
+3. **Phase 1.5** — catalog data and resource measurement now in hand (§1.1, §1.5): self-hosted OData bridge confirmed necessary; candidate switched to `oisee/odata_mcp_go` (~7.6 MB idle, native `streamable-http`, no stdio-to-HTTP wrapper needed). Remaining call is placement: (a) fold into `vps-bridge`, (b) host off-VPS, or (c) accept a new small VPS process. CSRF/write behavior against a real SAP tenant still needs verification, folded into Phase 1.4.
 4. **Phase 2 Option A vs. B** — recommendation is A-first, but confirm before any implementation.
 
 ## Success criteria
