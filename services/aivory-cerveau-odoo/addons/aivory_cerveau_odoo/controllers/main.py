@@ -7,10 +7,16 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
-# Falls back to the generalist agent (Geno) if the admin hasn't picked one
-# yet -- matches AGENT_DISPLAY_NAMES.autonomous in
-# frontend/avry-user-dashboard/lib/workspaceAccess.ts.
-DEFAULT_AGENT_TYPE = 'autonomous'
+# The Aivory backend, not Cerveau directly -- see docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md
+# open question #4. Calling Cerveau's own /webhook would mean this addon has
+# to hold Cerveau's single shared X-Webhook-Secret, which per
+# docs/ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md is explicitly NOT safe to
+# hand to a tenant-controlled server (any holder could set X-Tenant-Id to a
+# different tenant's user_id and read/write a stranger's agent). Using
+# POST /api/v1/agent-api/message with a per-tenant X-Aivory-Api-Key instead
+# avoids that entirely -- the key is bound to one (user_id, agent_type) pair
+# at creation, server-side, and never carries cross-tenant capability.
+AIVORY_API_BASE_URL = 'https://backend.aivory.id'
 
 
 class CerveauChatController(http.Controller):
@@ -22,46 +28,40 @@ class CerveauChatController(http.Controller):
             return {'error': 'message is required'}
 
         icp = request.env['ir.config_parameter'].sudo()
-        base_url = icp.get_param('aivory_cerveau.base_url')
-        shared_secret = icp.get_param('aivory_cerveau.shared_secret')
-        tenant_id = icp.get_param('aivory_cerveau.tenant_id')
-        agent_type = icp.get_param('aivory_cerveau.agent_type') or DEFAULT_AGENT_TYPE
+        api_key = icp.get_param('aivory_cerveau.api_key')
 
-        if not base_url:
+        if not api_key:
             return {
                 'error': (
-                    'Cerveau base URL is not configured. '
+                    'Aivory API Key is not configured. '
                     'Set it under Settings > General Settings > Aivory Cerveau.'
                 )
             }
-        if not tenant_id:
-            return {
-                'error': (
-                    'Aivory Account User ID is not configured. '
-                    'Set it under Settings > General Settings > Aivory Cerveau.'
-                )
-            }
-
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Tenant-Id': tenant_id,
-            'X-Agent-Type': agent_type,
-        }
-        if shared_secret:
-            # Matches the gateway's real X-Webhook-Secret contract, confirmed
-            # against docs/CERVEAU-STATUS.md 2026-09-14.
-            headers['X-Webhook-Secret'] = shared_secret
 
         try:
             resp = requests.post(
-                f'{base_url.rstrip("/")}/webhook',
-                json={'tenant_id': tenant_id, 'agent_type': agent_type, 'message': message},
-                headers=headers,
-                timeout=30,
+                f'{AIVORY_API_BASE_URL}/api/v1/agent-api/message',
+                json={'text': message},
+                headers={
+                    'Content-Type': 'application/json',
+                    'X-Aivory-Api-Key': api_key,
+                },
+                timeout=200,  # the gateway itself allows up to 195s for a tool-using turn
             )
-            resp.raise_for_status()
         except requests.RequestException:
-            _logger.exception('Cerveau /webhook call failed')
-            return {'error': 'Could not reach Cerveau. Check the base URL and that the service is running.'}
+            _logger.exception('Aivory agent-api call failed')
+            return {'error': 'Could not reach Aivory. Check your connection and try again.'}
+
+        if resp.status_code == 401:
+            return {'error': 'Aivory API Key is invalid or has been revoked. Check Settings > Aivory Cerveau.'}
+        if resp.status_code == 402:
+            return {'error': 'This Aivory account is out of credits.'}
+        if resp.status_code == 403:
+            return {'error': 'This Aivory account\'s plan no longer supports API access.'}
+        if resp.status_code == 429:
+            return {'error': 'Too many messages sent recently. Try again in a moment.'}
+        if not resp.ok:
+            _logger.error('Aivory agent-api call returned %s: %s', resp.status_code, resp.text[:200])
+            return {'error': 'Aivory agent is temporarily unavailable. Try again shortly.'}
 
         return resp.json()

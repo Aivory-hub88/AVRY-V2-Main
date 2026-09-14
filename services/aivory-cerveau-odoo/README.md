@@ -12,39 +12,57 @@ Target version for this scaffold: **Odoo 18**.
 ```
 addons/aivory_cerveau_odoo/
   __manifest__.py
-  controllers/main.py          -- /aivory_cerveau/chat -> Cerveau /webhook
-  models/res_config_settings.py -- Cerveau base URL + shared secret settings
+  controllers/main.py          -- /aivory_cerveau/chat -> avry-backend /api/v1/agent-api/message
+  models/res_config_settings.py -- single Aivory API Key setting
   views/res_config_settings_views.xml
   static/src/js/systray_icon.js -- OWL systray component
   static/src/xml/systray_icon.xml
 ```
 
+## Architecture note: talks to avry-backend, not Cerveau directly
+
+Earlier drafts of this scaffold called Cerveau's own `POST /webhook` with a
+per-install copy of Cerveau's shared `X-Webhook-Secret`. That is explicitly
+unsafe per `docs/ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md`: the secret is
+**not** a per-tenant credential, and `X-Tenant-Id` is trusted *only because*
+the secret gate already ran -- handing it to a tenant-controlled server
+would let that tenant set `X-Tenant-Id` to a different tenant's `user_id`
+and read/write a stranger's agent.
+
+Instead this addon calls `POST /api/v1/agent-api/message` on
+`backend.aivory.id` with a per-tenant `X-Aivory-Api-Key`
+(`app/routes/agent_api_keys.py`, `docs/ADR-006` Part A) -- a key created
+from the Aivory dashboard, bound server-side to one `(user_id, agent_type)`
+pair at creation. No tenant ID, no agent picker, no shared secret: the key
+alone carries the tenant's identity and which agent it talks to. Needs the
+Business plan or above on the Aivory account creating the key.
+
 ## What's real vs. placeholder
 
-- Real: systray icon registration, panel open/close, message send/receive
-  round trip through the Odoo controller to Cerveau's `/webhook`, correct
-  `X-Webhook-Secret` / `X-Tenant-Id` / `X-Agent-Type` header shape (matches
-  the live gateway contract in `docs/CERVEAU-STATUS.md`).
-- Placeholder: tenant id and agent type are hardcoded (`scaffold-tenant` /
-  `generalist`), no validation of what the shared secret should actually be
-  or where it's provisioned from, no streaming (`/ws/chat`), no
-  multi-company support.
+- Real: systray icon registration, panel open/close, full message
+  round trip through the Odoo controller to the real production
+  `backend.aivory.id` (verified against an invalid key: got the real 401
+  back, not a local mock).
+- Not yet exercised: a *valid* key's full reply (only the invalid-key error
+  path has been verified end to end so far -- see Manual verification
+  below), streaming (`/ws/chat`, not planned), multi-company support.
 
 ## Manual verification (local Odoo 18 instance)
 
-**Last run 2026-09-14 -- passed.** Installed cleanly, systray icon rendered,
-panel opened, a typed message round-tripped through `/aivory_cerveau/chat`
-and the controller's config-check reply rendered back in the panel. Did not
-test against the real `tencent-vps` Cerveau instance (needs
-`CERVEAU_WEBHOOK_SECRET`, not available locally, and that's live production
-infra -- ask before pointing a scaffold test at it).
+**Last run 2026-09-14 -- passed, including a real call to production.**
+Installed cleanly, systray icon rendered, panel opened, a typed message
+round-tripped through `/aivory_cerveau/chat` all the way to the real
+`https://backend.aivory.id/api/v1/agent-api/message` with a deliberately
+invalid key -- got back the real `401` and the controller's translated
+"Aivory API Key is invalid or has been revoked" message, rendered correctly
+in the panel. This is the first pass of this addon to actually reach
+production infrastructure, not just a local config-check error.
 
-Two real bugs were found and fixed this pass (see
-`docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md` for detail): the settings-view xpath
-didn't match Odoo 18's `app`/`block`/`setting` structure, and
-`useService("rpc")` no longer exists in Odoo 18 (use the `rpc` function
-imported from `@web/core/network/rpc` instead). Both are fixed in the
-committed source.
+Earlier passes (now superseded by the `agent_api_keys.py` pivot) found and
+fixed two real Odoo 18 bugs, still relevant to anyone extending this addon:
+the settings-view xpath didn't match Odoo 18's `app`/`block`/`setting`
+structure, and `useService("rpc")` no longer exists in Odoo 18 (use the
+`rpc` function imported from `@web/core/network/rpc` instead).
 
 Steps, if you need to redo this:
 
@@ -72,13 +90,15 @@ Steps, if you need to redo this:
 4. Log in as the admin user you just created. Activate developer mode
    (`?debug=1`), go to Apps, remove the default "Apps" filter, search
    "Aivory Cerveau Chat" (or "Cerveau"), Activate.
-5. Settings > General Settings > Aivory Cerveau: set the Cerveau Base URL to
-   a reachable Cerveau instance and, if configured, the shared secret. Save.
+5. Settings > General Settings > Aivory Cerveau: set the Aivory API Key
+   (create one from the Aivory dashboard: Agents > an agent > Customize >
+   Deploy > Create API Key -- needs Business plan or above). Save.
 6. Reload any backend page. The systray icon (top-right, chat-bubble, next
    to the user menu) should be visible -- widen the browser past mobile
    width if the panel renders cut off.
-7. Click it, type a message, submit. Confirm a reply renders in the panel
-   and check the controller logs / Cerveau logs for the round trip.
+7. Click it, type a message, submit. With a real key, confirm the agent's
+   actual reply renders. With no/invalid key, confirm the controller's
+   translated error message renders instead of a raw stack trace.
 
 Tear down the containers when done -- this is a throwaway verification
 instance, not a persistent dev environment.
