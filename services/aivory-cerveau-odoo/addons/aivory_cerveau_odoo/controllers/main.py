@@ -7,15 +7,10 @@ from odoo.http import request
 
 _logger = logging.getLogger(__name__)
 
-# Scaffold only -- tenant identity is hardcoded until open question #3
-# (docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md) picks a real source
-# (res.company.id / res.users.id / a dedicated admin-set field).
-SCAFFOLD_TENANT_ID = 'scaffold-tenant'
-
-# Scaffold only -- which Cerveau agent type this widget talks to isn't
-# decided yet; there's no per-product agent alias for a generic Odoo
-# chat widget the way there is for e.g. finance_invoice_ops.
-SCAFFOLD_AGENT_TYPE = 'generalist'
+# Falls back to the generalist agent (Geno) if the admin hasn't picked one
+# yet -- matches AGENT_DISPLAY_NAMES.autonomous in
+# frontend/avry-user-dashboard/lib/workspaceAccess.ts.
+DEFAULT_AGENT_TYPE = 'autonomous'
 
 
 class CerveauChatController(http.Controller):
@@ -29,6 +24,8 @@ class CerveauChatController(http.Controller):
         icp = request.env['ir.config_parameter'].sudo()
         base_url = icp.get_param('aivory_cerveau.base_url')
         shared_secret = icp.get_param('aivory_cerveau.shared_secret')
+        tenant_id = icp.get_param('aivory_cerveau.tenant_id')
+        agent_type = icp.get_param('aivory_cerveau.agent_type') or DEFAULT_AGENT_TYPE
 
         if not base_url:
             return {
@@ -37,23 +34,28 @@ class CerveauChatController(http.Controller):
                     'Set it under Settings > General Settings > Aivory Cerveau.'
                 )
             }
+        if not tenant_id:
+            return {
+                'error': (
+                    'Cerveau Tenant ID is not configured. '
+                    'Set it under Settings > General Settings > Aivory Cerveau.'
+                )
+            }
 
         headers = {
             'Content-Type': 'application/json',
-            'X-Tenant-Id': SCAFFOLD_TENANT_ID,
-            'X-Agent-Type': SCAFFOLD_AGENT_TYPE,
+            'X-Tenant-Id': tenant_id,
+            'X-Agent-Type': agent_type,
         }
         if shared_secret:
-            # Matches the gateway's real X-Webhook-Secret contract
-            # (docs/CERVEAU-STATUS.md) -- confirmed 2026-09-14, replacing an
-            # earlier guess at an x-bridge-key header. Where this per-install
-            # secret should live/be provisioned is still open question #4.
+            # Matches the gateway's real X-Webhook-Secret contract, confirmed
+            # against docs/CERVEAU-STATUS.md 2026-09-14.
             headers['X-Webhook-Secret'] = shared_secret
 
         try:
             resp = requests.post(
                 f'{base_url.rstrip("/")}/webhook',
-                json={'tenant_id': SCAFFOLD_TENANT_ID, 'message': message},
+                json={'tenant_id': tenant_id, 'agent_type': agent_type, 'message': message},
                 headers=headers,
                 timeout=30,
             )

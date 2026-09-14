@@ -11,8 +11,14 @@
                         <setting id="aivory_cerveau_base_url_setting" string="Cerveau Base URL" help="The Cerveau instance this Odoo install talks to, e.g. https://cerveau.aivory.uk">
                             <field name="aivory_cerveau_base_url" placeholder="https://cerveau.aivory.uk"/>
                         </setting>
-                        <setting id="aivory_cerveau_shared_secret_setting" string="Cerveau Shared Secret" help="Scaffold placeholder -- production auth mechanism is still an open question.">
+                        <setting id="aivory_cerveau_shared_secret_setting" string="Cerveau Shared Secret" help="Sent as X-Webhook-Secret. Where this value should be provisioned from is still an open question.">
                             <field name="aivory_cerveau_shared_secret" password="True"/>
+                        </setting>
+                        <setting id="aivory_cerveau_tenant_id_setting" string="Cerveau Tenant ID" help="The tenant identifier Cerveau knows this Odoo install as -- set explicitly during setup.">
+                            <field name="aivory_cerveau_tenant_id" placeholder="e.g. acme-corp"/>
+                        </setting>
+                        <setting id="aivory_cerveau_agent_type_setting" string="Cerveau Agent" help="Which Cerveau agent this widget talks to.">
+                            <field name="aivory_cerveau_agent_type"/>
                         </setting>
                     </block>
                 </app>
