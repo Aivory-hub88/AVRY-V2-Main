@@ -1,6 +1,6 @@
 # Cerveau × Odoo Native UI Widget — Planning & Scaffold Scope
 
-**Status:** scaffold in progress — architecture agreed 2026-09-14, target Odoo version picked 2026-09-14, module skeleton written at `services/aivory-cerveau-odoo/`. Not yet installed/verified on a live Odoo instance.
+**Status:** scaffold built and manually verified — architecture agreed 2026-09-14, target Odoo version picked 2026-09-14, module written at `services/aivory-cerveau-odoo/`, installed and round-trip-tested on a throwaway local Odoo 18 instance 2026-09-14 (passed; two real bugs found and fixed along the way, see below). Not yet tested against the real `tencent-vps` Cerveau instance.
 **Created:** 2026-09-14
 **Related:** `CERVEAU-ODOO-INTEGRATION-PLAN.md` (a completely different concern — Cerveau calling *into* Odoo's data via MCP for CRUD; this plan is the reverse direction: surfacing Cerveau's chat *inside* Odoo's own web client), `ODOO-MCP-SETUP-GUIDE.md`, `ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md` (custom MCP server registration — the mechanism the data-access side already uses and this plan does not touch)
 
@@ -47,14 +47,23 @@ Explicitly a skeleton, not a production module. Concretely:
 - [x] One systray icon registered (`static/src/js/systray_icon.js` + `static/src/xml/systray_icon.xml`), opens a panel with a message list and input (not fully empty, but no Cerveau-specific chrome beyond the round trip)
 - [x] One backend controller route `/aivory_cerveau/chat` (`controllers/main.py`) that accepts a message, calls Cerveau's `/webhook`, returns the reply — tenant id hardcoded to `scaffold-tenant` per open question #3 below
 - [x] A `res.config.settings` field for the Cerveau base URL and a shared-secret field (`models/res_config_settings.py`, `views/res_config_settings_views.xml`) — tenant-mapping field still a placeholder (open question #3)
-- [ ] Manual verification: install the module on a local/dev Odoo instance, click the icon, send one message, confirm the round-trip reaches Cerveau and a reply renders — **not done yet**, needs a throwaway Odoo 18 instance (steps in `services/aivory-cerveau-odoo/README.md`)
+- [x] Manual verification: **done 2026-09-14** on a throwaway local Odoo 18 + Postgres 15 (Docker, steps in `services/aivory-cerveau-odoo/README.md`). Installed cleanly, systray icon renders, panel opens, a typed message round-trips through `/aivory_cerveau/chat` and the controller's config-check reply ("Cerveau base URL is not configured...") renders back in the panel. Stopped short of hitting the real `tencent-vps` Cerveau instance — that needs `CERVEAU_WEBHOOK_SECRET`, which isn't available locally and touches live production infra, so it wasn't attempted without it being asked for explicitly. Two real bugs found and fixed during this pass (see below); containers torn down after.
 
 **Explicitly NOT in scope for this session:** real-time streaming (`/ws/chat`), production auth/token handling between the controller and Cerveau, multi-company tenant-mapping logic, packaging for the Odoo Apps Store, visual polish/theming, error-state UX, or support for more than one Odoo version.
+
+### Bugs found and fixed during manual verification (2026-09-14)
+
+1. **Settings view xpath didn't match Odoo 18.** The scaffold originally targeted `//div[hasclass('settings')]` (an older Odoo settings-page structure). Odoo 18's `base.res_config_settings_view_form` is an empty `<form>` — the real `app`/`block`/`setting` tag structure (used by `base_setup` and every first-party settings panel) has to be injected via `//form` position `inside`. Fixed in `views/res_config_settings_views.xml`.
+2. **`useService("rpc")` no longer exists in Odoo 18.** The web framework removed the `rpc` service; the replacement is importing the `rpc` function directly from `@web/core/network/rpc` and calling it as a plain function. This one initially crashed the whole navbar (`OwlError` in the systray slot, blank backend page) until fixed in `static/src/js/systray_icon.js`.
+
+### New information for the open questions below
+
+Cerveau's real gateway auth (confirmed live, `docs/CERVEAU-STATUS.md`) is **`X-Webhook-Secret` + `X-Tenant-Id`/`X-Agent-Type` headers**, not the `x-bridge-key` pattern the scaffold's controller guessed at in open question #4 below — that guess was wrong and needs correcting before this goes past scaffold stage.
 
 ## Open questions for the scaffold session to resolve (not pre-decided here)
 
 1. ~~**Target Odoo version first.**~~ **Decided 2026-09-14: Odoo 18** — current stable, most complete systray/OWL documentation, likely version for tenants when this ships. No dev Odoo instance has been set up yet; the scaffold module is written against Odoo 18's OWL/registry API but unverified against a running instance.
 2. **`/webhook` vs `/ws/chat`.** Simple request/response is far less scaffold work; streaming is a better long-term UX (typing/partial-response feel) but adds real complexity (WS auth, reconnect handling). Recommend starting with `/webhook` for the scaffold and treating `/ws/chat` as a follow-up.
 3. **Tenant-identity source.** `res.company.id`, `res.users.id`, or a dedicated new field an admin sets explicitly during setup (most explicit, least "magic," but adds a setup step). Needs a decision before layer 3 can be more than a placeholder.
-4. **Auth from the Odoo controller to Cerveau.** A per-install shared secret (System Parameter, like the existing `x-bridge-key` pattern already used for Cerveau's own native-tools bridge) is the likely shape — needs confirming against how `[[mcp.servers]]`-style bearer auth is issued today, not assumed to be a new mechanism.
+4. **Auth from the Odoo controller to Cerveau.** ~~A per-install shared secret... `x-bridge-key`...~~ **Partially resolved 2026-09-14:** the live gateway actually expects `X-Webhook-Secret` + `X-Tenant-Id`/`X-Agent-Type` headers (confirmed in `docs/CERVEAU-STATUS.md`), not `x-bridge-key` — the scaffold's controller still sends the wrong header name/shape and needs updating before this is more than a local-only demo. Still open: where the per-tenant `X-Webhook-Secret` value should live on the Odoo side (System Parameter set manually per install vs. something provisioned automatically), and how it maps to `CERVEAU_WEBHOOK_SECRET` on the Cerveau side.
 5. **Whether to reuse any Od-MCP research.** `CERVEAU-ODOO-INTEGRATION-PLAN.md` already solved "how does Cerveau read/write Odoo data" via custom MCP server registration — worth checking whether that plan's tenant/instance conventions should inform this one's tenant-mapping field, so a single Odoo install doesn't end up with two independent, inconsistent tenant-id schemes.

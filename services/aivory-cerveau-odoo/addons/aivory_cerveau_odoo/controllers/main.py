@@ -12,6 +12,11 @@ _logger = logging.getLogger(__name__)
 # (res.company.id / res.users.id / a dedicated admin-set field).
 SCAFFOLD_TENANT_ID = 'scaffold-tenant'
 
+# Scaffold only -- which Cerveau agent type this widget talks to isn't
+# decided yet; there's no per-product agent alias for a generic Odoo
+# chat widget the way there is for e.g. finance_invoice_ops.
+SCAFFOLD_AGENT_TYPE = 'generalist'
+
 
 class CerveauChatController(http.Controller):
 
@@ -33,12 +38,17 @@ class CerveauChatController(http.Controller):
                 )
             }
 
-        headers = {'Content-Type': 'application/json'}
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Tenant-Id': SCAFFOLD_TENANT_ID,
+            'X-Agent-Type': SCAFFOLD_AGENT_TYPE,
+        }
         if shared_secret:
-            # Placeholder auth shape -- open question #4 in the plan doc asks
-            # whether this should match the existing x-bridge-key pattern
-            # used by Cerveau's native-tools bridge.
-            headers['x-bridge-key'] = shared_secret
+            # Matches the gateway's real X-Webhook-Secret contract
+            # (docs/CERVEAU-STATUS.md) -- confirmed 2026-09-14, replacing an
+            # earlier guess at an x-bridge-key header. Where this per-install
+            # secret should live/be provisioned is still open question #4.
+            headers['X-Webhook-Secret'] = shared_secret
 
         try:
             resp = requests.post(

@@ -1,7 +1,7 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
-import { useService } from "@web/core/utils/hooks";
+import { rpc } from "@web/core/network/rpc";
 import { Component, useState } from "@odoo/owl";
 
 class CerveauSystrayIcon extends Component {
@@ -9,7 +9,6 @@ class CerveauSystrayIcon extends Component {
     static props = {};
 
     setup() {
-        this.rpc = useService("rpc");
         this.state = useState({
             open: false,
             sending: false,
@@ -38,7 +37,7 @@ class CerveauSystrayIcon extends Component {
         this.state.sending = true;
 
         try {
-            const result = await this.rpc("/aivory_cerveau/chat", { message });
+            const result = await rpc("/aivory_cerveau/chat", { message });
             if (result && result.error) {
                 this.state.messages.push({ from: "error", text: result.error });
             } else {
