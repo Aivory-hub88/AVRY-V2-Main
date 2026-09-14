@@ -31,9 +31,8 @@ const roadmapQueue = new Queue(QUEUE_NAME, { connection: queueConnection });
 // path and the reasoning profile do.
 const ROADMAP_MODEL = process.env.ROADMAP_MODEL || 'deepseek/deepseek-v4-flash-0731';
 const ROADMAP_TIMEOUT_MS = parseInt(process.env.ROADMAP_TIMEOUT_MS || '60000', 10);
-const ROADMAP_FALLBACK_TIMEOUT_MS = parseInt(process.env.ROADMAP_FALLBACK_TIMEOUT_MS || '180000', 10);
-// Different-model last resort, tried reasoning-off after both primary tiers
-// fail — sidesteps whatever is specifically wrong with ROADMAP_MODEL's
+// Different-model last resort, tried reasoning-off after the primary tier
+// fails — sidesteps whatever is specifically wrong with ROADMAP_MODEL's
 // provider right now. Comma-separated.
 const ROADMAP_FAILOVER_MODELS = (process.env.ROADMAP_FAILOVER_MODELS || 'qwen/qwen3-235b-a22b')
   .split(',')
@@ -157,9 +156,17 @@ async function callModel({ userContent, reasoningEnabled, timeoutMs, model = ROA
 }
 
 /**
- * Escalating generation: fast no-reasoning → reasoning-on → failover models.
- * Identical shape to the blueprint ladder; roadmap JSON is smaller, so the
- * timeouts are tighter.
+ * Escalating generation: fast no-reasoning → failover models.
+ *
+ * 2026-09-14: dropped the reasoning-on "fallback" tier that used to sit
+ * between fast and failover. Measured live: it never once produced usable
+ * content — it burned its entire max_tokens budget on reasoning tokens and
+ * came back `finish_reason=length` with 0 chars, every single time — while
+ * still costing ~130s (ROADMAP_FALLBACK_TIMEOUT_MS) before the ladder could
+ * move on. That 130s was pure dead weight: two consecutive roadmap jobs took
+ * ~230s end-to-end (tier=fast timeout + dead tier=fallback + successful
+ * failover) when the failover tier alone resolves in ~40s. Going fast →
+ * failover directly cuts the worst case roughly in half.
  */
 async function runRoadmapGeneration({ messages }) {
   if (!Array.isArray(messages)) throw new Error('messages array required');
@@ -170,34 +177,17 @@ async function runRoadmapGeneration({ messages }) {
   const userContent = lastUserMessage.content;
 
   // Tier 1: fast, no-reasoning, primary model.
+  let fastErr = null;
   try {
     const fast = await callModel({ userContent, reasoningEnabled: false, timeoutMs: ROADMAP_TIMEOUT_MS, tier: 'fast' });
     if (isUsableRoadmap(fast)) return { content: fast, tier: 'fast' };
-    console.warn('[roadmap-worker] tier=fast result not a usable roadmap — escalating to tier=fallback');
+    fastErr = new Error(`Roadmap generation not structurally usable: ${fast.length} chars`);
   } catch (err) {
-    console.warn(`[roadmap-worker] tier=fast failed (${err.message}) — escalating to tier=fallback`);
+    fastErr = err;
   }
+  console.warn(`[roadmap-worker] tier=fast failed (${fastErr.message})${ROADMAP_FAILOVER_MODELS.length ? ` — escalating to failover models: ${ROADMAP_FAILOVER_MODELS.join(', ')}` : ' — no ROADMAP_FAILOVER_MODELS configured, failing job'}`);
 
-  // Tier 2: reasoning-on, primary model. Warn-only on structure (the Next.js
-  // poll route has its own JSON extraction + flagged fallback — failing here
-  // on format alone would throw away a result it might salvage) but a
-  // suspiciously SMALL result can't be repaired by anyone.
-  let fallbackErr = null;
-  try {
-    const fallback = await callModel({ userContent, reasoningEnabled: true, timeoutMs: ROADMAP_FALLBACK_TIMEOUT_MS, tier: 'fallback' });
-    if (fallback.length >= MIN_ROADMAP_CHARS) {
-      if (!isUsableRoadmap(fallback)) {
-        console.warn('[roadmap-worker] tier=fallback result not structurally clean — returning it anyway for Next.js-layer normalization');
-      }
-      return { content: fallback, tier: 'fallback' };
-    }
-    fallbackErr = new Error(`Roadmap generation degenerate: ${fallback.length} chars even with reasoning enabled`);
-  } catch (err) {
-    fallbackErr = err;
-  }
-  console.warn(`[roadmap-worker] tier=fallback failed (${fallbackErr.message})${ROADMAP_FAILOVER_MODELS.length ? ` — escalating to failover models: ${ROADMAP_FAILOVER_MODELS.join(', ')}` : ' — no ROADMAP_FAILOVER_MODELS configured, failing job'}`);
-
-  // Tier 3+: fast, no-reasoning, each configured DIFFERENT model in order.
+  // Tier 2+: fast, no-reasoning, each configured DIFFERENT model in order.
   for (const failoverModel of ROADMAP_FAILOVER_MODELS) {
     const tierLabel = `failover:${failoverModel}`;
     try {
@@ -214,7 +204,7 @@ async function runRoadmapGeneration({ messages }) {
     }
   }
 
-  throw fallbackErr;
+  throw fastErr;
 }
 
 module.exports = { QUEUE_NAME, roadmapQueue, runRoadmapGeneration, isUsableRoadmap };
