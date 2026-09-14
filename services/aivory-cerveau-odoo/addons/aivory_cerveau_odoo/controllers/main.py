@@ -37,7 +37,7 @@ class CerveauChatController(http.Controller):
         if not tenant_id:
             return {
                 'error': (
-                    'Cerveau Tenant ID is not configured. '
+                    'Aivory Account User ID is not configured. '
                     'Set it under Settings > General Settings > Aivory Cerveau.'
                 )
             }

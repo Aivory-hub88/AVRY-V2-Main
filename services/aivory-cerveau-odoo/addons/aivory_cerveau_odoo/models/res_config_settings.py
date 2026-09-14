@@ -78,13 +78,19 @@ class ResConfigSettings(models.TransientModel):
         ),
     )
     aivory_cerveau_tenant_id = fields.Char(
-        string='Cerveau Tenant ID',
+        string='Aivory Account User ID',
         config_parameter='aivory_cerveau.tenant_id',
         help=(
-            'The tenant identifier Cerveau knows this Odoo install as. Set '
-            'explicitly by the admin during setup (resolves open question #3: '
-            'the most explicit option, no "magic" mapping from res.company or '
-            'res.users).'
+            'Your Aivory account\'s user_id -- NOT an arbitrary name. Every '
+            'live Cerveau integration (dashboard, Telegram, Slack, memory) '
+            'sends X-Tenant-Id=user_id and writes to the t_<user_id>.<agent_type> '
+            'scope; putting anything else here disconnects this widget\'s '
+            'conversations from that tenant\'s real Cerveau memory/history '
+            'instead of sharing it. Confirmed against backend/avry-backend\'s '
+            'live X-Tenant-Id usage 2026-09-14 -- see docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md '
+            'open question #3/#5. There is currently no dashboard page that '
+            'shows a tenant their own user_id to copy here; that is a separate, '
+            'not-yet-built follow-up.'
         ),
     )
     aivory_cerveau_agent_type = fields.Selection(
