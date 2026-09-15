@@ -98,8 +98,12 @@ BELUM / PENDING:
   (pola Composio). Belum ada key story.
 - `positive-reply-scoring`: ikut Tier 2 (butuh Smartlead).
 - Test chaining lanjutan (`campaign-copywriting` → `spam-word-checker`)
-  + finalisasi ICP — tertunda karena bug fallback di atas; siap diuji
-  ulang setelah fix deploy ini.
+  + finalisasi ICP — chaining sekarang PASS pada trial read-only setelah
+  cleanup artefak macOS AppleDouble `._SKILL.md` di bundle VPS. Trial kedua
+  memuat kedua skill, menghasilkan draft, flags checker (termasuk `opened`,
+  `invoices`, `get`, `open`), dan corrected draft; tidak ada external write.
+  Trial pertama setelah restart timeout 408 sebelum cleanup, sehingga tidak
+  dihitung sebagai pass.
 - Nit emoji (🎯🌍📊🔥 lolos padahal persona plain-text only) —
   pre-existing, satu baris system prompt kalau mau dibereskan.
 
@@ -135,6 +139,11 @@ BELUM / PENDING:
   terinvestigasi; monitor bila terulang.
 - `sync.sh` default `HOST=tencent-vps` sudah usang; pakai
   `CERVAU_HOST=aivory-prod CERVEAU_SUDO="sudo -n"`.
+- Artefak macOS AppleDouble `._*` di bundle skill VPS dapat membuat auditor
+  menolak seluruh direktori (error non-UTF-8), sehingga skill tidak masuk
+  effective skill set. Cleanup 35 artefak dilakukan; audit campaign dan
+  endpoint `/webhook/skills` kemudian memuat `campaign-copywriting` serta
+  `spam-word-checker`.
 - Theme tweak liar di working tree VPS (hardcoded `#0f0f11`) konflik
   dengan arah token upstream — diputus menang upstream 2× agar deploy
   tidak macet; kalau masih diinginkan, angkat jadi theme token resmi.
