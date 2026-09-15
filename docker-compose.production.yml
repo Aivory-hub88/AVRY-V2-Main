@@ -354,7 +354,7 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
-      - COMPOSIO_REDIRECT_URL=${COMPOSIO_REDIRECT_URL:-https://dashboard.aivory.id/integrations/callback}
+      - COMPOSIO_REDIRECT_URL=${COMPOSIO_REDIRECT_URL:-https://aivory.uk/dashboard/integrations/callback}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086"]
       interval: 30s
