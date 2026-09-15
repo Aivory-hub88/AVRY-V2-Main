@@ -4,6 +4,34 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-15 — Composio credential separation and MCP boundary cleanup
+
+**Architecture decision clarified:** Composio remains the connected-tool
+surface behind the dashboard Integrations/Connections directory. Cerveau's
+MCP surface remains the transport for Aivory-native and tenant-deployed
+external environments such as Aivory Mail, Odoo, and SAP. A Composio-hosted
+MCP endpoint is still an implementation detail of the Composio tool source;
+it is not the same product concept as a tenant's custom MCP deployment.
+
+**Credential fix:** `McpServerConfig` entries with
+`requires_composio_toolkit` now receive `x-api-key` at runtime from
+`CERVEAU_COMPOSIO_API_KEY` or `COMPOSIO_API_KEY`. Missing credentials fail
+closed. Native, Aivory Mail, Odoo, SAP, and tenant-custom MCP servers are not
+affected. Commit `df302470` passed the Cerveau CI/release pipeline and the
+rolling binary was deployed to `:3100`.
+
+The active Cerveau environment now carries the Composio key in the protected
+system env file; plaintext `x-api-key` lines were removed from the active
+config and dated Cerveau config backups. The Composio connection gate still
+comes from `product.agent_toolkit_connections`, and per-agent disablement
+still comes from `product.agent_tool_scope`.
+
+**Live proof:** two existing Zendesk connection rows were exercised through
+the customer-service Cerveau webhook after the binary swap. Both returned
+HTTP 200 with no pending write approval. Health remained OK and
+`NRestarts=0`. No connected-account credentials or tool response contents were
+written to logs or this document.
+
 ## 2026-09-12 — Memory/self-evolution reliability audit → 3 fixes shipped, fleet consolidated to 1 instance, ADR-013 Stage-2 tenant learning designed + Phase 1 live
 
 **The ask.** A worry that Cerveau's semantic memory, episodic memory, and self-evolution were all "still weak." Verdict after a full audit: justified, but narrower than it sounded — every mechanism was real, tested, and at least partially deployed (cognee-rs graph memory, per-turn episodic distillation, the skill self-improvement audit+rollback loop). The actual weakness was **write-path/observability reliability**, not missing capability: the model doesn't reliably choose the graph tool over the vector tool, and the self-improvement graph-log enrichment had zero observability (§ADR-007-11's "never observed firing" was still open). Full findings live in this session's transcript, not restated here — the fixes below are what came out of it.
