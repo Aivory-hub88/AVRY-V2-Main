@@ -46,6 +46,31 @@ Staging daemon `:3101` (isolated DB `aivory_cerveau_staging`):
   full round 13.2s / 44,547 tokens on the shared analyst key.
 - Denied/parked attempts fail closed, nothing loops (depth 1).
 
+## Phase 3E promotion — selective delegate auto-approve (2026-09-15)
+
+`"delegate"` added to `auto_approve` of all five product risk profiles
+(`agent_autonomous`, `agent_customer_service`, `agent_leads_qualifier`,
+`agent_finance_invoice_ops`, `agent_office_assistant` — verified 1× each
+via parsed-TOML check, `tomllib` clean). `agent_chief_of_staff` already
+had it. Backup before edit:
+`config.toml.bak-pre-3e-autoapprove-20260915`. Daemon restarted clean,
+`/health` ok across components, stable with `NRestarts=0`.
+
+What changed: specialist-initiated delegates now auto-fire instead of
+parking as F-1 approvals. Depth stays 1, Aira's native caps (12
+actions/hour, 200 cents/day, 8 iterations, depth 2) are untouched, and
+every other irreversible tool still parks.
+
+Known trade-off (disclosed, by design): auto-approved turns never become
+`pending_approvals` rows, so the verifier sweep never reviews them — the
+quality gate covers only what still parks. Watch
+`sum(rate(zeroclaw_tool_calls_total{tool="delegate"}[5m]))`; per the
+observability note, absence of the series means zero fires, not a scrape
+failure.
+
+Rollback: restore that backup and restart `zeroclaw-cerveau`; delegates
+return to approval-gated mode with zero config drift.
+
 ## Rollback
 
 ```bash
