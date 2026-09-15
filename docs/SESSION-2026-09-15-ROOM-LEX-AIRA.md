@@ -97,13 +97,13 @@ BELUM / PENDING:
 - Tier 2 (Smartlead, Prospeo, domain, inbox): butuh API key per tenant
   (pola Composio). Belum ada key story.
 - `positive-reply-scoring`: ikut Tier 2 (butuh Smartlead).
-- Test chaining lanjutan (`campaign-copywriting` → `spam-word-checker`)
-  + finalisasi ICP — chaining sekarang PASS pada trial read-only setelah
+- Test chaining lanjutan (`campaign-copywriting` → `spam-word-checker`) —
+  chaining sekarang PASS pada trial read-only setelah
   cleanup artefak macOS AppleDouble `._SKILL.md` di bundle VPS. Trial kedua
   memuat kedua skill, menghasilkan draft, flags checker (termasuk `opened`,
   `invoices`, `get`, `open`), dan corrected draft; tidak ada external write.
   Trial pertama setelah restart timeout 408 sebelum cleanup, sehingga tidak
-  dihitung sebagai pass.
+  dihitung sebagai pass. Finalisasi ICP tenant-specific masih pending.
 - Nit emoji (🎯🌍📊🔥 lolos padahal persona plain-text only) —
   pre-existing, satu baris system prompt kalau mau dibereskan.
 
