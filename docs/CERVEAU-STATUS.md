@@ -32,6 +32,22 @@ HTTP 200 with no pending write approval. Health remained OK and
 `NRestarts=0`. No connected-account credentials or tool response contents were
 written to logs or this document.
 
+**Agent capability audit (same deploy):** `customer_service` has Zendesk,
+HubSpot, and Slack; `leads_qualifier` has HubSpot, Slack, Gmail, and Outlook;
+`finance_invoice_ops` has ERPNext, Gmail, and Outlook; `office_assistant` has
+Slack, Asana, ERPNext, Gmail, Outlook, Google Calendar, Trello, and Linear;
+`autonomous` has the union of those Composio toolkits. Native Aivory tools,
+Lightpanda, Obscura, PDF, OfficeCLI, and SAP are separate MCP/native surfaces,
+not Composio connections. Chief of Staff has no external Composio toolkit
+grant by design.
+
+The dashboard Tools tab was missing Outlook for four of those agent types and
+the agent modal rendered toolkit names without icons. Backend scope parity and
+the modal icon/status rendering were fixed and deployed. The active connection
+sync table currently contains two ACTIVE Zendesk rows; the Composio API key and
+dashboard/bridge API path are healthy, but OAuth-connected accounts remain
+tenant data and are not inferred from the global catalog.
+
 ## 2026-09-12 — Memory/self-evolution reliability audit → 3 fixes shipped, fleet consolidated to 1 instance, ADR-013 Stage-2 tenant learning designed + Phase 1 live
 
 **The ask.** A worry that Cerveau's semantic memory, episodic memory, and self-evolution were all "still weak." Verdict after a full audit: justified, but narrower than it sounded — every mechanism was real, tested, and at least partially deployed (cognee-rs graph memory, per-turn episodic distillation, the skill self-improvement audit+rollback loop). The actual weakness was **write-path/observability reliability**, not missing capability: the model doesn't reliably choose the graph tool over the vector tool, and the self-improvement graph-log enrichment had zero observability (§ADR-007-11's "never observed firing" was still open). Full findings live in this session's transcript, not restated here — the fixes below are what came out of it.
