@@ -24,6 +24,23 @@ reproducible.
 
 `identity.md` / `soul.md` are the daemon's business identity / tone.
 
+## Agent Team
+
+Product agents are mirrored under `agents/<type>/workspace/IDENTITY.md`:
+
+| Agent | Type | Responsibility |
+|---|---|---|
+| Aira | `chief_of_staff` | Plan, delegate, track, and synthesize |
+| Geno | `autonomous` | Generalist execution and cross-domain support |
+| Teo | `customer_service` | Support and ticket operations |
+| Lex | `leads_qualifier` | Lead qualification and routing |
+| Finn | `finance_invoice_ops` | Invoice and finance operations |
+| Ofira | `office_assistant` | Meetings, tasks, and office operations |
+
+Aira is coordination-only. It can use delegation, research, memory, graph,
+and internal task tools, but it does not receive specialist business tools
+directly. External writes remain owned and approval-gated by the specialist.
+
 ## Sync
 
 ```bash
