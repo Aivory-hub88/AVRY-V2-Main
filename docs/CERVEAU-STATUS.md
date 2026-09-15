@@ -26,6 +26,41 @@ config and dated Cerveau config backups. The Composio connection gate still
 comes from `product.agent_toolkit_connections`, and per-agent disablement
 still comes from `product.agent_tool_scope`.
 
+## 2026-09-15 — Lex capability audit: HubSpot gate, mail provider choice, and cold-outbound skill mapping
+
+**Lex scope confirmed:** 12 Tier-1 skills (BANT, campaign-strategy/copy,
+spam-word-checker, ICP onboarding/prompt-builder, list-quality-scorecard,
+lead-magnet, experiment-design, weekly-rhythm, kickoff,
+personalization-pattern, browser-tool-priority) are byte-identical to
+`growthenginenowoslawski/coldoutboundskills` and gated correctly: Tier-1 is
+read/draft/QA-only, Tier-2 (Smartlead/Prospeo/MillionVerifier/domain+inbox
+warmup) still needs per-tenant API keys and remains pending by design.
+
+**HubSpot approval gate fixed:** `HUBSPOT_CREATE_CONTACT/DEAL/COMPANY` moved
+from `reversible` + `auto_approve` to `irreversible` (F-1 pending approval).
+`HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA` stays auto-approved read-only. Affects
+`agent_leads_qualifier`, `agent_customer_service`, `agent_autonomous`.
+Backup `config.toml.bak-pre-lex-hubspot-gate-20260915`, TOML re-validated,
+daemon still `active`/`NRestarts=0`/`health ok`. Gmail/Outlook
+`GMAIL_SEND_EMAIL`/`OUTLOOK_SEND_EMAIL` etc. were already
+`irreversible`+approval-gated.
+
+**Mail provider model clarified:** Lex offers **Gmail and Outlook via Composio**
+(tenant connects one or both; tool-scope toggle per agent is the explicit
+choice) and **Aivory Mail via tenant-custom MCP** (`https://mail.aivory.uk/mcp`,
+Bearer mailbox token). They are not interchangeable: Gmail/Outlook Composio
+paths cover HubSpot-synced outreach tooling; Aivory Mail covers
+`search_mail`/`send_mail` mailbox-isolated 1:1 send/search (not bulk domain
+warmup). The cold-outbound `zapmail-domain-setup-public` skill remains the
+bulk domain/inbox warmup path (Smartlead-managed), not replaced by Aivory
+Mail. The dashboard Integrations tab now shows brand icons and a
+`Reconnect` state; `googlecalendar` is intentionally not exposed for Lex.
+
+**Live bundles after fix:** `leads_qualifier` =
+`leads-qualifier-native` + `crm-hubspot` + `comms-slack` +
+`lightpanda-browsing` + `pdf-toolkit` + `mail-gmail` + `mail-outlook`
+(Aivory Mail is opt-in via the MCP tab, not a static bundle).
+
 **Live proof:** two existing Zendesk connection rows were exercised through
 the customer-service Cerveau webhook after the binary swap. Both returned
 HTTP 200 with no pending write approval. Health remained OK and
