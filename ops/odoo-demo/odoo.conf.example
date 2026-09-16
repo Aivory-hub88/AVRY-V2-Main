@@ -9,4 +9,5 @@ db_user = odoo
 db_password = CHANGE-ME-16-hex-min
 proxy_mode = True
 list_db = True
+addons_path = /usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
 # Set list_db = False after demo DBs are created, to hide /web/database/manager
