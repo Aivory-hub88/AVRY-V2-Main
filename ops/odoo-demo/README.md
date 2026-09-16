@@ -1,7 +1,7 @@
 # Odoo Demo — inject → demo → reset
 
-Persistent demo instance at `https://odoo-demo.aivory.id` (Odoo 18 + Postgres 15,
-Traefik TLS, addon `aivory_cerveau_odoo` mounted read-only).
+Persistent demo instance at `https://odoo-demo.aivory.id` (Odoo 19 Community +
+Postgres 15, Traefik TLS, addon `aivory_cerveau_odoo` mounted read-only).
 (`https://odoo.aivory.id` is the team's Odoo 17 — a different box.)
 
 ## First-time setup (once, on VPS)

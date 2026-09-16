@@ -2,7 +2,7 @@
 """
 Aivory Odoo Demo — inject scenario data before a prospect demo.
 
-Uses Odoo XML-RPC (works on 16/17/18, no extra addon needed).
+Uses Odoo XML-RPC (works on 17/18/19, no extra addon needed).
 Run AFTER the golden DB exists and the demo user + API key are created.
 
 Usage:

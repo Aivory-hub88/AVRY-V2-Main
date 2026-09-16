@@ -1,6 +1,6 @@
 {
     'name': 'Aivory Cerveau Chat',
-    'version': '18.0.1.0.0',
+    'version': '19.0.1.0.0',
     'category': 'Productivity',
     'summary': 'Embeds the Aivory Cerveau agent chat panel natively in the Odoo systray',
     'description': """
