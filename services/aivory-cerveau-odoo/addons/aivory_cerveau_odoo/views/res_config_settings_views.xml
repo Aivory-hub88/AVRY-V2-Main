@@ -6,8 +6,8 @@
         <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
             <xpath expr="//form" position="inside">
-                <app data-string="Aivory Cerveau" string="Aivory Cerveau" name="aivory_cerveau_odoo">
-                    <block title="Aivory Cerveau" name="aivory_cerveau_setting_container">
+                <app data-string="Aivory" string="Aivory" name="aivory_cerveau_odoo">
+                    <block title="Aivory" name="aivory_cerveau_setting_container">
                         <setting id="aivory_cerveau_api_key_setting" string="Aivory API Key" help="Created from the Aivory dashboard (Agents > an agent > Customize > Deploy > Create API Key) -- already bound to one agent for this tenant.">
                             <field name="aivory_cerveau_api_key" password="True"/>
                         </setting>

@@ -14,9 +14,7 @@ class ResConfigSettings(models.TransientModel):
             'this widget always talks to that agent for this tenant -- no '
             'separate agent picker or tenant ID needed here. Sent as the '
             'X-Aivory-Api-Key header on every message '
-            '(POST /api/v1/agent-api/message), never Cerveau\'s own shared '
-            'webhook secret -- see docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md open '
-            'question #4 and docs/ADR-006-CERVEAU-CLIENT-DEPLOYMENT-API.md '
-            'for why that distinction matters.'
+            '(POST /api/v1/agent-api/message). The key only ever grants access '
+            'to that one agent -- it cannot reach any other tenant.'
         ),
     )

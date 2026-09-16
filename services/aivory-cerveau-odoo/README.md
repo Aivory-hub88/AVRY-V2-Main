@@ -89,8 +89,8 @@ Steps, if you need to redo this:
    port-conflict issue above, not a wrong password).
 4. Log in as the admin user you just created. Activate developer mode
    (`?debug=1`), go to Apps, remove the default "Apps" filter, search
-   "Aivory Cerveau Chat" (or "Cerveau"), Activate.
-5. Settings > General Settings > Aivory Cerveau: set the Aivory API Key
+   "Aivory Chat" (or "Aivory"), Activate.
+5. Settings > General Settings > Aivory: set the Aivory API Key
    (create one from the Aivory dashboard: Agents > an agent > Customize >
    Deploy > Create API Key -- needs Business plan or above). Save.
 6. Reload any backend page. The systray icon (top-right, chat-bubble, next

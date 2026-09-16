@@ -1,19 +1,19 @@
 {
-    'name': 'Aivory Cerveau Chat',
-    'version': '19.0.1.0.0',
+    'name': 'Aivory Chat',
+    'version': '19.0.1.1.0',
     'category': 'Productivity',
-    'summary': 'Embeds the Aivory Cerveau agent chat panel natively in the Odoo systray',
+    'summary': 'Embeds the Aivory agent chat panel natively in the Odoo systray',
     'description': """
-Aivory Cerveau Chat (scaffold)
-===============================
+Aivory Chat
+===========
 
-Adds a systray icon that opens a Cerveau agent chat panel inside Odoo's own
+Adds a systray icon that opens an Aivory agent chat panel inside Odoo's own
 web client, instead of a bolted-on iframe. See
 docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md in the Aivory monorepo for the full
 architecture and open questions.
 
-This is a scaffold: the round trip (systray -> controller -> Cerveau
-/webhook -> reply rendered) works, but tenant mapping is hardcoded, there is
+This is a scaffold: the round trip (systray -> controller -> agent API
+message -> reply rendered) works, but tenant mapping is hardcoded, there is
 no production auth hardening, and there is no streaming support yet.
 """,
     'author': 'Aivory',

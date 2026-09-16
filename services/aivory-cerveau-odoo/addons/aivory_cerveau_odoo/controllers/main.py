@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 AIVORY_API_BASE_URL = 'https://backend.aivory.id'
 
 
-class CerveauChatController(http.Controller):
+class AivoryChatController(http.Controller):
 
     @http.route('/aivory_cerveau/chat', type='json', auth='user', methods=['POST'], csrf=False)
     def chat(self, message=None, **kwargs):
@@ -34,7 +34,7 @@ class CerveauChatController(http.Controller):
             return {
                 'error': (
                     'Aivory API Key is not configured. '
-                    'Set it under Settings > General Settings > Aivory Cerveau.'
+                    'Set it under Settings > General Settings > Aivory.'
                 )
             }
 
@@ -53,7 +53,7 @@ class CerveauChatController(http.Controller):
             return {'error': 'Could not reach Aivory. Check your connection and try again.'}
 
         if resp.status_code == 401:
-            return {'error': 'Aivory API Key is invalid or has been revoked. Check Settings > Aivory Cerveau.'}
+            return {'error': 'Aivory API Key is invalid or has been revoked. Check Settings > Aivory.'}
         if resp.status_code == 402:
             return {'error': 'This Aivory account is out of credits.'}
         if resp.status_code == 403:
