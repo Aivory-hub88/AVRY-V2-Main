@@ -148,7 +148,7 @@ def main():
     ap.add_argument("--clear", action="store_true")
     args = ap.parse_args()
 
-    url = os.environ.get("ODOO_URL", "https://odoo.aivory.id")
+    url = os.environ.get("ODOO_URL", "https://odoo-demo.aivory.id")
     db = os.environ.get("ODOO_DB", "demo")
     user = os.environ.get("ODOO_USER", "aivory-agent")
     api_key = os.environ.get("ODOO_API_KEY", "")

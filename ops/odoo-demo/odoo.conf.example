@@ -1,0 +1,12 @@
+# Aivory Odoo 18 demo — COPY to odoo.conf on the VPS and fill real secrets.
+# The real odoo.conf is NEVER committed (see .gitignore).
+#   cp ops/odoo-demo/odoo.conf.example ops/odoo-demo/odoo.conf   # on VPS only
+[options]
+admin_passwd = CHANGE-ME-16-hex-min
+db_host = odoo-demo-db
+db_port = 5432
+db_user = odoo
+db_password = CHANGE-ME-16-hex-min
+proxy_mode = True
+list_db = True
+# Set list_db = False after demo DBs are created, to hide /web/database/manager

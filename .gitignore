@@ -12,6 +12,10 @@
 /ed25519
 acme.json
 .mcp.json
+# Odoo demo live secrets (VPS only, generated from odoo.conf.example)
+ops/odoo-demo/odoo.conf
+ops/odoo-demo/.env-demo
+ops/odoo-demo/golden/*.dump
 
 # ─── Docker volumes / runtime data ───────────────────────────────────────────
 vps-local/

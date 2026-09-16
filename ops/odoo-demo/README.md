@@ -1,12 +1,15 @@
 # Odoo Demo — inject → demo → reset
 
-Persistent demo instance at `https://odoo.aivory.id` (Odoo 18 + Postgres 15,
+Persistent demo instance at `https://odoo-demo.aivory.id` (Odoo 18 + Postgres 15,
 Traefik TLS, addon `aivory_cerveau_odoo` mounted read-only).
+(`https://odoo.aivory.id` is the team's Odoo 17 — a different box.)
 
-## First-time setup (once)
+## First-time setup (once, on VPS)
 
-1. Fill `ODOO_DB_PASSWORD` + `ODOO_MASTER_PASSWORD` in `.env`.
-2. `docker compose -f docker-compose.odoo-demo.yml up -d`
+1. `cp ops/odoo-demo/odoo.conf.example ops/odoo-demo/odoo.conf` + fill 2 passwords
+   (`openssl rand -hex 16` twice). Also write the DB one to `ops/odoo-demo/.env-demo`
+   as `ODOO_DB_PASSWORD=...` (compose needs it for the Postgres container).
+2. `docker compose --env-file ops/odoo-demo/.env-demo -f docker-compose.odoo-demo.yml up -d`
 3. Create DB `demo` via `/web/database/manager` (no demo data — golden stays clean).
 4. Login, install `Aivory Cerveau Chat`, set the Aivory API key.
 5. Create dedicated user `aivory-agent`, generate its Odoo API key.

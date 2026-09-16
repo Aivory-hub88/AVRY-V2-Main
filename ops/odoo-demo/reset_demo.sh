@@ -17,12 +17,12 @@ fi
 echo "=== resetting Odoo demo DB '$DB' from golden ==="
 
 # 1. drop via Odoo database manager (also cleans filestore/$DB)
-curl -s -X POST "https://odoo.aivory.id/web/database/drop" \
+curl -s -X POST "https://odoo-demo.aivory.id/web/database/drop" \
   -H 'Content-Type: application/json' \
   -d "{\"params\":{\"master_pwd\":\"$MASTER_PWD\",\"name\":\"$DB\"}}" > /dev/null || true
 
 # 2. recreate empty + restore
-curl -s -X POST "https://odoo.aivory.id/web/database/create" \
+curl -s -X POST "https://odoo-demo.aivory.id/web/database/create" \
   -H 'Content-Type: application/json' \
   -d "{\"params\":{\"master_pwd\":\"$MASTER_PWD\",\"name\":\"$DB\",\"demo\":false,\"lang\":\"en_US\",\"password\":\"${DEMO_ADMIN_PASSWORD:-demo}\",\"login\":\"admin\"}}" > /dev/null
 
