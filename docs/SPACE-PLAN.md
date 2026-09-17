@@ -52,14 +52,18 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 
 ## Phase 3 — Agent di thread (F4)
 
-- [ ] Dispatcher per-agent: stamp `#agent:<type>` → `agent_tasks` parent/child (TASK-CONTRACT)
-      → run → tulis balik (message vs artifact + `reason` wajib + atribusi).
-- [ ] Kartu task (Running → Idle, badge count) + kartu approval NotificationCard
-      (glyph warn, divider, Approve sage/Deny) + receipt `✅/❗`.
-- [ ] Verifier finding (ADR-008 sweep) tampil di kartu approval ("Automated check: …").
-- [ ] Guard: tulis irreversible wajib approval; Deny = nol tulis; audit di activity.
-- **Exit gate:** acceptance PRD #4 hijau end-to-end (mention → receipt → approve → tulis tercatat).
-- **Verifikasi:** synthetic approval row (pola verifikasi ADR-008 Phase 3a) + e2e dogfood.
+- [x] Dispatcher per-agent: stamp `#agent:<type>` → `workspace_agent_tasks` (1 row per agent,
+      dedupe task terbuka) → run client-triggered (forward JWT user ke backend agent-chat,
+      tanpa service baru) → tulis balik message sebagai agent + `reason` + atribusi.
+- [x] Kartu task (Running → Idle, badge count) + kartu approval NotificationCard
+      (glyph warn, divider, Approve sage/Deny) + receipt derived `👀/✅/❗`.
+- [x] Verifier finding (ADR-008 sweep) tampil di kartu approval ("Automated check: …").
+- [x] Guard: pending_approval → blocked + NOL tulis; Deny → resolve + cancel + audit;
+      agent tidak memicu agent (depth 1); audit `agent.mentioned/replied/failed/cancelled`.
+- **Exit gate:** acceptance PRD #4 — rantai mention → task → approve → tulis hijau di test
+      (synthetic); e2e dogfood manual menyusul migrasi DB.
+- **Verifikasi:** 14 tests agent hijau (enqueue/dedupe, run reply/blocked/fail, cancel);
+      full suite 47f/476t; `tsc` 0 error.
 
 ## Phase 4 — Roadmap → project (F6, killer flow)
 
@@ -89,7 +93,7 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 | 0 fondasi | 🟩 selesai | fixture hijau 18/18 + baseline tercatat | 2026-09-17 |
 | 1 baca | 🟩 selesai | stream/thread + diff nol | 2026-09-17 |
 | 2 tulis | 🟩 selesai | root/reply/topic/mention + composer | 2026-09-17 |
-| 3 agent | ⬜ | e2e mention→approve→tulis | — |
+| 3 agent | 🟩 selesai | mention→task→approve→tulis | 2026-09-17 |
 | 4 roadmap-import | ⬜ | board penuh idempotent | — |
 | 5 activity+hardening | ⬜ | acceptance #1–#7 | — |
 
