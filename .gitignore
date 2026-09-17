@@ -36,8 +36,9 @@ Thumbs.db
 # ─── Node (shouldn't be in root but just in case) ────────────────────────────
 node_modules/
 
-# runtime database artefact, never commit
-data/
+# runtime database artefact, never commit (root-level only -- bare `data/`
+# would also ignore Odoo addon data dirs like */addons/*/data/)
+/data/
 
 # ─── Rust build artefacts ────────────────────────────────────────────────────
 **/target/
