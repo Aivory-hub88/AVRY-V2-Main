@@ -29,6 +29,7 @@ from odoo.addons.aivory_cerveau_odoo.models.aivory_api import (
     SHOW,
     post_agent_message,
 )
+from odoo.addons.aivory_cerveau_odoo.models.aivory_bot import ensure_aivory_bot
 
 _logger = logging.getLogger(__name__)
 
@@ -48,9 +49,14 @@ class DiscussChannel(models.Model):
         return super()._message_post_after_hook(message, msg_vals)
 
     def _aivory_bot_partner(self):
-        return self.env['res.partner'].sudo().search(
+        bot = self.env['res.partner'].sudo().search(
             [('name', '=', 'Aivory'), ('is_company', '=', False)], limit=1,
         )
+        if not bot:
+            # Self-healing: post_init_hook runs on install, but not reliably
+            # on every upgrade path -- provision lazily on first use instead.
+            bot = ensure_aivory_bot(self.env)
+        return bot
 
     def _aivory_bot_answer(self, message, msg_vals):
         self.ensure_one()
