@@ -1,3 +1,4 @@
 from . import aivory_api
+from . import aivory_bot
 from . import discuss_channel
 from . import res_config_settings

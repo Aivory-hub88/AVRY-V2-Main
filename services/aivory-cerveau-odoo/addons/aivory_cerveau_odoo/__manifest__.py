@@ -24,9 +24,9 @@ secret. See docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md in the Aivory monorepo.
     'license': 'LGPL-3',
     'depends': ['base', 'web', 'mail'],
     'data': [
-        'data/aivory_bot_data.xml',
         'views/res_config_settings_views.xml',
     ],
+    'post_init_hook': 'post_init_hook',
     'assets': {
         'web.assets_backend': [
             'aivory_cerveau_odoo/static/src/js/systray_icon.js',

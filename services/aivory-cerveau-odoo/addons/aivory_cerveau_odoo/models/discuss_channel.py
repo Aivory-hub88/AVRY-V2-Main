@@ -47,11 +47,14 @@ class DiscussChannel(models.Model):
         self._aivory_bot_answer(message, msg_vals)
         return super()._message_post_after_hook(message, msg_vals)
 
+    def _aivory_bot_partner(self):
+        return self.env['res.partner'].sudo().search(
+            [('name', '=', 'Aivory'), ('is_company', '=', False)], limit=1,
+        )
+
     def _aivory_bot_answer(self, message, msg_vals):
         self.ensure_one()
-        bot = self.env.ref(
-            'aivory_cerveau_odoo.aivory_bot_partner', raise_if_not_found=False,
-        )
+        bot = self._aivory_bot_partner()
         if not bot:
             return
         if msg_vals.get('message_type') != 'comment':
