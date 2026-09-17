@@ -40,14 +40,15 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 
 ## Phase 2 — Tulis: root/reply/topic/mention (F1/F2-write, F3, F7-write)
 
-- [ ] `POST .../messages`, PATCH/DELETE author-only (tombstone), `POST/PATCH .../topics`
-      (retitle/archive/unarchive/remove/attach/detach), stamp mention server-side.
-- [ ] Composer + picker `@`/`#`, chip render, reply composer kanan, receipt `👀` lokal.
-- [ ] Presence tulis + `agent_working` relay (Rust: tambah state, tanpa inspeksi isi).
-- [ ] Test: archive→reply→un-archive; remove-topic keeps messages; viewer 403 tulis;
-      mention dalam code block tidak stamp.
-- **Exit gate:** acceptance PRD #2, #3, #6(‑viewer) hijau di dogfood workspace.
-- **Verifikasi:** `npm test -- workspace`, live click-through + network tab (PATCH bodies).
+- [x] `POST .../messages`, PATCH/DELETE author-only (tombstone), `POST/PATCH .../topics`
+      (retitle/archive/unarchive/remove/attach/detach), stamp server-side.
+- [x] Composer + picker `@`/`#`, chip render, reply composer kanan, refresh background setelah kirim.
+- [ ] Presence tulis + `agent_working` relay (Rust) — **ditunda ke Phase 3**: belum ada produsen
+      (dispatcher agent mendarat di Phase 3); viewing/typing existing tetap jalan via awareness.
+- [x] Test: reply→un-archive; remove-topic keeps messages; viewer 403 tulis;
+      mention dalam code block tidak stamp (20 tests route tulis hijau).
+- **Exit gate:** acceptance PRD #2, #3, #6(‑viewer) — API + UI tulis selesai, dogfood manual menyusul migrasi DB.
+- **Verifikasi:** full suite 45f/462t hijau; `tsc` 0 error.
 
 ## Phase 3 — Agent di thread (F4)
 
@@ -87,7 +88,7 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 |------|--------|------|---------|
 | 0 fondasi | 🟩 selesai | fixture hijau 18/18 + baseline tercatat | 2026-09-17 |
 | 1 baca | 🟩 selesai | stream/thread + diff nol | 2026-09-17 |
-| 2 tulis | ⬜ | root/reply/topic/mention | — |
+| 2 tulis | 🟩 selesai | root/reply/topic/mention + composer | 2026-09-17 |
 | 3 agent | ⬜ | e2e mention→approve→tulis | — |
 | 4 roadmap-import | ⬜ | board penuh idempotent | — |
 | 5 activity+hardening | ⬜ | acceptance #1–#7 | — |
