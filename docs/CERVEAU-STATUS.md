@@ -4,8 +4,17 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
-## 2026-09-17 — Approval gate REMOVED (owner decision: explicit instruction IS the approval)
+## 2026-09-17 — Empty-result tool loop made Lex unresponsive (anti-loop prompt guardrail)
 
+**Symptom:** console turns with Lex ended in "agent is temporarily unavailable" (backend fallback). Chain: bridge `/telegram/message` → Cerveau turn → 500. Trace proof: `loop_detector_circuit_breaker` FAIL — `tenant_aivory-mail__search_mail` called 7× with different args but identical (empty) results, then `webhook model_provider error`. Earlier same-shape turns ate the full 180s cap (408s in bridge log). The gate removal exposed this: previously the search would have parked for approval instead of looping; the detector worked as designed, but the abort surfaced as a generic 500 with no partial answer.
+
+**Fix (config-only, no rebuild):** one anti-loop sentence in all 5 product-agent `system_prompt`s (backup `config.toml.bak-pre-antiloop-20260917`; chief_of_staff skipped — coordination-only, never calls tools): stop after the second empty/identical result, answer with findings + ask for specifics. Restarted clean, doctor green.
+
+**Live proof:** probe search for a fictitious vendor → 3 query variants, graceful "Tidak ada" answer, `pending_approval: null`, trace shows clean `llm_request → llm_response → turn_final_response` with zero loop-detector events.
+
+**Follow-up if loops recur in other shapes:** engine-level graceful abort (synthesize a final answer from partial results instead of failing the turn) — Rust patch + CI + deploy, not done this pass.
+
+## 2026-09-17 — Approval gate REMOVED (owner decision: explicit instruction IS the approval)
 **Decision:** the F-1 approval gate is gone. "Kirimkan email ke X isi Y" → agent drafts, shows it, user says "kirim" → it sends. No second ask, no buttons anywhere (console inline card already removed 36769b7; Telegram never rendered them). The conversational protocol (Ya/Batal multilingual) and the Approvals surfaces stay as dormant fallback — nothing will park anymore.
 
 **Why config alone couldn't do it (verified in source):** `ApprovalManager::approval_requirement` puts `Irreversible` on non-interactive above even `AutonomyLevel::Full` (test `irreversible_tier_beats_full_autonomy_on_non_interactive`), and `risk_tier()` forced every `tenant_*` tool to `Irreversible` unconditionally — backend `risk_tier` was plumbed but ignored.
