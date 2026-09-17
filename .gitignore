@@ -44,3 +44,7 @@ data/
 
 # design source files don't belong in a served public/ dir
 *.ai
+
+# python cache
+__pycache__/
+*.pyc
