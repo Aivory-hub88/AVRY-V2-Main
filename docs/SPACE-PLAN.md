@@ -8,8 +8,8 @@
 Aturan eksekusi (dari WORKSPACE-PARITY-HANDOFF + CERVEAU-WORKING-OFFICE):
 `git add <path>` eksplisit (tidak pernah `-A`), 1 sub-fitur = 1 commit kecil + test,
 `tsc` + `npm test` hijau tiap fase, deploy = build background + poll → smoke → catat.
-Baseline (diisi saat Phase 0 mulai): dashboard HEAD `______`, `tsc` `______`,
-`npm test` `______` file / `______` tests.
+Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
+`npm test` `40` file / `433` tests (termasuk `spaceProtocol` 18 tests; pre-Phase-0: 39/415).
 
 ---
 
@@ -17,10 +17,10 @@ Baseline (diisi saat Phase 0 mulai): dashboard HEAD `______`, `tsc` `______`,
 
 - [x] D1–D2 dikunci 2026-09-17 (Team Space, per-agent). D3–D4 dikunci 2026-09-17
       (Postgres-first, wireframe di `docs/space/wireframe.html` — sudah dipindahkan).
-- [ ] Tulis `lib/spaceProtocol.ts` (zod mini: Attribution, MentionStamps, Topic, Message,
+- [x] `lib/spaceProtocol.ts` (zod mini: Attribution, MentionStamps, Topic, Message,
       hasil applied/merged/conflict) + golden fixture mention parser (token, code-block,
-      bare-word) + test hijau.
-- [ ] Catat baseline tsc/test/HEAD di atas.
+      bare-word) + test hijau (18/18).
+- [x] Baseline tsc/test/HEAD tercatat di atas.
 - **Exit gate:** fixture parser hijau; baseline tercatat. (Keputusan sudah lengkap — tidak ada yang menggantung.)
 - **Verifikasi:** `npx tsc --noEmit`, `npm test -- spaceProtocol`.
 
@@ -82,7 +82,7 @@ Baseline (diisi saat Phase 0 mulai): dashboard HEAD `______`, `tsc` `______`,
 
 | Fase | Status | Gate | Tanggal |
 |------|--------|------|---------|
-| 0 fondasi | ⬜ belum mulai | D3–D4 + fixture hijau | — |
+| 0 fondasi | 🟩 selesai | fixture hijau 18/18 + baseline tercatat | 2026-09-17 |
 | 1 baca | ⬜ | stream/thread + diff nol | — |
 | 2 tulis | ⬜ | root/reply/topic/mention | — |
 | 3 agent | ⬜ | e2e mention→approve→tulis | — |
