@@ -126,6 +126,9 @@ proposal offline/import). Response divalidasi sebelum dikirim (pola Harbor `repl
    `[#Judul](#doc:<id>)` untuk referensi doc (usulan D3 SCOPE: `#doc`, bukan `#space`).
 2. Server: parse di luar code region → validasi id ∈ roster/ACL Space → stamp
    (`mentions[], here, cerveal`) → simpan. Label tidak pernah di-parse.
+   Token link bersifat otoritatif; nama polos (`@Geno`, `@here`) ikut di-stamp
+   sebagai fallback pola Room 2026-09-17 (span token di-blank dulu supaya label
+   tak bocor). Email/kata biasa tetap prose.
 3. Konsumen (unread/activity/push/picker) hanya baca stamp.
 4. Stamp `#agent:<type>` → enqueue `agent_tasks` untuk agent itu (parent `AIRA-orch`
    per TASK-CONTRACT; `Aira` sendiri bisa jadi parent/orchestrator) → agent run di atas

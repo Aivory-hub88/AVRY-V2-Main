@@ -50,7 +50,9 @@
 - Ketik `@` → picker manusia + agent (Lex, Geno, Finn, Aira, Teo, Ofira) + `@here`;
   ketik `#` → picker doc.
 - `@nama-agent/@nama-orang/@here` = address (notify); `#doc` = referensi (buka doc, notify **nol**).
-- Token di dalam code block = kutipan, bukan sapaan. Bare `@word` = prose, mencapai **nol** orang.
+- Token di dalam code block = kutipan, bukan sapaan. Nama polos `@Geno`/`@here`
+  ikut men-stamp (fallback pola Room 2026-09-17); selain itu bare `@word`/email
+  = prose, mencapai **nol** orang.
 - Label chip di-resolve ulang dari roster saat render (bukan di-parse dari nama).
 
 ### F4 — Agent bekerja di thread (P0)
