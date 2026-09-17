@@ -67,12 +67,16 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 
 ## Phase 4 — Roadmap → project (F6, killer flow)
 
-- [ ] `POST /api/workspace/roadmap-import` (mapping TRD §6, idempotent via `roadmap_id`/`wave_id`,
+- [x] `POST /api/workspace/roadmap-import` (idempotent via `roadmap_id`/`wave_id`/marker,
       conflict → `currentContent + history`, tidak pernah silent overwrite).
-- [ ] Tombol di Board project + halaman roadmap → push `?view=board`.
-- [ ] Tiap wave doc lahir dengan thread-nya (F2) siap didiskusikan.
-- **Exit gate:** acceptance PRD #5 (fixture 3 waves/11 deliverables → board penuh).
-- **Verifikasi:** import 2× (tidak duplikat) + ubah wave doc lalu import ulang (conflict path).
+- [x] Tombol di Board project + halaman roadmap → push `?view=board`.
+- [x] Tiap wave doc lahir dengan thread-nya (root `#doc` + topic `Wave: …`).
+- **Exit gate:** acceptance PRD #5 — fixture 3 waves/11 deliverables hijau di test
+      (11 rows, import 2× nol duplikat, conflict path); board penuh manual menyusul migrasi DB.
+- **Verifikasi:** 9 tests import hijau; full suite 49f/485t; `tsc` 0 error.
+- **Adaptasi dari TRD §6:** input = objek AiryRoadmap penuh di body (phase→wave,
+      milestone→row; bukan `roadmapId` server-side — roadmap tinggal di localStorage client);
+      lineage row = marker HTML-comment di description (match by marker, bukan judul).
 
 ## Phase 5 — Activity inbox + hardening (F5 + exit keseluruhan)
 
@@ -94,7 +98,7 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 | 1 baca | 🟩 selesai | stream/thread + diff nol | 2026-09-17 |
 | 2 tulis | 🟩 selesai | root/reply/topic/mention + composer | 2026-09-17 |
 | 3 agent | 🟩 selesai | mention→task→approve→tulis | 2026-09-17 |
-| 4 roadmap-import | ⬜ | board penuh idempotent | — |
+| 4 roadmap-import | 🟩 selesai | board penuh idempotent | 2026-09-17 |
 | 5 activity+hardening | ⬜ | acceptance #1–#7 | — |
 
 ## Perintah verifikasi standar (tiap fase)
