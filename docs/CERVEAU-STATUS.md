@@ -4,6 +4,18 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-17 — Approval gate REMOVED (owner decision: explicit instruction IS the approval)
+
+**Decision:** the F-1 approval gate is gone. "Kirimkan email ke X isi Y" → agent drafts, shows it, user says "kirim" → it sends. No second ask, no buttons anywhere (console inline card already removed 36769b7; Telegram never rendered them). The conversational protocol (Ya/Batal multilingual) and the Approvals surfaces stay as dormant fallback — nothing will park anymore.
+
+**Why config alone couldn't do it (verified in source):** `ApprovalManager::approval_requirement` puts `Irreversible` on non-interactive above even `AutonomyLevel::Full` (test `irreversible_tier_beats_full_autonomy_on_non_interactive`), and `risk_tier()` forced every `tenant_*` tool to `Irreversible` unconditionally — backend `risk_tier` was plumbed but ignored.
+
+**What shipped, 3 parts:** (1) Config on live `:3100` (backup `config.toml.bak-pre-gate-removal-20260917`): all 53 `[tool_risk_tiers].irreversible` slugs → `reversible` + added to `auto_approve` of all 13 serving profiles (verifier untouched, still `[]`); `-b` skipped — decommissioned/inactive. (2) AVRY-Cerveau patch 0040 (`29f310c`, CI green both jobs): `risk_tier()` honors backend `risk_tier` per custom server (`safe`/`reversible` execute, unknown fails closed to `Irreversible`); 3 new tests. Binary swapped (`zeroclaw-cerveau.bak-pre-gate-removal-20260917` kept), restarted, doctor 77 ok / 0 errors. (3) avry-backend `32b8fc9`: custom-MCP default `risk_tier` `irreversible`→`safe` + boot migration; prod DB verified (verified row → `safe`, disabled row untouched, column default `safe`).
+
+**Live proof (real tenant turn, read-only tool):** `/webhook` as `leads_qualifier` asking to search mail via `tenant_aivory-mail__search_mail` executed 3 real search variants and answered conversationally with `pending_approval: null` — pre-fix this parked as Pending.
+
+**Ops notes:** `sudo -n systemctl` works for restarts (bare `systemctl` asks for interactive auth; a plain `kill` clean-stops WITHOUT auto-restart — do not use). **Credential hygiene:** DB password + bridge key + one channel secret were displayed in cleartext during this session's verification — rotate at next opportunity per standing rule.
+
 ## 2026-09-15 — Composio credential separation and MCP boundary cleanup
 
 **Architecture decision clarified:** Composio remains the connected-tool
