@@ -4,7 +4,13 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
-## 2026-09-17 — Empty-result tool loop made Lex unresponsive (anti-loop prompt guardrail)
+## 2026-09-17 — draft.create 400-loop (rule extended to failed results)
+
+**Deeper error behind the same "unresponsive" symptom:** a later turn failed differently — `tool failed: tenant_aivory-mail__draft.create`. The agent composed a reply draft WITHOUT recipients and the mail MCP hard-400s on missing `to`; the model retried instead of asking, hit the 180s cap / circuit breaker, and the frontend's hanging fetch died as "failed to fetch" (downstream symptom of hung turns, not its own bug). The "flagged suspicious by prompt guard" notes on those turns are WARN-level informational (draft text trips injection patterns; content still delivered) — not the driver.
+
+**Fix:** extended the morning's anti-loop rule in all 5 product prompts to cover *failed* results incl. validation errors, plus "always include recipient addresses the user already gave before calling draft/send" (backup `config.toml.bak-pre-antiloop2-20260917`). Live probe (draft without recipients) → agent composed in-chat, zero tool calls, clean 8s turn, `pending: null`, zero loop events.
+
+**Noted but not acted on:** local `services/avry-mail` source is older than the deployed AVRY-Mail build (no `draft.create` arm locally vs scoped arms live); the tenant probe `initialize` returned 401 from my curl (likely my handshake, not production — live calls demonstrably execute). Both worth a mail-team sync, neither blocks this fix.
 
 **Symptom:** console turns with Lex ended in "agent is temporarily unavailable" (backend fallback). Chain: bridge `/telegram/message` → Cerveau turn → 500. Trace proof: `loop_detector_circuit_breaker` FAIL — `tenant_aivory-mail__search_mail` called 7× with different args but identical (empty) results, then `webhook model_provider error`. Earlier same-shape turns ate the full 180s cap (408s in bridge log). The gate removal exposed this: previously the search would have parked for approval instead of looping; the detector worked as designed, but the abort surfaced as a generic 500 with no partial answer.
 
