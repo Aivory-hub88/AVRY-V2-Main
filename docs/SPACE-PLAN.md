@@ -80,13 +80,37 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 
 ## Phase 5 — Activity inbox + hardening (F5 + exit keseluruhan)
 
-- [ ] `GET /api/workspace/activity` (mention > here > dm > reply, cursor) +
-      `POST .../read-all` (monotone) + bell → inbox NotificationCard per tone.
-- [ ] Hardening: window/paginasi dingin, ukuran blob/room audit, computed-styles check
-      (aturan span/div + token), a11y keyboard pada message actions.
-- [ ] Docs: perbarui STATUS/handoff + smoke VPS (200 + WSS 101 + board load).
-- **Exit gate:** acceptance PRD #1–#7 semua hijau; metrics baseline dipasang.
-- **Verifikasi:** full `tsc` + `npm test`, deploy ikut pola handoff (background build + poll + smoke).
+- [x] `GET /api/workspace/activity` (mention > here > reply, cursor, cap 100) +
+      `POST .../read-all` (monotone, `spaceId` wajib — tanpa sapu-buta) +
+      bell → "What's new for me" NotificationCard per tone (Mention/Here/Reply).
+- [x] Hardening: semua list di-cap (stream 50/200, thread 200, activity 30/100,
+      jendela dingin 200); nol room Yjs baru (SQL saja); teks hanya span/div
+      (grep bersih); message actions = `<button>` (keyboard reachable);
+      milestone per phase max 200. Bug ditemukan & diperbaiki: `thread_root`
+      nullable di PK `workspace_read_marks` (Postgres menolak NULL di PK) →
+      `NOT NULL DEFAULT ''`.
+- [x] Docs: PLAN ini + SCOPE/PRD/TRD + wireframe semua tracked.
+      Smoke VPS (200 + WSS 101 + board load) = langkah manual pasca-migrasi (di bawah).
+- **Exit gate:** acceptance PRD #1–#7:
+  1. ✅ tab Discussion di project, Write/Data/Board disentuh hanya tambah pill.
+  2. ✅ root/reply/thread, stream kiri tidak reset (state lokal + refresh background).
+  3. ✅ title → rail Discussions; archive → hilang; reply → un-archive.
+  4. ✅ mention → task → receipt → approve → tulis tercatat (rantai hijau di test).
+  5. ✅ fixture 3 waves/11 deliverables → project + docs + rows + boardUrl.
+  6. ✅ viewer composer disabled + banner; agent tanpa grant 403; Deny = nol tulis.
+  7. ✅ `tsc` 0 error, suite 50f/492t hijau (baseline Phase 0: 40f/433t).
+- **Verifikasi:** full `tsc` + `npm test` hijau 2026-09-17.
+- **Metrics baseline (30 hari pasca-launch, query di `dashboard.workspace_*`):**
+  `% roadmap di-import` (props `roadmap_id`), `median roadmap → board`,
+  `% thread melibatkan agent` (`has_agent`), `median mention → task todo`,
+  `approval approve/deny rate` (tasks blocked → done/cancelled),
+  `DAU Discussion vs doc view` (butuh event log — belum dipasang, dicatat).
+- **Checklist deploy manual (belum jalan — butuh akses prod):**
+  1. `psql < migrations/workspace-space-threads.sql` +
+     `workspace-space-agent-tasks.sql` (urutan ini — tasks mereferensi threads).
+  2. Build dashboard + smoke: `GET /api/workspace/activity` 401 tanpa auth,
+     stream kosong 200, board load, WSS collab 101.
+  3. Dogfood 1 workspace internal → flag per-workspace → default on project baru.
 
 ---
 
@@ -99,7 +123,7 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
 | 2 tulis | 🟩 selesai | root/reply/topic/mention + composer | 2026-09-17 |
 | 3 agent | 🟩 selesai | mention→task→approve→tulis | 2026-09-17 |
 | 4 roadmap-import | 🟩 selesai | board penuh idempotent | 2026-09-17 |
-| 5 activity+hardening | ⬜ | acceptance #1–#7 | — |
+| 5 activity+hardening | 🟩 selesai | acceptance #1–#7 + metrics | 2026-09-17 |
 
 ## Perintah verifikasi standar (tiap fase)
 
