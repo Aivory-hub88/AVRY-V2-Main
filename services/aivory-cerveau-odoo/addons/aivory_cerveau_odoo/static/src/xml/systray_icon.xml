@@ -1,36 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
 
+    <!-- Systray entry: a real Odoo Dropdown so Popper positions the panel
+         (flip + viewport boundary) instead of the previous hand-rolled div
+         with a fixed 320px width, which overflowed past the viewport edge. -->
     <t t-name="aivory_cerveau_odoo.SystrayIcon">
-        <div class="o_aivory_cerveau_systray dropdown" t-att-class="{ show: state.open }">
-            <button class="dropdown-toggle btn" title="Aivory" t-on-click="togglePanel">
+        <Dropdown position="'bottom-end'" menuClass="'o_aivory_panel_menu p-0 border-0 bg-transparent shadow-none'">
+            <button class="dropdown-toggle btn" title="Aivory">
                 <i class="fa fa-comments-o"/>
             </button>
-            <div t-if="state.open" class="dropdown-menu dropdown-menu-end o_aivory_cerveau_panel p-2" style="display: block; width: 320px;">
-                <div class="o_aivory_cerveau_messages" style="max-height: 240px; overflow-y: auto;">
-                    <div t-if="!state.messages.length" class="text-muted small p-2">
-                        Ask Aivory anything.
-                    </div>
-                    <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
-                        <div t-attf-class="p-2 mb-1 rounded {{ msg.from === 'user' ? 'bg-light text-end' : (msg.from === 'error' ? 'text-danger' : 'bg-info bg-opacity-25') }}">
-                            <span t-esc="msg.text"/>
-                        </div>
-                    </t>
+            <t t-set-slot="content">
+                <AivorySystrayPanel/>
+            </t>
+        </Dropdown>
+    </t>
+
+    <t t-name="aivory_cerveau_odoo.SystrayPanel">
+        <div class="o_aivory_panel bg-white border rounded shadow p-2">
+            <div class="o_aivory_messages px-1">
+                <div t-if="!state.messages.length" class="text-muted small p-2">
+                    Ask Aivory anything. For longer threads, mention @Aivory in Discuss.
                 </div>
-                <form class="d-flex mt-2" t-on-submit="sendMessage">
-                    <input
-                        type="text"
-                        class="form-control form-control-sm me-1"
-                        placeholder="Message Aivory..."
-                        t-att-value="state.draft"
-                        t-on-input="onInput"
-                        t-att-disabled="state.sending"
-                    />
-                    <button type="submit" class="btn btn-sm btn-primary" t-att-disabled="state.sending">
-                        <i class="fa fa-paper-plane"/>
-                    </button>
-                </form>
+                <t t-foreach="state.messages" t-as="msg" t-key="msg_index">
+                    <div t-attf-class="p-2 mb-1 rounded {{ msg.from === 'user' ? 'bg-light text-end' : (msg.from === 'error' ? 'text-danger' : 'bg-info bg-opacity-25') }}">
+                        <span t-esc="msg.text"/>
+                    </div>
+                </t>
             </div>
+            <form class="d-flex mt-2" t-on-submit="sendMessage">
+                <input
+                    type="text"
+                    class="form-control form-control-sm me-1"
+                    placeholder="Message Aivory..."
+                    t-att-value="state.draft"
+                    t-on-input="onInput"
+                    t-att-disabled="state.sending"
+                />
+                <button type="submit" class="btn btn-sm btn-primary" t-att-disabled="state.sending">
+                    <i class="fa fa-paper-plane"/>
+                </button>
+            </form>
         </div>
     </t>
 

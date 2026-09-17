@@ -2,23 +2,19 @@
 
 import { registry } from "@web/core/registry";
 import { rpc } from "@web/core/network/rpc";
+import { Dropdown } from "@web/core/dropdown/dropdown";
 import { Component, useState } from "@odoo/owl";
 
-class CerveauSystrayIcon extends Component {
-    static template = "aivory_cerveau_odoo.SystrayIcon";
+class AivorySystrayPanel extends Component {
+    static template = "aivory_cerveau_odoo.SystrayPanel";
     static props = {};
 
     setup() {
         this.state = useState({
-            open: false,
             sending: false,
             draft: "",
             messages: [],
         });
-    }
-
-    togglePanel() {
-        this.state.open = !this.state.open;
     }
 
     onInput(ev) {
@@ -42,7 +38,7 @@ class CerveauSystrayIcon extends Component {
                 this.state.messages.push({ from: "error", text: result.error });
             } else {
                 const reply = (result && (result.reply || result.message)) || JSON.stringify(result);
-                this.state.messages.push({ from: "cerveau", text: reply });
+                this.state.messages.push({ from: "aivory", text: reply });
             }
         } catch (error) {
             this.state.messages.push({ from: "error", text: "Request failed. Check the browser console." });
@@ -52,8 +48,14 @@ class CerveauSystrayIcon extends Component {
     }
 }
 
+class AivorySystrayIcon extends Component {
+    static template = "aivory_cerveau_odoo.SystrayIcon";
+    static components = { Dropdown, AivorySystrayPanel };
+    static props = {};
+}
+
 export const systrayItem = {
-    Component: CerveauSystrayIcon,
+    Component: AivorySystrayIcon,
 };
 
 registry.category("systray").add("aivory_cerveau_odoo.systray_icon", systrayItem, { sequence: 1 });
