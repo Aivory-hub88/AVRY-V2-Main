@@ -111,6 +111,22 @@ Baseline (Phase 0, 2026-09-17): dashboard HEAD `58fa8c7`, `tsc` `0 error`,
   2. Build dashboard + smoke: `GET /api/workspace/activity` 401 tanpa auth,
      stream kosong 200, board load, WSS collab 101.
   3. Dogfood 1 workspace internal → flag per-workspace → default on project baru.
+- **Deploy 2026-09-17 (terlaksana, VPS `aivory-prod` 129.226.155.216):**
+  - Push submodule `avry-user-dashboard` → origin main (Phase 0–5 + 2 fix).
+  - Migrasi applied ke `avry-postgres`: 5 tabel verified
+    (`threads/topics/messages/read_marks/agent_tasks`).
+  - Temuan VPS: 20 file WIP uncommitted (tier2/mention, 0 overlap) → diverifikasi
+    aman lokal (worktree merge bersih, tsc 0, 496 tests hijau) → commit di VPS
+    `54755a4`, merge `origin/main`. 4 file untracked identik origin dihapus.
+  - Build gagal 1×: `SpaceAgentPanel` (client) → `spaceAgent` → `@/lib/db` (`pg`)
+    dibundle Turbopack (`Can't resolve dns/fs/net`) → split `spaceAgent`
+    (client-safe) vs `spaceAgentStore` (server-only). Aturan: lib client-safe
+    tidak boleh impor `@/lib/db`. Fix `8d42808`, build lokal + prod hijau.
+  - Roster drift: backend ganti title Lex → "Sales and Lead Agent"; test
+    disinkronkan (`15af3bc`). Non-blocking untuk Space (match by type id).
+  - Smoke prod (basePath `/dashboard`! publik 301 → `aivory.uk/dashboard/`):
+    stream+service 200 `[]`, activity ghost 400, activity agent 200,
+    container Up. Dogfood login (post/reply/mention/approve) = manual user.
 
 ---
 
