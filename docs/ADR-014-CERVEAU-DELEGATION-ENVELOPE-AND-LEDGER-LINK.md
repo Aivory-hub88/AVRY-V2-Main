@@ -1,6 +1,6 @@
 # ADR-014 — Cerveau delegation envelope and the task-ledger link: an A2A-shaped contract without the wire protocol
 
-**Status:** Approved 2026-09-19 (decisions in §8 resolved). Phase A1 implemented, deployed and live-verified 2026-09-19 (`AVRY-Cerveau@5fcd622e2`, §11); one-week observation window running. A2/P1-P3 not started. Every "today" claim below was read from source on 2026-09-19 (`AVRY-Cerveau@7cc6323af`, `avry-user-dashboard` working tree); items not verified are listed in §9.
+**Status:** Approved 2026-09-19 (decisions in §8 resolved). Phase A1 implemented, deployed and live-verified 2026-09-19 (`AVRY-Cerveau@5fcd622e2`, §11); one-week observation window running. Phase A2 implemented, deployed and live-verified 2026-09-19 (`AVRY-Cerveau@b5fd5882d`, §12); the live check found a pre-existing depth bug in background/parallel delegation, fixed in `9fe78f0ad`, deployed and live-verified (§12.1). P1-P3 not started. Every "today" claim below was read from source on 2026-09-19 (`AVRY-Cerveau@7cc6323af`, `avry-user-dashboard` working tree); items not verified are listed in §9.
 **Date:** 2026-09-19
 **Context:** The ask was "what can we copy from LobeHub and Hermes (which ships an A2A plugin) to make Cerveau's agent-to-agent schema, communication flow and delegation solid and low-error", followed by "can the task ledger and the self-evolve ledger be part of A2A". Research conclusion: copy the *contract* (structured result, context id, terminal-state discipline, anti-loop, untrusted framing), not the *transport*. This ADR specifies the contract.
 
@@ -327,3 +327,70 @@ Two real turns through `/webhook` (synthetic tenant `a1verify1789816508`, `X-Age
 Still open from the §7 gate: (a) trace-level check that the framed summary and `output.data` look right in `runtime-trace*.jsonl`; (b) a week of `tool == delegate` records to read the `reason` distribution; (c) leftover rows of the test tenant in `cerveau.agents` / `cerveau.memories` (not cleaned — DB access was blocked). The failed-result guardrail was not exercised live; the failure text is deterministic (no ids), which is what it depends on.
 
 **Known pre-existing issue found while testing:** `send_message_to_peer::tests::peer_turn_cost_scope_through_execute_boundary_attributes_recipient_and_shares_budget` overflows its stack in a debug `cargo test` on `HEAD` before this change too; unrelated, skipped in the full-suite run (3723 passed).
+
+---
+
+## 12. Phase A2 outcome (2026-09-19, `AVRY-Cerveau@b5fd5882d`)
+
+Started earlier than the §8.4 plan (a week of A1 observation) at the owner's request; the `reason` data A1 emits keeps accumulating, so nothing is lost by the order.
+
+**Shipped as designed:** six nullable columns + one partial index on `agent_tasks` and `archive.context_id`, added with `ADD COLUMN IF NOT EXISTS` in the existing `connect()` batch; background delegations create their row before spawn (or adopt `ledger_task_id`), settle it before the registry records the terminal state, and poll their own row every 5 s so the dashboard's raw-SQL Stop is observed; failed sync hops are recorded lazily; the reaper tick reconciles rows whose delegation ended without the engine writing them; the orphan sweep skips delegated rows; failure is `blocked` + `outcome`.
+
+**Deliberate differences from §5 / §7 — each found in the code:**
+
+| Design said | What shipped | Why |
+|---|---|---|
+| `parent_task_id` populated | column exists, **not populated** | the caller's own active row is not knowable from the delegate tool; `ledger_task_id` adoption covers the case where the caller has one. Grouping still works through `session_id` (`TASK-CONTRACT.md`). |
+| `context_id` populated | column exists, not populated | P1 (carry-forward, turn cap). |
+| cancel observation in P1 with heartbeat/stall | **cancel observation in A2, heartbeat/stall still P1** | the A2 gate ("Stop is observed") needs it; heartbeats change the reaper's timeout behaviour and stay separate. |
+| reaper reconciles `Lost` | reconciler runs on the reaper's 60 s tick over `open_delegation_ids()`, not inside `recovery_pass` | ledger install order vs boot recovery is not guaranteed; a tick always runs after both exist. |
+| a refused `ledger_task_id` | refuses the delegation (`rejected` / `invalid_request`) and starts nothing | starting work nobody can track is the failure mode this ADR exists to remove. |
+
+**Facts worth remembering**
+- `memory-postgres` is **not** a default feature of `zeroclaw-runtime`; the release build adds it. Code behind it is invisible to a plain `cargo test -p zeroclaw-runtime`. `delegate_ledger.rs` compiles to no-ops without it, and the e2e test needs `--features memory-postgres` plus `CERVEAU_TEST_PG_URL`. CI's `postgres-tests` job now runs it (`ledger_link_e2e`).
+- Rollback is safe: every query in the previous binary names its columns (0 `SELECT *`), archive payload fields are `#[serde(default)]`, and no status enum changed. The only `SELECT *` in the dashboard targets the separate Team Space table.
+- The dashboard needs no change: failed rows show in its `blocked` column with the reason and the existing Stop button.
+- Another session changed `update_status` (`StatusUpdate`) concurrently; merged with a rebase, both suites pass together.
+
+**Verified locally against Postgres 16:** `pg_task_ledger` (3 tests, including an upgrade that starts from the pre-A2 ten-column table and an archive payload without the new fields) and `ledger_link_e2e` (background failure, adoption + refusal, lazy sync record, no-tenant, operator Stop observed and not overwritten, reconciler). Runtime suite: 3725 passed without the feature, 3735 with it.
+
+**Still open:** deploy (a startup `ALTER TABLE`, idempotent, nullable, metadata-only), then a live check that Stop on a running delegated row halts it. Reading `runtime-trace*.jsonl` and DB rows from the assistant's session is blocked by the auto-mode classifier, so live confirmation of the row itself needs the owner to look at Mission Control or run the query.
+
+### 12.1 Live verification of A2 found a pre-existing bug (2026-09-19)
+
+Deployed by the owner at 21:44 CST (`b5fd5882d`, 6 new columns confirmed in `cerveau.agent_tasks`, health 200, 0 restarts). Two real turns through `/webhook` with a synthetic tenant:
+
+| Turn | Observation |
+|---|---|
+| Aira delegates to Lex with `background=true`, then `await_sessions` | The specialist's board (`task_list` as `leads_qualifier`, same tenant) shows `Delegated to leads_qualifier: Reply with exactly the single word PONG.` as `blocked` with `Delegation failed: Delegation depth limit reached (1/1)`. **A2 works** — the row exists under the specialist's `agent_type` and settles with a truthful reason — **but the delegation itself failed.** |
+| `delegate(parallel=["leads_qualifier"])` vs a sync control in the same turn | parallel: `Error: One or more parallel agents failed`; sync: `state=completed`. |
+
+**Root cause (upstream, June, #8217; not introduced by A1/A2):** the tool built to run a background or parallel hop was given `depth = self.depth + 1`, and the hop then ran its *own* `depth >= max_depth` check against a depth the caller never had. With `max_delegation_depth = 1` (ADR-008's cap) that is `1 >= 1`, so **every background and every parallel delegation was refused on arrival while sync worked.** The tool is never handed to the sub-agent (bounded targets get the parent's tools minus `delegate`; independent targets build their own registry; `with_depth` is unused outside tests), so the `+ 1` protected against no recursion and only rejected valid hops. ADR-008 Phase 2's "parallel fan-out verified live 2026-09-03" predates that change reaching this fork, or was checked with a higher cap; either way it has not held since.
+
+**Fix (`9fe78f0ad`):** background and parallel run the hop on the caller's own depth, as sync always did. The caller-side check is unchanged (a caller at the cap is still refused up front). Regression tests pin: depth-0 hop admitted for background and parallel with a cap of 1; a caller at the cap still refused for both; sync as the reference. Mutation-checked: restoring `+ 1` fails exactly the two "not refused" tests.
+
+**Why it stayed hidden:** before A1 a failed background delegation left no envelope and no board row, and parallel's aggregated text looked like an ordinary tool failure. The envelope's `reason` and A2's `blocked` row are what made it legible.
+
+**Deployed and re-verified live (2026-09-19 23:54 CST, binary `cf30ae16…`, health 200, 0 restarts, backup `bak-pre-depthfix-20260919`), same shape of turns with a fresh synthetic tenant:** background delegation to Lex → `completed` (was: depth failure); `parallel=["leads_qualifier"]` → `[Parallel delegation: 1 agents]` with `PONG` (was: "One or more parallel agents failed"); the specialist's board shows the delegated row as `done` with no `blocked_reason` (settled through the engine's own `finish`, archived). The sync control call was `state=completed` throughout. Completed sync/parallel hops leave no row, as designed.
+
+**Still open:** ~~deploy `9fe78f0ad` and re-run the same two turns expecting `completed`;~~ (done above) a live check that Stop halts a *running* delegation (the raw `cancelled` write cannot be issued from the assistant session, so the owner should press Stop in Mission Control on a long-running delegated task). Note: the start envelope's `ledger_task_id` is only in `output.data`; the model sees the legacy "Background task started… task_id:" text, so it cannot yet quote the board row id.
+
+---
+
+## 13. Ledger audit and the three fixes it produced (2026-09-19/20)
+
+Asked by the owner: is the Cerveau task ledger in sync with Mission Control, is it stable, are there bugs or hard-coded values, and can agents read it correctly? Method: read both repos, experiments against a real Postgres, and live probes through `/webhook` with synthetic tenants. Reading production tables and traces from the assistant's session is blocked, so nothing below relies on production rows.
+
+**Sync.** There is no sync layer to drift: the dashboard reads the same tables Cerveau writes (live table plus, since dashboard `2a9c164`, the archive), and its only write is Stop (`cancelled`). Divergence could only come from a dead ledger connection, from transitions that never reached the notification feed, or from the dashboard's DB role being unable to read the archive (unverified in production; the dashboard deploy script warns about it).
+
+| # | Finding | Evidence | Fix (`AVRY-Cerveau`) |
+|---|---|---|---|
+| 1 | **HIGH.** The ledger, the capability graph and the skill-insight ledger each held ONE `postgres::Client` with no reconnect: after the connection dropped every op failed "connection closed" until the daemon restarted. `PostgresMemory` (r2d2 pool) was unaffected. | After `pg_terminate_backend`: list/update/create failed 5 of 5. | `ad1b9d3de`: `pg_live::LiveClient` reconnects; verifies a connection idle >1 s with `SELECT 1` because a synchronous client does not notice a dead socket while nothing uses it (a first version relying on `is_closed()` failed the test). |
+| 2 | **MEDIUM.** Aira's identity says to verify children through `task_list` and to create child rows owned by the specialist. Both impossible: the tools are scoped to the caller's own `agent_type`; `task_list` had no session filter. | Live: Aira's `task_list` did not show Lex's row and she concluded the delegation created none. | `b594c8c5c`: `task_list scope=session` lists every agent's rows in the session with owners, finished work included. Identity docs and `TASK-CONTRACT.md` corrected. |
+| 3 | **MEDIUM.** Only an agent's own `task_update_status` posted to `agent-actions`; the engine's settles, failed sync hops and the reconciler never did, so a failed delegation was visible only on the board. | Code: `should_notify` reachable only from the tool. | `8e031a8eb`: the same post, addressed by the row, fire-and-forget, blocked/done only; a re-settle or a cancel announces nothing. |
+
+Also found, not fixed: SLA 15/60 minutes duplicated in three places (identity docs, `TASK-CONTRACT.md`, `lib/airaTasks.ts`); archive retention 40 days duplicated across two repos; `chief_of_staff` hard-coded as the parent in the dashboard; the 30-minute orphan sweep vs the 15-minute SLA; Stop on a parent does not reach its children; `task_create` has no dedupe or title cap; `task_list` shows only the 20 newest finished tasks per agent; a sync delegation that succeeds leaves no engine row, so its card exists only if the specialist creates one. Performance is fine (~174 us/op, 200 concurrent reads in 0.3-0.5 s on one connection).
+
+Health check: `ops/cerveau-ledger-health.sql` (read-only, 13 checks, verified against deliberately corrupted data). Run on the VPS: `docker exec -i avry-postgres psql -U aivory -d aivory -f - < cerveau-ledger-health.sql`.
+
+**Prompt drift to know about.** Two copies of the agent identity docs exist (`AVRY-Cerveau/aivory/` and `Aivory V2/services/cerveau/`) and they differ; `sync.sh` lives in the latter, which is the newer one and the one edited here. In git, `leads_qualifier/IDENTITY.md` stops at §6: its §7 (task ledger protocol) and §8 (mail send confirmation) exist only as uncommitted working-tree changes, so the corrected `Delegated to <you>` line for Lex is uncommitted too. Identity docs reach the live agents only through `./sync.sh deploy` (a daemon restart), which is a manual step.

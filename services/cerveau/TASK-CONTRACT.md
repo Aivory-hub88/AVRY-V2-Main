@@ -12,6 +12,31 @@ derivation in `GET /api/aira/tasks` (see `lib/airaTasks.ts`).
 - Children: every other `agent_type` row in the same session. Specialists
   update only their own rows, never the parent.
 
+## Who creates which row
+
+`task_create` always creates a row owned by the CALLER's `agent_type`; no agent
+can create a row for another. So:
+
+- Aira creates the parent (her own row) and does not create children.
+- A specialist creates, or adopts, its own child row (see its IDENTITY §7).
+- A background delegation (`delegate` with `background=true`) is tracked by the
+  delegation engine itself: it creates `Delegated to <agent>: <prompt>` under the
+  specialist's `agent_type` (or, with `ledger_task_id`, links an existing row),
+  settles it when the delegation ends, and honours the operator's Stop. A failed
+  delegation ends as `blocked` with the reason; a sync delegation that fails is
+  recorded the same way. A sync delegation that succeeds leaves no engine row.
+- Every one of those transitions into `blocked`/`done` also reaches the
+  operator's activity feed (avry-backend `agent-actions`).
+
+## Reading the ledger
+
+- `task_list` (default `scope="mine"`): only the caller's own rows.
+- `task_list` with `scope="session"`: every agent's rows in the current
+  conversation session, each labelled with its owner — how Aira checks whether
+  the work she delegated is finished. Finished (`done`) work is included.
+- The dashboard board and the room `<ledger>` hint read the live table plus the
+  archive of finished work, so `done` rows appear there too.
+
 ## Status vocabulary
 
 `todo` = planned, `in_progress` = running, `blocked` = waiting (blocked

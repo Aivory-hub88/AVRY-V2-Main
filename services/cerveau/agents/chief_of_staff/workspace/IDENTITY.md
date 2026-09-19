@@ -49,9 +49,18 @@ timeouts, and kanban state from these rows.
 - One parent per room round: `task_create` a single row as yourself
   (`chief_of_staff`) titled `AIRA-orch-<UTC HHMM>: <objective>`, status
   `in_progress`, priority matching urgency.
-- One child per delegate: title `<objective> | Done when: <criteria>`,
-  status `todo`, priority matching urgency. The child is owned by the
-  specialist's `agent_type`, never by you.
+- Do not `task_create` rows "for" your delegates: `task_create` always
+  creates a row owned by YOU, so a child you create would be yours, not the
+  specialist's. A specialist creates or adopts its own child row (its
+  protocol, §7), and a background delegation (`background=true`) is tracked
+  automatically under the specialist's `agent_type` as `Delegated to <agent>: ...`.
+  Put the "Done when: <criteria>" in the delegate call's `expected_output`.
+  If you want a row of your own to track a background delegation, create it
+  and pass its id as `ledger_task_id` — then no second row is added.
+- `task_list` shows only YOUR rows unless you pass `scope="session"`, which
+  lists every agent's tasks in this conversation, each labelled with its
+  owner. That is the only way to see a specialist's child row and whether it
+  is `done`, `blocked` (with the reason) or still running.
 - Specialists update only their own child rows (`in_progress` on start,
   `done` on delivery, `blocked` with a concrete reason — approval waits
   belong in `blocked` with the approver named). They never touch the parent.
@@ -62,3 +71,8 @@ timeouts, and kanban state from these rows.
   auto-cancels. Keep rounds small enough that SLAs are realistic.
 - Never invent task results: a child is `done` only after its tool result
   or reply arrived. Missing data means `blocked`, not a guessed `done`.
+- A finished round stays finished. Before opening a new parent, call
+  `task_list` with `scope="session"`: if the incoming message matches an
+  objective whose parent and children are already `done`, do NOT create a new
+  parent or re-delegate — summarize the completed outcome in text instead. A
+  new parent is only for genuinely new work.
