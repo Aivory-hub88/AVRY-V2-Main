@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented, tested, deployed and live-verified (§16). P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented and tested; deployed 11:10 CST, rolled back by the owner 11:14 CST (§16-§17). P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -259,4 +259,13 @@ The owner merged `88e363786` to `cerveau-main` (my own push and deploy were deni
 - **Effect on users today:** none visible, as predicted in §15, because `rerank_enabled` is still `false`. New rows carry importance from now on; the 549 older rows keep `NULL` until they are re-stored.
 
 **Open decision (owner):** `rerank_enabled = true` with the floor left at 0.4 is now the `rerank_imp_f0.4` row of §13 on new rows (hit@5 0.829 vs 0.286 on the fixture). Note that with old rows still at `NULL` importance, their blend is the lower `rerank_f0.4` case (0.457), so the gain arrives gradually as rows are re-stored, unless a one-off heuristic backfill is approved (§5 default: no backfill). Nothing has been changed; the earlier stopgap was reverted by the owner and is not re-applied without an explicit go-ahead.
+
+## 17. P1 rolled back by the owner (2026-09-20 11:14 CST)
+
+Four minutes after the deploy in §16, the owner restored the previous binary from `zeroclaw-cerveau.bak-pre-memp1-20260920`. Verified on the VPS afterwards: binary `251e51ed…` (build `c172c8427`, the pre-P1 build), service active since 11:14:43 CST, `NRestarts=0`, health 200, journal clean, config unchanged (`rerank_enabled = false`, `min_relevance_score = 0.4`). No reason was given.
+
+- **Production is not running P1.** Importance is no longer stored or read, recall no longer filters `superseded_by` or counts accesses, and `memory_store` no longer advertises `importance`.
+- **Data left behind, harmless:** the four new columns stay on `cerveau.memories` (the old binary ignores them, as designed). During the four minutes the P1 build was live it wrote `importance` on 2 rows and counted up to 2 accesses on others (554 rows in total now). Those values are dormant and correct to leave. `cerveau.memories` needs no cleanup.
+- **The code is still on `cerveau-main`** (`88e363786`), so the next deploy of `cerveau-main`, from any session, will include P1 again. Anyone deploying from `cerveau-main` should know this. Reverting on `cerveau-main` is the owner's call.
+- **Status of the plan:** P0 (benchmark) stays valid and merged. P1 is implemented, CI-tested and live-proven in a 4-minute window, but not adopted. Nothing further is deployed. P3 and any backfill are on hold until the owner says what drove the rollbacks (both times unstated), because the design of P3 depends on it.
 
