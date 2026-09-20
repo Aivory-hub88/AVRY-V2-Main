@@ -95,18 +95,24 @@ must stop at Approvals.
 # other scenarios (XML-RPC, run from a laptop; needs a user allowed to create data)
 ODOO_API_KEY=xxx ./ops/odoo-demo/seed_demo.py --scenario retail
 
-# after the demo — full wipe back to golden (DB + filestore)
-ODOO_MASTER_PASSWORD=xxx ./ops/odoo-demo/reset_demo.sh      # ODOO_URL=... to override host
-./ops/odoo-demo/bootstrap_demo.sh seed                      # re-inject roofer data
+# after the demo — back to the golden snapshot (~15 s, short outage), no master password needed
+./ops/odoo-demo/reset_demo.sh
+./ops/odoo-demo/bootstrap_demo.sh seed          # only if the snapshot was frozen before the data
+
+# after changing the demo ON PURPOSE (new agent, rotated key, more data): take a new golden
+./ops/odoo-demo/reset_demo.sh --freeze
 ```
 
-`seed_demo.py --scenario roofer` is the older, thin "Roofers Resource as vendor"
-scenario (Elevate tiers as products); `roofer-ops` is the contractor's-own-Odoo view.
+## The golden snapshot
 
-## Why golden dump, not just delete
+Two files in `ops/odoo-demo/golden/` (git-ignored, mode 600): `demo_golden.dump` (pg_dump) and
+`demo_golden_filestore.tar.gz` (attachments and agent avatars). They are a pair. The snapshot
+includes the Geno agent row **with its Aivory API key**, both Odoo API keys' hashes and the
+`admin@aivory.uk` login, so a reset returns exactly to the configured, seeded demo. Rotate a key or
+add an agent, then `--freeze` again, or a later reset will bring the old state back.
 
-`reset_demo.sh` drops via `/web/database/drop` (cleans filestore too), recreates,
-then `pg_restore`. ~10 s, no orphan attachments, no skipped SO numbers. The agent
-user and its API key live in the DB, so they survive a reset. Set `list_db = False`
-in `odoo.conf` once you are done creating databases — but note reset needs the
-database manager, so flip it back only if you drop that flow.
+`reset_demo.sh` works on Postgres and the container filesystem directly. It does not use Odoo's
+`/web/database/drop|create`: on Odoo 19 those are form-POST endpoints and the previous JSON calls
+returned HTTP 500 without anyone noticing, so the old reset never worked. Because no master
+password is needed any more, set `list_db = False` in `odoo.conf` (then `docker restart
+aivory-odoo-demo`) to take the public database manager offline.

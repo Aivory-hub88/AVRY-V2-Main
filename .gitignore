@@ -16,6 +16,9 @@ acme.json
 ops/odoo-demo/odoo.conf
 ops/odoo-demo/.env-demo
 ops/odoo-demo/golden/*.dump
+ops/odoo-demo/golden/*.tar.gz
+ops/odoo-demo/golden/*.txt
+ops/odoo-demo/backups/
 
 # ─── Docker volumes / runtime data ───────────────────────────────────────────
 vps-local/
