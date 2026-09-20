@@ -11,7 +11,8 @@ removed in 19.0.2.1.0 -- Discuss is the only surface.
 2. Odoo -> **Settings -> Aivory Agents** -> New: pick the agent, paste its key.
 3. In Discuss, type `@Lex ...` in any channel, or open a direct chat with it.
 
-Each configured agent gets a bot with the dashboard's name and avatar. Each keeps
+Each configured agent gets a bot with the dashboard's name and avatar, shown
+with OdooBot's green-heart "bot" status (`models/res_partner.py`) instead of offline. Each keeps
 its own conversation per channel. Group channels stay quiet unless an agent is
 mentioned; agents never trigger each other. Replies are posted from a background
 thread after the sender's message commits (a tool-using turn can take ~3 min).
