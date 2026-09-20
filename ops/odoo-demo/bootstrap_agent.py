@@ -24,6 +24,8 @@ from datetime import datetime, timedelta
 PUBLIC_URL = os.environ.get("ODOO_PUBLIC_URL", "https://odoo-demo.aivory.id")
 AGENT_LOGIN = os.environ.get("ODOO_AGENT_LOGIN", "aivory-agent")
 KEY_NAME = "Aivory MCP"
+# Not "Aivory Agent": that reads like a chat persona, and Discuss offers it in @-mentions.
+AGENT_NAME = "Aivory MCP (API user)"
 
 # App-level rights the agent needs to read/write demo business data. Deliberately
 # no base.group_system: Aivory's own approval gate covers writes, and the MCP guide
@@ -55,7 +57,7 @@ for xmlid in AGENT_GROUPS:
 portal = env.ref("base.group_portal")  # noqa: F821
 if not user:
     user = Users.create({
-        "name": "Aivory Agent",
+        "name": AGENT_NAME,
         "login": AGENT_LOGIN,
         "email": "agent@aivory.uk",
         "group_ids": [(4, g.id) for g in groups],
@@ -63,6 +65,7 @@ if not user:
     print(f"created internal user {AGENT_LOGIN} (id {user.id})")
 else:
     user.write({
+        "name": AGENT_NAME,
         "active": True,
         "group_ids": [(3, portal.id)] + [(4, g.id) for g in groups],
     })
