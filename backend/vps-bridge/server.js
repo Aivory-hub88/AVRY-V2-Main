@@ -903,6 +903,45 @@ function buildZeroclawWebhookBody(body) {
   return body;
 }
 
+
+// ── Mention-style delegation split ─────────────────────────────────────
+// The caller agent pastes each delegate result inside its original
+// `[Agent 'alias']` wrapper (see Delegation Rendering contract in the agent
+// identities). Split those blocks out so the UI can render each specialist
+// as their own speaker bubble (@mention style) instead of quoted narration.
+const DELEGATE_SPEAKERS = {
+  autonomous: 'Geno',
+  customer_service: 'Teo',
+  leads_qualifier: 'Lex',
+  finance_invoice_ops: 'Finn',
+  office_assistant: 'Ofira',
+  chief_of_staff: 'Aira',
+};
+function splitDelegateBlocks(fullText) {
+  const out = { main: fullText, delegations: [] };
+  if (typeof fullText !== 'string' || fullText.indexOf("[Agent '") === -1) return out;
+  const re = /\[Agent '([\w-]+)'[^\]]*\]\s*\n?([\s\S]*?)(?=\n?\[Agent '|$)/g;
+  let m;
+  let lastIndex = 0;
+  const mainParts = [];
+  while ((m = re.exec(fullText)) !== null) {
+    mainParts.push(fullText.slice(lastIndex, m.index));
+    lastIndex = m.index + m[0].length;
+    const alias = m[1];
+    const text = (m[2] || '').trim();
+    if (text) {
+      out.delegations.push({
+        agent_type: alias,
+        name: DELEGATE_SPEAKERS[alias] || alias,
+        text,
+      });
+    }
+  }
+  mainParts.push(fullText.slice(lastIndex));
+  out.main = mainParts.join('').replace(/\n{3,}/g, '\n\n').trim();
+  return out;
+}
+
 function handleStreamRequest(req, res) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
@@ -938,6 +977,7 @@ function handleStreamRequest(req, res) {
     let buffer = '';
     let rawResponse = '';
     let wroteChunk = false;
+    let fullText = '';
     
     proxyRes.on('data', (chunk) => {
       const text = chunk.toString();
@@ -957,6 +997,7 @@ function handleStreamRequest(req, res) {
             if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
               const content = data.choices[0].delta.content;
               
+              fullText = content;
               // Emit proper SSE format for Next.js
               res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
               wroteChunk = true;
@@ -986,6 +1027,7 @@ function handleStreamRequest(req, res) {
           }
 
           if (content) {
+            fullText = content;
             res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
             wroteChunk = true;
           } else if (data.error) {
@@ -997,6 +1039,20 @@ function handleStreamRequest(req, res) {
         }
       }
 
+      // Mention-style split: emit one `delegation` event per [Agent] block
+      // plus a `replace` event with the stripped main text, then done.
+      try {
+        const full = fullText;
+        const split = splitDelegateBlocks(full);
+        if (split.delegations.length > 0) {
+          for (const d of split.delegations) {
+            res.write(`data: ${JSON.stringify({ type: 'delegation', agent_type: d.agent_type, name: d.name, text: d.text })}\n\n`);
+          }
+          res.write(`data: ${JSON.stringify({ type: 'replace', content: split.main })}\n\n`);
+        }
+      } catch (e) {
+        console.error('[delegation split] error:', e.message);
+      }
       // Send done event
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
