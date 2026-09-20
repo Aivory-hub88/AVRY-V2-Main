@@ -294,3 +294,11 @@ So **96% of the table (531 rows) is written by the engine's own auto-save**, not
 - **Recommended next step, no behaviour change:** add observability instead of a fix. (1) A counter or log line per turn with the number of candidates recalled, how many survive decay and the floor, and how many the rerank blend *would* have kept (a **shadow evaluation**: computed, logged as counts, never injected). (2) Let it run for a few days. That yields the real loss rate with zero user impact and settles whether P3 is worth doing.
 - Until then: no rerank, no backfill, no further memory deploys. P1 remains on `cerveau-main` and is inert if redeployed only in the sense that it changes nothing user-visible, but it does change the schema and writes; the owner decides whether it stays.
 
+## 19. Decision: P1 stays on `cerveau-main` (2026-09-20)
+
+After §17 and §18 the owner chose to **keep P1 on `cerveau-main`** (the alternative was a revert commit). The reasoning that was weighed: the change is additive (four nullable or constant-defaulted columns, rollback-safe), its behaviour is covered by `pg_memory_p1` and was mutation-checked, and it passed a live probe in the four minutes it ran in production. The accepted risk is that any later deploy of `cerveau-main`, from any session, ships P1 again without anyone deciding to.
+
+To make that risk visible instead of silent, the deploy checklist in `services/cerveau/README.md` ("Deploying the Cerveau binary") now lists P1 under "known behaviour that ships with `cerveau-main`", says that a deploy containing it must say so, and records that `memory.rerank_enabled` / `memory.min_relevance_score` are configuration decisions outside any binary deploy.
+
+Unchanged and still on hold, pending real data: rerank, the importance backfill and P3. Recommended next step (§18): observability plus a shadow evaluation of auto-injection, with no behaviour change.
+
