@@ -163,7 +163,7 @@ export default function LoginClient() {
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">
             Don&apos;t have a subscription yet?{" "}
-            <a href="/product" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
+            <a href="/pricing" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
               Explore plans &rarr;
             </a>
           </p>

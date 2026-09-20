@@ -719,6 +719,38 @@ body,
   }
 }
 
+/* ─── Sign-in modal enter animations ───
+   The modal previously relied on `animate-in fade-in zoom-in-95` classes,
+   but tailwindcss-animate is not installed, so those were dead classes and
+   the modal popped in with no transition. These plain-CSS equivalents give
+   the backdrop and card a real enter animation with zero new deps. */
+@keyframes signin-modal-zoom-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.signin-modal-backdrop {
+  animation: fade-in 0.25s ease-out;
+}
+
+.signin-modal-card {
+  animation: signin-modal-zoom-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signin-modal-backdrop,
+  .signin-modal-card {
+    animation: none;
+  }
+}
+
 @keyframes scale-x {
   0% {
     transform: translateY(-50%) scaleX(0);

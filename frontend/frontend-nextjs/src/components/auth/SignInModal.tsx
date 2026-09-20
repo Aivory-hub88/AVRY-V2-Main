@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, MouseEvent } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { login } from '@/lib/auth';
 import { SpotlightButton } from '@/components/ui/SpotlightButton';
@@ -17,29 +18,37 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const modalRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!modalRef.current) return;
-    const rect = modalRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    modalRef.current.style.setProperty('--mouse-x', `${x}px`);
-    modalRef.current.style.setProperty('--mouse-y', `${y}px`);
-  };
-
-  // Handle escape key to close
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Handle escape key to close + lock body scroll without layout shift.
+  // The previous version set `document.body.style.overflow = 'hidden'` and
+  // restored it to `'auto'`: removing the scrollbar changes the viewport
+  // width, which makes the landing's sticky/GSAP sections visibly jump
+  // behind the modal, and forcing `'auto'` on cleanup clobbers whatever
+  // value the page had before. Compensate the missing scrollbar width and
+  // always restore the exact previous values.
+  useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'hidden'; // Prevent scrolling when modal is open
+    window.addEventListener('keydown', handleKeyDown);
+
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
     }
+    document.body.style.overflow = 'hidden'; // Prevent scrolling when modal is open
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = 'auto';
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
     };
   }, [isOpen, onClose]);
 
@@ -65,19 +74,31 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  // Portaled to <body> instead of rendering inside the fixed <nav>: a
+  // `position: fixed` overlay nested under another positioned ancestor is at
+  // the mercy of that ancestor's stacking context (any future transform /
+  // filter / backdrop-filter on the nav would re-base it and shrink the
+  // backdrop). It also guarantees the overlay paints above every page
+  // section regardless of their own stacking contexts.
+  //
+  // NOTE: the card intentionally does NOT use `spotlight-card`. That
+  // unlayered global class sets its own background/border, which overrides
+  // the `bg-[#0a0a0a]` Tailwind utility (unlayered CSS beats layered
+  // utilities) and left this card nearly transparent — the hero's bright
+  // blue pill (#3434ff) and blobs bled straight through the "glass",
+  // smeared further by the backdrop blur. That bleed-through is the
+  // "glitching" look. Solid background + a lighter blur keeps it opaque.
+  const overlay = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300"
+      <div
+        className="signin-modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       {/* Modal Content */}
-      <div 
-        ref={modalRef}
-        onMouseMove={handleMouseMove}
-        className="relative spotlight-card w-full max-w-[420px] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-8 sm:p-10 animate-in fade-in zoom-in-95 duration-200"
+      <div
+        className="signin-modal-card relative w-full max-w-[420px] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl p-8 sm:p-10"
       >
         
         {/* Close button */}
@@ -169,7 +190,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">
             Don&apos;t have a subscription yet?{' '}
-            <a href="/product" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
+            <a href="/pricing" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
               Explore plans &rarr;
             </a>
           </p>
@@ -178,4 +199,6 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
       </div>
     </div>
   );
+
+  return mounted ? createPortal(overlay, document.body) : overlay;
 }
