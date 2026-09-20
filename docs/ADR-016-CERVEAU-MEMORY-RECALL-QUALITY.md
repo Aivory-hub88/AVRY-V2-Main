@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§12). P1 not started. P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented and tested, not deployed (§15). P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -228,4 +228,23 @@ On the owner's instruction, the config-only option from §13 was applied to `/ho
 - **Watch for:** more memories now reach the prompt (mean about 1.4 per turn on the fixture instead of about 0.3), so slightly more context tokens per turn; and near-duplicate collapse is now active. If tenants report irrelevant memories being quoted, raise `min_relevance_score` towards 0.35.
 
 **Reverted by the owner (2026-09-20 09:51 CST).** The two settings were set back to `rerank_enabled = false` and `min_relevance_score = 0.4` about five minutes after they were applied (verified on the VPS: config lines, service active, health 200, journal clean). The stopgap is therefore **not in effect**; production is back to the behaviour measured as `injected` in §13 (0.286 on the fixture). The reason for the revert was not stated. Anything above that says "applied" describes the 09:46-09:51 window only. Re-applying needs the owner's explicit go-ahead.
+
+## 15. P1 implemented (2026-09-20), not deployed
+
+`AVRY-Cerveau` branch `feat/memory-recall-bench`, commit `88e363786` (not merged to `cerveau-main`, not deployed). Changes to `zeroclaw-memory/src/postgres.rs` and the `memory_store` tool:
+
+1. **Importance now works end to end.** Implementing it exposed that G1 had three layers, not one: the store ignored the value, none of the ten SELECT statements fetched the column, and the reader asked for `f64` from a `REAL` column, which the driver rejects and `.ok()` silently turned into `None`. All three are fixed. An explicit value is clamped to 0-1; otherwise `importance::compute_importance` supplies one. Re-storing a key never lowers a deliberate value. The `memory_store` tool takes an optional `importance` (0-1, invalid values ignored, never a reason to lose the memory).
+2. **Supersede exists.** `superseded_by` column, `AND superseded_by IS NULL` in all four ranked recall queries, `mark_superseded` / `clear_superseded` on `PostgresMemory`. Rows are kept, so a wrong call is reversible; a fresh write to the same key revives the row; a row cannot supersede itself. The tenant budget now evicts superseded rows first, then orders by importance. Nothing calls `mark_superseded` automatically (that is P4).
+3. **Access tracking.** `access_count` and `last_accessed_at`, updated by one best-effort statement after each ranked recall. A failed update cannot fail a recall.
+4. **Schema:** four additive columns (`ADD COLUMN IF NOT EXISTS`, nullable or constant-defaulted), now created on every deployment, not only the pgvector path. The previous binary ignores them, so a binary rollback is safe. Rows written before the upgrade keep `importance = NULL` (no backfill, as decided in §5).
+
+**Verification.** New `pg_memory_p1` test (importance stored/clamped/defaulted/kept on re-store; supersede hidden, reversible, revived; budget keeps an old important row and evicts a superseded one first; access counts; in-place upgrade of a table created before P1) and a `memory_store` tool test. Three deliberate mutations (drop the recall filter, drop superseded-first ordering, read importance as `f64` again) each made the test fail. Existing suites unchanged: `pg_lifecycle`, `pg_embedding_recall`, `pg_v3_migration_schema_scope`, `pg_vector_init_thread`, `tenant_isolation` pass; `zeroclaw-memory` lib tests pass except `parsed_lucid_alias_drives_factory_binary_and_distinct_timeouts`, which already failed before this change. Wired into the CI `postgres-tests` job.
+
+**Effect on recall quality.** The benchmark's `rerank_imp_*` variants, which simulated stored importance with the heuristic, now use what the backend really stores and reproduce the same numbers (`rerank_imp_f0.4` 0.829, `rerank_imp_f0.3` 0.943). The production-like `injected` variant is unchanged at 0.286: **P1 alone changes nothing the user sees while `rerank_enabled` is off**, because the time-decay arm never reads importance. Its value is that a later config or code change (rerank on, or P3) now has a real importance signal, and that the budget prune is no longer recency-only.
+
+**Consequence for the config stopgap (§13-§14).** With P1 deployed, `rerank_enabled = true` alone (floor left at 0.4) is the `rerank_imp_f0.4` row: hit@5 0.829, no-answer queries handled 0.80, 2.2 memories shown. That is a one-line config change with a better precision trade-off than the two-line stopgap that was reverted, and it should only be considered after P1 is deployed and the owner agrees.
+
+**New observation (G6, not changed):** `row_to_entry` reports `created_at` as the entry timestamp and the upsert never touches `created_at`, so a fact that is re-stored or corrected keeps looking old to the decay and to rerank's recency factor. Worth deciding in P3 whether ranking should use `updated_at`.
+
+**Deploy plan (needs the owner's go-ahead):** merge to `cerveau-main`, let CI build, run the guarded deploy script (sha256, verified predecessor, doctor, atomic swap, health, rollback). First start runs four `ADD COLUMN IF NOT EXISTS` on `cerveau.memories` (549 rows; metadata-only, brief lock). Then a probe: store with and without `importance`, recall, confirm `access_count` moves.
 
