@@ -44,13 +44,13 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/New_Favicon_2026.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: '48x48' },
-      { url: '/icon-16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/icon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icon-48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/favicon.ico?v=20260920', sizes: '48x48' },
+      { url: '/icon-16.png?v=20260920', sizes: '16x16', type: 'image/png' },
+      { url: '/icon-32.png?v=20260920', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-48.png?v=20260920', sizes: '48x48', type: 'image/png' },
       { url: '/icon.svg', type: 'image/svg+xml' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: '/apple-touch-icon.png?v=20260920',
   },
   title: {
     default: SITE_TITLE,
