@@ -217,3 +217,12 @@ The harness now replays the same candidate pool through ten injection variants, 
 - **Do not** flip `rerank_enabled` alone.
 - **Optional stopgap, no deploy of code:** set `rerank_enabled = true` and `min_relevance_score = 0.3` in `~/.zeroclaw-cerveau/config.toml` and restart. It is global (every tenant), reversible by restoring the two lines, and would print the stale "rerank not implemented" validator warning (§9). Expected effect on this fixture: hit@5 0.286 to 0.800. Not applied.
 - **Proper fix:** P1 (persist importance) then P3 (drop or slow the decay under a calibrated floor). The harness will show the gain against `injected` and enforce it in CI.
+
+## 14. Stopgap applied to production (2026-09-20 09:46 CST)
+
+On the owner's instruction, the config-only option from §13 was applied to `/home/ubuntu/.zeroclaw-cerveau/config.toml` `[memory]`: `rerank_enabled = false -> true` and `min_relevance_score = 0.4 -> 0.3`. No binary change.
+
+- **Procedure:** backup `config.toml.bak-pre-rerank-20260920`; a two-line diff and nothing else; `doctor` before restart (87 ok, 23 warnings, 0 errors; the extra warning is the stale "rerank not implemented" message, §9); restart with automatic config rollback if health failed. Health 200, `NRestarts=0`, journal clean, and the config still held the change after the restart (no file watcher reverted it).
+- **Probe:** a synthetic tenant stored a fact in one session and a new session, with no hint, answered it correctly ("Kopi Kita wants all invoices sent on the 25th of each month"). Probe rows were deleted afterwards. This shows the memory path works under the new setting; it does **not** measure recall quality in production, which this ADR can only estimate from the fixture (0.286 -> 0.800).
+- **Rollback:** `cp -p /home/ubuntu/.zeroclaw-cerveau/config.toml.bak-pre-rerank-20260920 /home/ubuntu/.zeroclaw-cerveau/config.toml && sudo systemctl restart zeroclaw-cerveau`. Note: this backup is from 09:35 CST; any config change made after that by another process would be lost by a full restore, so prefer reverting the two lines by hand.
+- **Watch for:** more memories now reach the prompt (mean about 1.4 per turn on the fixture instead of about 0.3), so slightly more context tokens per turn; and near-duplicate collapse is now active. If tenants report irrelevant memories being quoted, raise `min_relevance_score` towards 0.35.
