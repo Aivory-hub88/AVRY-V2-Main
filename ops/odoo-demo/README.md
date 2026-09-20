@@ -1,7 +1,6 @@
 # Odoo Demo — bootstrap → golden → inject → reset
 
-Persistent demo instance: `https://odoo-demo.aivory.uk` (also served at
-`odoo-demo.aivory.id`) — Odoo 19 Community + Postgres 15, Traefik TLS, addon
+Persistent demo instance: `https://odoo-demo.aivory.id` — Odoo 19 Community + Postgres 15, Traefik TLS, addon
 `aivory_cerveau_odoo` mounted read-only. (`odoo.aivory.id` is the team's Odoo 17,
 a different box.) You log in as `admin` and have the full Settings menu, so
 API keys, users and modules can all be managed from the UI; nothing here is a

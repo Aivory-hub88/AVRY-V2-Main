@@ -3,7 +3,7 @@
 Check the exact path the Odoo MCP uses: log in with the agent's API key over
 XML-RPC and JSON-2, read real business data, and confirm the key is NOT an admin.
 
-  ODOO_URL=https://odoo-demo.aivory.uk ODOO_DB=demo \
+  ODOO_URL=https://odoo-demo.aivory.id ODOO_DB=demo \
   ODOO_USER=aivory-agent ODOO_API_KEY=xxx ./ops/odoo-demo/verify_agent.py
 
 Exit code 0 = everything the MCP needs works; the key is never printed.
@@ -14,7 +14,7 @@ import sys
 import urllib.request
 import xmlrpc.client
 
-url = os.environ.get("ODOO_URL", "https://odoo-demo.aivory.uk").rstrip("/")
+url = os.environ.get("ODOO_URL", "https://odoo-demo.aivory.id").rstrip("/")
 db = os.environ.get("ODOO_DB", "demo")
 user = os.environ.get("ODOO_USER", "aivory-agent")
 key = os.environ.get("ODOO_API_KEY") or sys.exit("set ODOO_API_KEY")

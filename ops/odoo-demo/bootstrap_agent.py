@@ -13,7 +13,7 @@ Idempotent: re-running keeps the user and does NOT mint a second key unless
 ROTATE_KEY=1. The key is printed once and never stored (Odoo keeps only a hash).
 
 Env (all optional):
-  ODOO_PUBLIC_URL   default https://odoo-demo.aivory.uk
+  ODOO_PUBLIC_URL   default https://odoo-demo.aivory.id
   ODOO_AGENT_LOGIN  default aivory-agent
   ROTATE_KEY        1 = revoke existing "Aivory MCP" keys and mint a new one
                     (Odoo 19 keys expire after at most 90 days -- rotate on a schedule)
@@ -23,7 +23,7 @@ Env (all optional):
 import os
 from datetime import datetime, timedelta
 
-PUBLIC_URL = os.environ.get("ODOO_PUBLIC_URL", "https://odoo-demo.aivory.uk")
+PUBLIC_URL = os.environ.get("ODOO_PUBLIC_URL", "https://odoo-demo.aivory.id")
 AGENT_LOGIN = os.environ.get("ODOO_AGENT_LOGIN", "aivory-agent")
 KEY_NAME = "Aivory MCP"
 

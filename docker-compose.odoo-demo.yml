@@ -1,12 +1,9 @@
 version: '3.8'
 
 # ─── Aivory Odoo Demo — persistent demo instance for prospect demos ──────────
-# URL: https://odoo-demo.aivory.uk (canonical) + https://odoo-demo.aivory.id (kept)
-#      Odoo 19 Community — mirrors prospect env
+# URL: https://odoo-demo.aivory.id (Odoo 19 Community — mirrors prospect env)
 # (https://odoo.aivory.id is the team's Odoo 17 — a different box.)
-# DNS: A record odoo-demo -> VPS IP on BOTH zones, DNS-only (Traefik HTTP challenge).
-#      Each host has its own router so a missing DNS record on one zone cannot
-#      block the certificate for the other.
+# DNS: A record odoo-demo -> VPS IP, DNS-only (Traefik TLS-ALPN/HTTP challenge)
 # Secrets: NOT in this file — ops/odoo-demo/odoo.conf on the VPS only
 #   (see ops/odoo-demo/odoo.conf.example). Never commit the real odoo.conf.
 # Usage (on VPS, from repo root):
@@ -61,11 +58,6 @@ services:
       - "traefik.http.routers.odoo-demo.entrypoints=websecure"
       - "traefik.http.routers.odoo-demo.tls.certresolver=letsencrypt"
       - "traefik.http.routers.odoo-demo.middlewares=aivory-odoo-secure@file"
-      - "traefik.http.routers.odoo-demo-uk.rule=Host(`odoo-demo.aivory.uk`)"
-      - "traefik.http.routers.odoo-demo-uk.entrypoints=websecure"
-      - "traefik.http.routers.odoo-demo-uk.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.odoo-demo-uk.middlewares=aivory-odoo-secure@file"
-      - "traefik.http.routers.odoo-demo-uk.service=odoo-demo"
       - "traefik.http.services.odoo-demo.loadbalancer.server.port=8069"
 
 volumes:
