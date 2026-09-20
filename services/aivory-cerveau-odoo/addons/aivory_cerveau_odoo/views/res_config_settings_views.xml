@@ -15,9 +15,6 @@
                                         string="Manage Aivory agents" icon="oi-arrow-right" class="btn-link"/>
                             </div>
                         </setting>
-                        <setting id="aivory_cerveau_api_key_setting" string="Aivory API Key (side-panel widget)" help="Created from the Aivory dashboard (Agents > an agent > Customize > Deploy > Create API Key) -- already bound to one agent for this tenant.">
-                            <field name="aivory_cerveau_api_key" password="True"/>
-                        </setting>
                     </block>
                 </app>
             </xpath>

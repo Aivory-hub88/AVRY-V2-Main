@@ -10,7 +10,7 @@
 # running container, so no Odoo password/RPC is needed and the API key never touches
 # a file: it is printed once by `agent` and Odoo stores only its hash.
 #
-# Env (all optional): ODOO_DB=demo  ODOO_PUBLIC_URL  ROTATE_KEY=1  AIVORY_API_KEY
+# Env (all optional): ODOO_DB=demo  ODOO_PUBLIC_URL  ROTATE_KEY=1
 #                     ODOO_MODULES  SVC  COMPOSE  ODOO_ARGS (override for non-prod setups)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -22,7 +22,7 @@ ODOO_ARGS="${ODOO_ARGS:--c /etc/odoo/odoo.conf}"
 MODULES="${ODOO_MODULES:-sale_management,account,l10n_us,crm,sale_crm,project,sale_project,purchase,calendar,aivory_cerveau_odoo}"
 
 env_flags=()
-for v in ODOO_PUBLIC_URL ODOO_AGENT_LOGIN ROTATE_KEY AIVORY_API_KEY; do
+for v in ODOO_PUBLIC_URL ODOO_AGENT_LOGIN ROTATE_KEY; do
   [[ -n "${!v:-}" ]] && env_flags+=(-e "$v=${!v}")
 done
 

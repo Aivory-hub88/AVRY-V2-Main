@@ -17,9 +17,7 @@ locked-down hosted demo.
    Calendar, Invoicing, `sale_crm`, `sale_project` and the Aivory chat addon.
 5. `./ops/odoo-demo/bootstrap_demo.sh agent` — makes `aivory-agent` an internal user
    (app-level rights, **not** Settings admin), sets `web.base.url`, and prints an
-   API key **once**. Put it in the Od-MCP / `ODOO_API_KEY` config. Add
-   `AIVORY_API_KEY=<tenant key from the Aivory dashboard>` to the same command to
-   wire the chat widget's `aivory_cerveau.api_key` too.
+   API key **once**. Put it in the Od-MCP / `ODOO_API_KEY` config.
 6. Freeze golden (clean instance + agent user, before any demo data):
    `docker exec aivory-odoo-demo-db pg_dump -U odoo -Fc demo > ops/odoo-demo/golden/demo_golden.dump`
 7. `./ops/odoo-demo/bootstrap_demo.sh seed` — the roofer dataset.
@@ -51,8 +49,8 @@ Everything is done inside Odoo as `admin` — no terminal:
 
 Group channels stay quiet unless an agent is mentioned, and agents never trigger each
 other. Removing a row (or toggling *Active* off) retires the bot but keeps its history.
-The old single "Aivory" bot and its *Aivory API Key (side-panel widget)* setting are
-left only for the systray widget; the generic bot was retired by the 19.0.2.0.0 upgrade.
+The old single "Aivory" bot was retired by the 19.0.2.0.0 upgrade, and the systray
+chat widget (with its own key) was removed in 19.0.2.1.0 — Discuss is the only surface.
 
 **Two different keys, two directions — don't mix them up:**
 

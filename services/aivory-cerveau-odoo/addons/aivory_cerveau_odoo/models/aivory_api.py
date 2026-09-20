@@ -1,9 +1,8 @@
 """Shared client for the Aivory agent API.
 
 Single place that talks to ``POST /api/v1/agent-api/message`` on
-``backend.aivory.id`` with a per-tenant ``X-Aivory-Api-Key``. Used by both the
-systray controller (``controllers/main.py``) and the Discuss bot hook
-(``models/discuss_channel.py``) so the two surfaces behave identically.
+``backend.aivory.id`` with a per-agent ``X-Aivory-Api-Key``. Used by the Discuss
+bot hook (``models/discuss_channel.py``).
 
 The key is bound server-side to one ``(user_id, agent_type)`` pair at
 creation -- this addon never holds Cerveau's shared webhook secret (see

@@ -17,8 +17,6 @@ Env (all optional):
   ODOO_AGENT_LOGIN  default aivory-agent
   ROTATE_KEY        1 = revoke existing "Aivory MCP" keys and mint a new one
                     (Odoo 19 keys expire after at most 90 days -- rotate on a schedule)
-  AIVORY_API_KEY    the tenant key from the Aivory dashboard (Deploy -> Create API
-                    Key); stored as aivory_cerveau.api_key so the chat widget works
 """
 import os
 from datetime import datetime, timedelta
@@ -43,10 +41,6 @@ ICP = env["ir.config_parameter"].sudo()  # noqa: F821 -- `env` is injected by od
 ICP.set_param("web.base.url", PUBLIC_URL)
 ICP.set_param("web.base.url.freeze", "True")
 print(f"web.base.url = {PUBLIC_URL} (frozen)")
-
-if os.environ.get("AIVORY_API_KEY"):
-    ICP.set_param("aivory_cerveau.api_key", os.environ["AIVORY_API_KEY"])
-    print("aivory_cerveau.api_key set (chat widget can now reach the Aivory agent)")
 
 Users = env["res.users"].with_context(no_reset_password=True)  # noqa: F821
 user = Users.with_context(active_test=False).search([("login", "=", AGENT_LOGIN)], limit=1)
