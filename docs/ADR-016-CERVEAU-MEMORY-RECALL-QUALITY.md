@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). Nothing implemented. P0 and P1 are ready to start; P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 harness built with a keyword-mode baseline (§11); hybrid baseline pending embeddings. P1 not started. P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -112,7 +112,7 @@ Read from the production config, `[memory]` section. Consequences:
 | Rows with `importance` set | **0** (G1 confirmed live) |
 | Largest tenant-agent | 212 rows (`t_user_d0985ab099ef142a.leads_qualifier`); next 75 and 22 |
 | Default caps (`PgLifecycleConfig`) | core 2000, daily 1000, conversation 500 per tenant; age caps daily 180 d, conversation 30 d |
-| `cerveau.tenant_quota` table | **does not exist** in production (per-tier quotas from ADR-004 §2 were never deployed) |
+| Per-tier quota table `cerveau.cerveau_tenant_quota` | exists, **0 rows**: no tier override has ever been seeded, so every tenant runs on the flat defaults (an earlier draft of this ADR wrongly said the table was missing; it had queried the wrong name) |
 
 By category and `updated_at` age:
 
@@ -129,4 +129,28 @@ Consequences for the plan:
 - **Priority change:** move the recency work (P3) ahead of RRF (P2). It addresses the measured problem, and unlike RRF it needs no proof that the fusion is worse. P0 still comes first, so the change is measured.
 - **Corpus is dominated by one tenant plus test tenants** (`pg-test-*`, `test-lat`, `probe-*` and the 16-row `default` agent). Any benchmark golden set must be built from the real tenant and must exclude test tenants.
 - The `updated_at` bucket is used because `store` upserts (`ON CONFLICT ... updated_at = EXCLUDED.updated_at`); `created_at` ages would be older.
-- `tenant_quota` missing means the per-tier caps promised in ADR-004 §2 do not exist; only the flat defaults apply. Worth a separate decision when tenants approach the defaults, not now.
+- The quota table is empty, so the per-tier caps of ADR-004 §2 are not in effect; only the flat defaults apply. Worth a separate decision when tenants approach the defaults, not now.
+
+## 11. P0 status (2026-09-20): harness built, keyword baseline recorded, hybrid baseline pending
+
+**Where:** `AVRY-Cerveau` branch `feat/memory-recall-bench` (`e66d4fdc9`, `b5128d4e8`), not yet merged to `cerveau-main`. Test `crates/zeroclaw-memory/tests/pg_recall_bench.rs`, fixtures in `tests/fixtures/recall_bench/` (`corpus.json`, `baseline.json`, `gen_embeddings.py`). The corpus is fully synthetic (40 memories over three agents, 36 queries in English and Indonesian, rows aged 1-100 days); it deliberately contains **no** production rows, because the fixture is committed. Wired into the CI `postgres-tests` job.
+
+**What it measures:** hit@5 and MRR per query kind (`exact`, `paraphrase`, `indonesian`, `old`, `multi`, `isolation`), through the real `recall_for_agents`, in two pipelines: `raw` (what `memory_recall` returns) and `injected` (raw, then the flat 7-day decay and the 0.4 floor exactly as `memory_inject.rs` applies them). It also asserts zero cross-agent leaks, including a case where the same sentence exists in two tenants. Regression tolerance: hit@5 may fall 0.03 below the recorded baseline. The detection was mutation-checked (a raised baseline makes the run fail).
+
+**Baseline, keyword-only mode (no embeddings yet), raw pipeline:**
+
+| kind | n | hit@5 | MRR |
+|---|---|---|---|
+| all | 35 | 0.914 | 0.818 |
+| exact | 6 | 1.000 | 1.000 |
+| indonesian | 8 | 1.000 | 0.906 |
+| old | 6 | 1.000 | 1.000 |
+| multi | 3 | 1.000 | 1.000 |
+| paraphrase | 11 | **0.727** | **0.488** |
+
+**How to read it, honestly:**
+- The paraphrase row is the only one with headroom. It is also the row a vector channel should lift, so it is the number P2 has to move.
+- These figures are **inflated by the small corpus**: each agent has about 34 rows, so a random top-5 already hits about 15% of the time, and the OR `to_tsquery` over the `simple` text-search config keeps stopwords, so a query such as "what time do reports get sent?" matches many rows on filler words. Do not compare these numbers with production; use them only to compare a change against the same fixture. A larger corpus with more distractors is the obvious next improvement and needs the embeddings step below.
+- The `injected` pipeline and the whole `hybrid` mode need precomputed embeddings and are **not measured yet**. That is the number that would quantify G4 (the 7-day cliff) on the `old` queries.
+
+**To finish P0:** run `OPENROUTER_API_KEY=... python3 gen_embeddings.py` once (same model and 768 dimensions as production, about 80 short strings, a fraction of a cent, no private data), then `RECALL_BENCH_WRITE_BASELINE=1 cargo test ... --test pg_recall_bench` against a Postgres that has pgvector (the CI service container has it; a local Postgres 16 needs `pgvector` installed). Commit `embeddings.json` (about 1.5 MB) and the updated baseline.
