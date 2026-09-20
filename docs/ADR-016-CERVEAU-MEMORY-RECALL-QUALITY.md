@@ -185,3 +185,35 @@ hit@5 by pipeline (35 answerable queries):
 - **P2 (RRF) is downgraded** from "likely" to "only if a larger corpus shows a gain"; note that RRF scores live around 0.03, so adopting it would force the floor to be redefined anyway (rank cut-off instead of an absolute score).
 - **A cheap interim mitigation exists and is reversible:** lowering `memory.min_relevance_score` (for example to 0.2) and/or turning `rerank_enabled` on (which replaces the decay with a recency blend) are config-only changes. Rerank's importance term is still 0 until P1 (G1), so its effect is recency plus retrieval only. Neither should be applied to production before the benchmark shows the result with that setting; the harness can be extended with these variants in an hour.
 - P1 is unchanged and still worth doing (G1, G2 are real defects), but it is no longer on the critical path for the user-visible symptom.
+
+## 13. Candidate variants measured (2026-09-20, `feat/memory-recall-bench` after `ebb94aae6`)
+
+The harness now replays the same candidate pool through ten injection variants, so a proposed change can be judged before anything is deployed. `neg` is the share of five no-answer queries that correctly return nothing (ideal 1.00); `ret` is the mean number of memories shown per query. `raw` is the backend's own top 5 and is shown for reference.
+
+| variant | what it is | hit@5 all | paraphrase | indonesian | old | neg | ret |
+|---|---|---|---|---|---|---|---|
+| `injected` | **production today**: 7-day decay, floor 0.4 | 0.286 | 0.364 | 0.125 | 0.000 | 1.00 | 0.3 |
+| `decay_f0.3` | config only: floor 0.3, decay kept | 0.314 | 0.364 | 0.250 | 0.000 | 1.00 | 0.5 |
+| `decay_f0.2` | config only: floor 0.2, decay kept | 0.457 | 0.545 | 0.375 | 0.000 | 0.60 | 1.9 |
+| `rerank_f0.4` | config only: `rerank_enabled=true`, floor 0.4 | 0.457 | **0.091** | 0.500 | 0.667 | 1.00 | 0.5 |
+| `rerank_f0.3` | config only: `rerank_enabled=true`, floor 0.3 | **0.800** | 0.545 | 0.750 | 1.000 | 0.80 | 1.4 |
+| `rerank_f0.2` | config only: `rerank_enabled=true`, floor 0.2 | 0.971 | 0.909 | 1.000 | 1.000 | 0.60 | 4.9 |
+| `floor_only` | code: no decay, floor 0.4 | 0.771 | 0.455 | 0.750 | 1.000 | 1.00 | 1.0 |
+| `nodecay_f0.3` | code: no decay, floor 0.3 | 0.914 | 0.727 | 1.000 | 1.000 | 0.80 | 1.8 |
+| `nodecay_f0.2` | code: no decay, floor 0.2 | 1.000 | 1.000 | 1.000 | 1.000 | 0.40 | 4.7 |
+| `rerank_imp_f0.4` | needs P1: rerank, heuristic importance stored, floor 0.4 | 0.829 | 0.636 | 0.750 | 1.000 | 0.80 | 2.2 |
+| `rerank_imp_f0.3` | needs P1: same, floor 0.3 | 0.943 | 0.818 | 1.000 | 1.000 | 0.60 | 5.0 |
+
+**Reading**
+1. **Lowering the floor while keeping the decay barely helps** (0.286 to 0.314 at 0.3, 0.457 at 0.2). The decay is the dominant cause; the floor cannot compensate for it.
+2. **Turning rerank on with the current floor is worse than it looks.** The blend is `0.7·hybrid + 0.2·importance + 0.1·recency`; with importance always 0 (G1) a correct match scoring 0.49 blends to about 0.44 at best, so the unchanged 0.4 floor still removes most of them (paraphrase 0.091). **Do not enable `rerank_enabled` without also lowering `min_relevance_score`.**
+3. **The best config-only option is `rerank_enabled=true` with `min_relevance_score=0.3`:** 0.286 to 0.800, while still returning nothing for 80% of the no-answer queries and showing 1.4 memories on average. Floor 0.2 is nearly `raw` (0.971) but stops filtering (ret 4.9, neg 0.60).
+4. **Storing importance (P1) is worth +0.14 to +0.37 at the same floor** (`rerank_f0.3` 0.800 to `rerank_imp_f0.3` 0.943; `rerank_f0.4` 0.457 to `rerank_imp_f0.4` 0.829). This makes P1 part of the visible fix, not only a defect cleanup. Caveat: the heuristic importance is category-based (core 0.7, daily 0.3), so part of that gain is "prefer core rows", not "prefer relevant rows".
+5. **Removing the decay with a modest floor is the best trade-off overall** (`nodecay_f0.3`: 0.914, neg 0.80, ret 1.8). It needs a code change (P3), not just config.
+
+**Limits of this measurement.** The no-answer set is five queries against an agent with only three rows, so `ret` is capped at 3 and `neg` is directional only. Answers are mostly old rows (§12 caveat). The importance variant uses the heuristic scorer, not what the model would choose. Nothing here has been applied to production.
+
+**Recommendation (decision for the owner)**
+- **Do not** flip `rerank_enabled` alone.
+- **Optional stopgap, no deploy of code:** set `rerank_enabled = true` and `min_relevance_score = 0.3` in `~/.zeroclaw-cerveau/config.toml` and restart. It is global (every tenant), reversible by restoring the two lines, and would print the stale "rerank not implemented" validator warning (§9). Expected effect on this fixture: hit@5 0.286 to 0.800. Not applied.
+- **Proper fix:** P1 (persist importance) then P3 (drop or slow the decay under a calibrated floor). The harness will show the gain against `injected` and enforce it in CI.
