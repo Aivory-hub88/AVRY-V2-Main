@@ -16,6 +16,26 @@ _LINK = re.compile(r'\[([^\]\n]+)\]\((https?://[^\s)]+)\)')
 _BULLET = re.compile(r'^\s*[-*•]\s+(.*)$')
 _NUMBER = re.compile(r'^\s*\d+[.)]\s+(.*)$')
 _HEADING = re.compile(r'^\s*#{1,6}\s+(.*)$')
+# table separator row: "---  ---  ---" or "|---|:---:|" (agents send either, and the chat gateway
+# may strip the pipes, leaving columns separated by runs of spaces)
+_TABLE_SEP = re.compile(r'^\s*\|?\s*:?-{3,}:?\s*(?:[|\s]\s*:?-{3,}:?\s*)+\|?\s*$')
+_NUMERIC = re.compile(r'^[\s$€£+\-−]*[\d][\d.,\s]*[%kKmM]?$')
+
+
+def _cells(line):
+    line = line.strip()
+    if '|' in line:
+        return [c.strip() for c in line.strip('|').split('|')]
+    return [c.strip() for c in re.split(r'\s{2,}', line)]
+
+
+def _table(header, rows):
+    def cell(tag, text):
+        align = ' style="text-align:right"' if tag == 'td' and _NUMERIC.match(text) else ''
+        return f'<{tag}{align}>{_inline(text)}</{tag}>'
+    head = ''.join(cell('th', c) for c in header)
+    body = ''.join('<tr>' + ''.join(cell('td', c) for c in r) + '</tr>' for r in rows)
+    return f'<table class="table table-sm"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
 
 
 def _inline(text):
@@ -42,7 +62,22 @@ def render_reply(text):
             items.clear()
         kind = None
 
-    for raw in (text or '').replace('\r\n', '\n').split('\n'):
+    lines = (text or '').replace('\r\n', '\n').split('\n')
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        i += 1
+        # a table = header line, separator line, then row lines (>= 2 cells) up to a blank line
+        if raw.strip() and i < len(lines) and _TABLE_SEP.match(lines[i]) and len(_cells(raw)) >= 2:
+            header, rows, j = _cells(raw), [], i + 1
+            while j < len(lines) and lines[j].strip() and len(_cells(lines[j])) >= 2:
+                rows.append(_cells(lines[j]))
+                j += 1
+            flush_para()
+            flush_list()
+            blocks.append(_table(header, rows))
+            i = j
+            continue
         bullet, number, heading = _BULLET.match(raw), _NUMBER.match(raw), _HEADING.match(raw)
         if bullet or number:
             flush_para()
@@ -64,3 +99,25 @@ def render_reply(text):
     flush_para()
     flush_list()
     return Markup(''.join(blocks) or '<p></p>')
+
+
+def with_context_note(text, company, author, currency=''):
+    """Prefix a question with where it came from and how to answer it.
+
+    The agent API takes only ``text``. Without this the agent has no idea the question was asked
+    inside Odoo: with several CRMs connected it picked Aivory's own lead inbox (test leads) over
+    the tenant's Odoo, and it drifted into the language of that data instead of the user's.
+    Kept short: it travels with every message and lands in the agent's history.
+    """
+    who = f' · asked by {author}' if author else ''
+    money = (f'Amounts are in {currency}: report them as they are, with no currency conversion or web lookups. '
+             if currency else '')
+    note = (
+        f'[Odoo Discuss · {company}{who}]\n'
+        "This company's CRM and ERP live in Odoo. If Odoo tools (server tenant_odoo) are available, use them "
+        'for anything about leads, pipeline, quotes, orders, invoices, purchases, projects or the calendar, '
+        'and do not substitute another CRM. Prefer one aggregate query (odoo_read_group) over many small ones. '
+        + money +
+        'Reply in the language the question below is written in (not the language of this note).\n\n'
+    )
+    return (note + text)[:8000]

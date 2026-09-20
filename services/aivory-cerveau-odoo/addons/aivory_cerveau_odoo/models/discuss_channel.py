@@ -29,7 +29,7 @@ from markupsafe import Markup
 from odoo import SUPERUSER_ID, api, models
 from odoo.modules.registry import Registry
 
-from odoo.addons.aivory_cerveau_odoo.models.aivory_format import render_reply
+from odoo.addons.aivory_cerveau_odoo.models.aivory_format import render_reply, with_context_note
 from odoo.addons.aivory_cerveau_odoo.models.aivory_api import (
     REPLY,
     SHOW,
@@ -96,9 +96,11 @@ class DiscussChannel(models.Model):
         if not text:
             return
         base_url = self.env['ir.config_parameter'].sudo().get_param('aivory_cerveau.api_base_url')
+        author = self.env['res.partner'].sudo().browse(msg_vals.get('author_id')).name or ''
+        prompt = with_context_note(text, self.env.company.name, author, self.env.company.currency_id.name)
         dbname, channel_id, chan_key = self.env.cr.dbname, self.id, self.uuid or self.id
         for agent in targets:
-            args = (dbname, channel_id, agent.partner_id.id, base_url, agent.api_key, text,
+            args = (dbname, channel_id, agent.partner_id.id, base_url, agent.api_key, prompt,
                     f'discuss-{chan_key}-{agent.agent_type}')
             # postcommit: the sender's message is already visible when the agent starts
             self.env.cr.postcommit.add(

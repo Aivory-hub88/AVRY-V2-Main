@@ -23,8 +23,8 @@ Ask in Odoo **Discuss** (`@Lex …`, `@Finn …`) or in the Aivory dashboard.
 ## 2. Finn — finance
 | Ask | Good answer |
 |---|---|
-| "Who owes us money and how late?" | Grace Lindqvist, Oak Terrace HOA (partial, disputed), Monica Reyes; ≈ $57k overdue |
-| "What do we owe suppliers?" | 2 open vendor bills ≈ $13k |
+| "Who owes us money and how late?" | Grace Lindqvist, Oak Terrace HOA (partial, disputed), Monica Reyes; ≈ $52k overdue (incl. 6 % tax) |
+| "What do we owe suppliers?" | 2 open vendor bills ≈ $12k |
 | "Which completed jobs had the thinnest material margin?" | the jobs where decking was rotten — 27–36 % vs 62 % average |
 | "Revenue by month for the last six months." | six monthly totals, roughly $85k–$197k, July highest |
 
@@ -48,7 +48,7 @@ Ask in Odoo **Discuss** (`@Lex …`, `@Finn …`) or in the Aivory dashboard.
 |---|---|
 | "Who are our top five customers and who is a repeat customer?" | Brazos Family Dental / Douglas Pratt / … ; repeat: Pratt, Miller, Tolliver |
 | "Average deal size and how long from lead to close?" | ≈ $22k, ≈ 12 days |
-| "Cash owed to us vs owed to suppliers, and what jobs are in progress?" | ≈ $57k vs ≈ $13k; job board by stage |
+| "Cash owed to us vs owed to suppliers, and what jobs are in progress?" | ≈ $52k vs ≈ $12k; job board by stage |
 | "Where are we losing deals and why?" | Price too high is #1, then "went with another contractor" |
 
 ## 6. Aira — chief of staff

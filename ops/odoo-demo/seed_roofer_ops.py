@@ -600,6 +600,25 @@ for j in JOBS:
     if j["who"] and j["who"].startswith("k"):
         partners[j["who"]].write({"category_id": [(4, cats["comm"].id)]})
 
+# Odoo opens CRM, Quotations and Tasks on "mine only" filters. Every demo record belongs to Dana or
+# Marcus, so an Administrator saw empty boards ("Create an opportunity to start playing...").
+# Show everybody's records by default.
+import re  # noqa: E402
+for _xmlid, _keys in [
+    ("crm.crm_lead_action_pipeline", ["search_default_assigned_to_me"]),
+    ("crm.crm_lead_action_forecast", ["search_default_assigned_to_me"]),
+    ("project.action_view_task", ["search_default_my_tasks"]),
+    ("sale.action_quotations", ["search_default_my_quotation"]),
+    ("sale.action_quotations_with_onboarding", ["search_default_my_quotation"]),
+]:
+    _act = env.ref(_xmlid, raise_if_not_found=False)
+    if _act:
+        _new = _act.context or ""
+        for _k in _keys:
+            _new = re.sub(rf"'{_k}'\s*:\s*\w+\s*,?\s*", "", _new)
+        if _new != (_act.context or ""):
+            _act.write({"context": _new})
+
 # ------------------------------------------------------------------- chatter history
 # Realistic threads so Teo (customer service) and Ofira have something to answer from.
 THREADS = {
