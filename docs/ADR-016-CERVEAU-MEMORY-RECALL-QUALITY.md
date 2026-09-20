@@ -269,3 +269,28 @@ Four minutes after the deploy in §16, the owner restored the previous binary fr
 - **The code is still on `cerveau-main`** (`88e363786`), so the next deploy of `cerveau-main`, from any session, will include P1 again. Anyone deploying from `cerveau-main` should know this. Reverting on `cerveau-main` is the owner's call.
 - **Status of the plan:** P0 (benchmark) stays valid and merged. P1 is implemented, CI-tested and live-proven in a 4-minute window, but not adopted. Nothing further is deployed. P3 and any backfill are on hold until the owner says what drove the rollbacks (both times unstated), because the design of P3 depends on it.
 
+## 18. What production actually looks like (2026-09-20, read-only)
+
+After the two rollbacks, the owner asked to test the premise with real data before changing anything else. Read-only queries on `cerveau.memories` and aggregate counts from the runtime traces (`runtime-trace*.jsonl`, 2026-09-04 to 2026-09-20, 394 turns). No content was copied out.
+
+**What is in the table (554 rows).**
+
+| kind | category | rows | avg length |
+|---|---|---|---|
+| engine autosave (`daily_...`, `core_<uuid>` keys) | daily | 344 | 205 chars |
+| engine autosave | core | 187 | 246 chars |
+| written deliberately (agent `memory_store`, other keys) | core | 4 | 198 |
+| written deliberately | daily | 3 | 282 |
+| conversation | conversation | 16 | 99 |
+
+So **96% of the table (531 rows) is written by the engine's own auto-save**, not by agents choosing to remember something; deliberate `memory_store` rows are 7 in total. The autosaves are short distilled notes of turns (for example an email that was sent). The autosaved rows labelled `core` (187) are exempt from decay; the 344 labelled `daily` are the ones exposed to the 7-day cliff. Growth is bursty: 0 to 130 rows a day (peak 129 on 09-18).
+
+**How agents use memory.** 72 of 394 turns (18%) called `memory_recall` explicitly, 146 calls in total; **86% returned results, 14% "No memories found"**. 105 of the 146 calls happened on a single day (09-18), so the rate is dominated by one busy session. The agents therefore can and do reach memory themselves through the tool, which has no decay and no floor.
+
+**What cannot be measured today.** The traces do not record what auto-injection put in the prompt (only message counts), and the Prometheus endpoint has no memory metric. So the size of the injection loss in production is **unknown**: §12's 0.286 comes from the synthetic fixture and has never been observed live. The fixture's content (business facts and rules) also differs from the real table (mostly distilled turn notes), so its absolute numbers may not transfer.
+
+**Consequences**
+- The case for P3 and for turning rerank on is **weaker than §12-§13 suggested**. Explicit recall works for agents 86% of the time, deliberate memories are rare, and most rows are low-value autosaves. What is *not* known is whether auto-injection matters for answer quality.
+- **Recommended next step, no behaviour change:** add observability instead of a fix. (1) A counter or log line per turn with the number of candidates recalled, how many survive decay and the floor, and how many the rerank blend *would* have kept (a **shadow evaluation**: computed, logged as counts, never injected). (2) Let it run for a few days. That yields the real loss rate with zero user impact and settles whether P3 is worth doing.
+- Until then: no rerank, no backfill, no further memory deploys. P1 remains on `cerveau-main` and is inert if redeployed only in the sense that it changes nothing user-visible, but it does change the schema and writes; the owner decides whether it stays.
+
