@@ -26,8 +26,11 @@ TIMEOUT = 200
 REPLY, SHOW, SILENT = 'reply', 'show', 'silent'
 
 
-def post_agent_message(api_key, text, session_id=None):
-    """Send one message, return ``(kind, text)``. ``text`` is None for SILENT."""
+def post_agent_message(api_key, text, session_id=None, base_url=None):
+    """Send one message, return ``(kind, text)``. ``text`` is None for SILENT.
+
+    ``base_url`` overrides the production backend (staging / tests).
+    """
     if not api_key:
         return SILENT, None
     payload = {'text': text}
@@ -35,7 +38,7 @@ def post_agent_message(api_key, text, session_id=None):
         payload['session_id'] = session_id
     try:
         resp = requests.post(
-            f'{AIVORY_API_BASE_URL}/api/v1/agent-api/message',
+            f'{(base_url or AIVORY_API_BASE_URL).rstrip("/")}/api/v1/agent-api/message',
             json=payload,
             headers={
                 'Content-Type': 'application/json',

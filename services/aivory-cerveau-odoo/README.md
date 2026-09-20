@@ -1,5 +1,10 @@
 # Aivory Cerveau Odoo Widget (scaffold)
 
+> **19.0.2.0.0:** the main surface is now Discuss, not the widget. Add agents under
+> Settings → Aivory Agents (one Aivory API key per agent); each gets a bot with its
+> dashboard name/avatar and answers to `@Name` or a direct chat. See
+> `ops/odoo-demo/README.md`. The systray widget below still works with its own key.
+
 Native OWL systray chat widget for Cerveau, embedded in Odoo's own web client.
 See `docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md` in the monorepo root for the full
 architecture, decisions, and open questions this scaffold does not yet

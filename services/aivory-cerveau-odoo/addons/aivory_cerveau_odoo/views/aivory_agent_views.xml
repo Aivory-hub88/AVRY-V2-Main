@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="aivory_agent_view_list" model="ir.ui.view">
+        <field name="name">aivory.agent.list</field>
+        <field name="model">aivory.agent</field>
+        <field name="arch" type="xml">
+            <list editable="bottom" string="Aivory Agents">
+                <field name="agent_type"/>
+                <field name="title" optional="show"/>
+                <field name="handle"/>
+                <field name="api_key" password="True" placeholder="Paste the key from the Aivory dashboard"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="aivory_agent_action" model="ir.actions.act_window">
+        <field name="name">Aivory Agents</field>
+        <field name="res_model">aivory.agent</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Add your first Aivory agent</p>
+            <p>Pick an agent (Geno, Teo, Lex, Finn, Ofira, Aira) and paste the API key you created
+            for it in the Aivory dashboard. It then appears in Discuss under its own name:
+            type <b>@Lex</b> in any channel, or open a direct chat with it.</p>
+        </field>
+    </record>
+
+    <menuitem id="aivory_agent_menu" name="Aivory Agents" parent="base.menu_administration"
+              action="aivory_agent_action" sequence="15"/>
+</odoo>

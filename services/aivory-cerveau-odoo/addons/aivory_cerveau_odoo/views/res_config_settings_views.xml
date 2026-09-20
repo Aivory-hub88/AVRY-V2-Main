@@ -8,7 +8,14 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Aivory" string="Aivory" name="aivory_cerveau_odoo">
                     <block title="Aivory" name="aivory_cerveau_setting_container">
-                        <setting id="aivory_cerveau_api_key_setting" string="Aivory API Key" help="Created from the Aivory dashboard (Agents > an agent > Customize > Deploy > Create API Key) -- already bound to one agent for this tenant.">
+                        <setting id="aivory_agents_setting" string="Aivory Agents in Discuss"
+                                 help="Each agent you add here appears in Discuss under its own name (Geno, Teo, Lex, Finn, Ofira, Aira) and answers when you @mention it or chat with it directly.">
+                            <div class="mt8">
+                                <button name="%(aivory_cerveau_odoo.aivory_agent_action)d" type="action"
+                                        string="Manage Aivory agents" icon="oi-arrow-right" class="btn-link"/>
+                            </div>
+                        </setting>
+                        <setting id="aivory_cerveau_api_key_setting" string="Aivory API Key (side-panel widget)" help="Created from the Aivory dashboard (Agents > an agent > Customize > Deploy > Create API Key) -- already bound to one agent for this tenant.">
                             <field name="aivory_cerveau_api_key" password="True"/>
                         </setting>
                     </block>

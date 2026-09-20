@@ -1,6 +1,6 @@
 {
     'name': 'Aivory Chat',
-    'version': '19.0.1.2.0',
+    'version': '19.0.2.0.0',
     'category': 'Productivity',
     'summary': 'Aivory agent in the Odoo systray and natively in Discuss',
     'description': """
@@ -11,9 +11,11 @@ Two surfaces, one agent:
 
 * A systray icon that opens an Aivory agent chat panel inside Odoo's own
   web client, instead of a bolted-on iframe.
-* An ``Aivory`` bot inside Discuss itself: mention ``@Aivory`` in any channel
-  or open a 1-1 chat with it, and the bound Aivory agent answers right in the
-  thread (each Discuss channel keeps its own agent history).
+* Every Aivory agent you add under Settings > Aivory Agents (Geno, Teo, Lex,
+  Finn, Ofira, Aira) gets its own bot in Discuss with the same name and avatar
+  as in the Aivory dashboard: mention ``@Lex`` in any channel or open a 1-1
+  chat with it and that agent answers right in the thread (each agent keeps
+  its own history per channel).
 
 Both go through ``POST /api/v1/agent-api/message`` with a per-tenant
 ``X-Aivory-Api-Key`` -- the addon never holds Cerveau's shared webhook
@@ -24,9 +26,10 @@ secret. See docs/CERVEAU-ODOO-UI-WIDGET-PLAN.md in the Aivory monorepo.
     'license': 'LGPL-3',
     'depends': ['base', 'web', 'mail'],
     'data': [
+        'security/ir.model.access.csv',
+        'views/aivory_agent_views.xml',
         'views/res_config_settings_views.xml',
     ],
-    'post_init_hook': 'post_init_hook',
     'assets': {
         'web.assets_backend': [
             'aivory_cerveau_odoo/static/src/js/systray_icon.js',

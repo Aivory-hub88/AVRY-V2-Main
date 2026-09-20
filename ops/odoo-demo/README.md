@@ -34,6 +34,33 @@ locked-down hosted demo.
   Add API Key; verified on 19.0), but Odoo 19 caps their life at **90 days** — rotate with
   `ROTATE_KEY=1 ./ops/odoo-demo/bootstrap_demo.sh agent`. The old key stops working.
 
+## Aivory agents in Odoo Discuss (all from Odoo's own UI)
+
+Everything is done inside Odoo as `admin` — no terminal:
+
+1. In the **Aivory dashboard**, for each agent you want in Odoo: Agents → the agent →
+   Customize → Deploy → **Create API Key** (Business plan or above). A key is bound to
+   one agent, so Lex needs its own key, Geno its own, and so on.
+2. In **Odoo → Settings → Aivory Agents** (top menu; also *Settings → Aivory → Manage
+   Aivory agents*): click **New**, pick the agent (Geno, Teo, Lex, Finn, Ofira, Aira),
+   paste its key, save.
+3. The agent now exists in **Discuss** under its dashboard name and avatar. Type
+   **`@Lex …`** in any channel, or open a direct message with it. Each agent keeps its
+   own history per channel. Replies arrive asynchronously (a tool-using turn can take
+   up to ~3 minutes); your own message shows immediately.
+
+Group channels stay quiet unless an agent is mentioned, and agents never trigger each
+other. Removing a row (or toggling *Active* off) retires the bot but keeps its history.
+The old single "Aivory" bot and its *Aivory API Key (side-panel widget)* setting are
+left only for the systray widget; the generic bot was retired by the 19.0.2.0.0 upgrade.
+
+**Two different keys, two directions — don't mix them up:**
+
+| Direction | Key | Created in | Pasted in |
+|---|---|---|---|
+| Odoo → Aivory (chat with agents) | Aivory API key, one per agent | Aivory dashboard | Odoo: *Settings → Aivory Agents* |
+| Aivory → Odoo (agent reads/writes Odoo data via MCP) | Odoo API key | Odoo: avatar → Preferences → *Security* → *Add API Key* | The Od-MCP server config (`ODOO_API_KEY`), not an Odoo screen |
+
 ## The roofer-ops dataset (`seed_roofer_ops.py`)
 
 A fictional Texas roofing contractor, **Brazos Ridge Roofing Co.** (Bryan / College
