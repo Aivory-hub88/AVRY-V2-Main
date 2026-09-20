@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented and tested, not deployed (§15). P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented, tested, deployed and live-verified (§16). P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -247,4 +247,16 @@ On the owner's instruction, the config-only option from §13 was applied to `/ho
 **New observation (G6, not changed):** `row_to_entry` reports `created_at` as the entry timestamp and the upsert never touches `created_at`, so a fact that is re-stored or corrected keeps looking old to the decay and to rerank's recency factor. Worth deciding in P3 whether ranking should use `updated_at`.
 
 **Deploy plan (needs the owner's go-ahead):** merge to `cerveau-main`, let CI build, run the guarded deploy script (sha256, verified predecessor, doctor, atomic swap, health, rollback). First start runs four `ADD COLUMN IF NOT EXISTS` on `cerveau.memories` (549 rows; metadata-only, brief lock). Then a probe: store with and without `importance`, recall, confirm `access_count` moves.
+
+## 16. P1 deployed and live-verified (2026-09-20 11:10 CST)
+
+The owner merged `88e363786` to `cerveau-main` (my own push and deploy were denied by the permission classifier) and ran `deploy_p1.sh` on the VPS. CI was fully green first: `build-release`, `postgres-tests` (including `pg_memory_p1` and `pg_recall_bench`), `tenant-isolation`, `redis-tests`.
+
+- **Deploy:** binary `4700eb4fbdefc627c1343a2fffb03fd1b507557e0655f1681517139bc03fcb79`, `doctor` 87 ok / 22 warnings / 0 errors, `NRestarts=0`, health 200, backup `/usr/local/bin/zeroclaw-cerveau.bak-pre-memp1-20260920`. Rollback is a plain binary restore (the four new columns are ignored by the previous binary). Journal since the restart: no panic, fatal or memory errors.
+- **Schema on production:** `cerveau.memories` now has `access_count`, `importance`, `last_accessed_at`, `superseded_by` (checked with `information_schema`).
+- **Probe (synthetic tenant, rows deleted afterwards):** the agent called `memory_store` with an explicit `importance` and once without. Stored values: explicit 0.95 kept as 0.95; the call without it got the heuristic 0.7 (core); the engine's own autosaved rows got heuristic values (0.9 for a core row containing a boost keyword, 0.4 for a daily row). A second session then asked about the fact without a hint and answered correctly; the rows it recalled show `access_count = 3` and `last_accessed_at` set. So importance is stored and read, and access counting runs on the real recall path.
+- **Not exercised in production:** `mark_superseded` (no caller yet; covered by `pg_memory_p1`) and the budget ordering (no tenant is near its caps).
+- **Effect on users today:** none visible, as predicted in §15, because `rerank_enabled` is still `false`. New rows carry importance from now on; the 549 older rows keep `NULL` until they are re-stored.
+
+**Open decision (owner):** `rerank_enabled = true` with the floor left at 0.4 is now the `rerank_imp_f0.4` row of §13 on new rows (hit@5 0.829 vs 0.286 on the fixture). Note that with old rows still at `NULL` importance, their blend is the lower `rerank_f0.4` case (0.457), so the gain arrives gradually as rows are re-stored, unless a one-off heuristic backfill is approved (§5 default: no backfill). Nothing has been changed; the earlier stopgap was reverted by the owner and is not re-applied without an explicit go-ahead.
 
