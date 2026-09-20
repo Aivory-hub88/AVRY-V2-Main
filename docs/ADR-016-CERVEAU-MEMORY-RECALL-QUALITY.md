@@ -87,7 +87,7 @@ Evaluate whether uteke's tag-overlap contradiction pre-filter is worth adding **
 1. ~~Read the live config for `memory.rerank_enabled`.~~ **Done 2026-09-20:** `rerank_enabled = false`, `rerank_threshold = 5`, `min_relevance_score = 0.4`, `search_mode = "hybrid"`, `vector_weight = 0.7`, `keyword_weight = 0.3`, `retrieval_stages = ["cache","fts","vector"]`, `embedding_dimensions = 768`, `vector_enabled = true` (see §9).
 2. Re-verify the uteke figures in §4 against its source; they were carried over from an earlier read.
 3. Decide whether to backfill importance for the existing rows (default: no).
-4. Confirm how many tenants are near their ADR-004 row caps, to know how urgent the budget consequence of G1 is (use the `ops/cerveau-ledger-health.sql` style of read-only query on the VPS).
+4. ~~Confirm how many tenants are near their ADR-004 row caps.~~ **Done 2026-09-20 (§10):** none is close.
 
 ## 8. Consequences
 
@@ -103,3 +103,30 @@ Read from the production config, `[memory]` section. Consequences:
 - **The config validator's message is stale.** `schema.rs:11805-11812` still says the rerank stage "is not yet implemented", yet `memory_inject.rs:318` runs it. Harmless while the flag is off; if we turn it on, the warning will appear and should be removed as part of P3.
 - **The `purge_after_days = 30` / `archive_after_days = 7` / `conversation_retention_days = 30` keys do not govern Postgres rows** (ADR-004 §1). Retention for tenants is the ADR-004 lifecycle job only.
 - **Not yet measured:** which categories tenants' agents actually store under. That determines how many rows are exposed to the 7-day cliff. Add a read-only count of `cerveau.memories` by `category` and age bucket to P0 (one query on the VPS, no product change).
+
+## 10. Measured production data (2026-09-20, read-only queries on `cerveau.memories`)
+
+| Fact | Value |
+|---|---|
+| Rows / embedded / agents | 549 / 512 / 74 |
+| Rows with `importance` set | **0** (G1 confirmed live) |
+| Largest tenant-agent | 212 rows (`t_user_d0985ab099ef142a.leads_qualifier`); next 75 and 22 |
+| Default caps (`PgLifecycleConfig`) | core 2000, daily 1000, conversation 500 per tenant; age caps daily 180 d, conversation 30 d |
+| `cerveau.tenant_quota` table | **does not exist** in production (per-tier quotas from ADR-004 §2 were never deployed) |
+
+By category and `updated_at` age:
+
+| category | rows | 0-7 d | 7-14 d | 14-30 d | >30 d |
+|---|---|---|---|---|---|
+| daily | 343 | 188 | 57 | 63 | 35 |
+| core | 190 | 135 | 21 | 20 | 14 |
+| conversation | 16 | 0 | 3 | 13 | 0 |
+
+Consequences for the plan:
+
+- **G1's budget consequence is not urgent.** The biggest tenant-agent holds 212 rows against caps of 1000/2000, and age caps are 180/30 days, so importance-based pruning has not yet had a chance to choose wrongly. P1.3 stays in the plan but no longer drives priority.
+- **G4 is the live problem, and it hits most of the corpus.** `daily` is 62% of all rows (343 of 549). 155 of those 343 (45%) were last updated more than 7 days ago, so after the 7-day half-life and the 0.4 floor they fall out of auto-injection unless their raw score is very high (a raw 1.0 is already 0.5 at 7 days and 0.25 at 14). Only the 190 `core` rows are exempt. This is an upper-bound reading: it does not measure how often those rows would have matched a query.
+- **Priority change:** move the recency work (P3) ahead of RRF (P2). It addresses the measured problem, and unlike RRF it needs no proof that the fusion is worse. P0 still comes first, so the change is measured.
+- **Corpus is dominated by one tenant plus test tenants** (`pg-test-*`, `test-lat`, `probe-*` and the 16-row `default` agent). Any benchmark golden set must be built from the real tenant and must exclude test tenants.
+- The `updated_at` bucket is used because `store` upserts (`ON CONFLICT ... updated_at = EXCLUDED.updated_at`); `created_at` ages would be older.
+- `tenant_quota` missing means the per-tier caps promised in ADR-004 §2 do not exist; only the flat defaults apply. Worth a separate decision when tenants approach the defaults, not now.
