@@ -18,6 +18,8 @@ scenarios.  Dates are relative to today so the pipeline always looks current.
 Built-in test situations for the five Cerveau agents are listed at the bottom.
 """
 import math
+import random
+from collections import Counter
 from datetime import date, datetime, timedelta
 
 env = env(context=dict(  # noqa: F821 -- `env` is injected by odoo shell
@@ -185,6 +187,35 @@ VENDORS = [
     ("v3", "Texas Trim & Flashing Co.", "455 Texas Ave", "College Station", "77840"),
     ("v4", "Roll-Off Ron's Dumpsters", "1717 Finfeather Rd", "Bryan", "77801"),
 ]
+# ---- more customers for the six-month history below. Seeded RNG: the same code always
+# produces the same people/jobs, which is what makes re-runs idempotent (keys c29.. / h01..).
+RNG = random.Random(20260920)
+_FIRST = ["Alan", "Brenda", "Carlos", "Diane", "Ethan", "Fatima", "Gordon", "Holly", "Ivan", "Janet", "Kyle", "Lena",
+          "Miguel", "Nora", "Owen", "Priscilla", "Quentin", "Rosa", "Samuel", "Tessa", "Umar", "Vera", "Wesley", "Ximena",
+          "Yolanda", "Zack", "Amber", "Bruno", "Celia", "Darius", "Elise", "Felix", "Gwen", "Hector", "Iris", "Jamal"]
+_LAST = ["Aguilar", "Bishop", "Castillo", "Dawson", "Ellison", "Fontaine", "Gallagher", "Hartman", "Ibarra", "Jennings",
+         "Keller", "Lombardi", "Mercer", "Novak", "Ortega", "Pruitt", "Quinn", "Rowland", "Sutherland", "Trevino",
+         "Underwood", "Valdez", "Whitmore", "Yates", "Zimmerman", "Acosta", "Barrett", "Cordero", "Dunham", "Escobar",
+         "Fitzgerald", "Guerrero", "Holloway", "Iverson", "Jacobs", "Kessler", "Landry", "Monroe"]
+_STREETS = ["Live Oak Dr", "Pebble Creek Ln", "Cypress Bend Ct", "Hickory Hollow Rd", "Bluebonnet Way", "Creekside Cir",
+            "Mockingbird Ln", "Pecan Grove Dr", "Sandy Point Rd", "Willow Run", "Longleaf Trl", "Magnolia Ct"]
+_CITIES = [("College Station", "77840"), ("College Station", "77845"), ("Bryan", "77802"), ("Bryan", "77803"),
+           ("Bryan", "77801"), ("Navasota", "77868")]
+_taken = {n for _, n, *_ in HOMEOWNERS}
+_extra = []
+while len(_extra) < 34:
+    _nm = f"{RNG.choice(_FIRST)} {RNG.choice(_LAST)}"
+    if _nm in _taken:
+        continue
+    _taken.add(_nm)
+    _city, _zip = RNG.choice(_CITIES)
+    _extra.append((f"c{29 + len(_extra):02d}", _nm, f"{RNG.randint(100, 9899)} {RNG.choice(_STREETS)}", _city, _zip))
+HOMEOWNERS = HOMEOWNERS + _extra
+COMPANIES = COMPANIES + [
+    ("k5", "Lakeview Townhomes HOA", "300 Lakeview Blvd", "College Station", "77845"),
+    ("k6", "Brazos Family Dental", "2210 Texas Ave S", "College Station", "77840"),
+]
+
 partners = {}
 seen_slugs = set()
 for i, (key, name, street, city, zip_) in enumerate(HOMEOWNERS + COMPANIES + VENDORS):
@@ -312,6 +343,46 @@ JOBS = [
          desc="HOA paid 50% deposit; balance disputed over one section."),
 ]
 
+# ---- six months of history: won/paid and lost jobs, generated once, deterministically.
+# Gives the agents trends to read (revenue by month, win rate per salesperson and source,
+# sales-cycle length, repeat customers) and a storm-season spike in Apr-Jun.
+_pool = [e[0] for e in _extra] + ["c03", "c07", "c13", "c25", "c03", "c07", "c13", "c25"] + ["k5", "k6", "k2", "k4"]
+RNG.shuffle(_pool)
+_WHY = ["price"] * 9 + ["other"] * 6 + ["ghost"] * 3 + ["later"] * 2
+_won_seen = 0
+_ROUT = random.Random(5)
+HISTORY = []
+for _i, _who in enumerate(_pool):
+    _d = 66 + int((len(_pool) - 1 - _i) * 3.0) + RNG.randint(0, 2)
+    _comm = _who.startswith("k")
+    _sq = RNG.randint(60, 140) if _comm else RNG.randint(18, 42)
+    _tier = RNG.choices(["good", "better", "best"], [50, 35, 15])[0]
+    _month = (TODAY - timedelta(days=_d)).month
+    _src = RNG.choices(["web", "google", "referral", "storm", "yard"], [26, 20, 24, 35 if _month in (4, 5, 6) else 8, 10])[0]
+    _sp = "dana" if RNG.random() < 0.55 else "marcus"
+    # outcome has its own generator so tuning win rates never reshuffles the rest of the history.
+    # Dana closes more than Marcus; referrals convert best, yard signs worst.
+    _win = _ROUT.random() < ((0.55 if _sp == "dana" else 0.38) + {"referral": 0.15, "yard": -0.10, "storm": 0.05}.get(_src, 0))
+    _tags = (["comm"] if _comm else []) + (["repair"] if (not _comm and RNG.random() < 0.22) else ["full"])
+    if _src == "storm":
+        _tags += ["storm"] + (["ins"] if RNG.random() < 0.6 else [])
+    _job = dict(k=f"h{_i + 1:02d}", who=_who, d=_d, sq=_sq, tier=_tier, src=_src, tags=_tags, sp=_sp,
+                desc=RNG.choice(["Repeat customer, straightforward tear-off.", "Referred by a neighbour we roofed last year.",
+                                 "Wanted three options and a firm start date.", "Compared us against two other bids.",
+                                 "Asked about the warranty and the crew's insurance."]))
+    if _win:
+        _so = _d - RNG.randint(8, 16)
+        _job.update(phase="complete_paid", so_d=_so, crew="abc"[_i % 3], po_d=_so - RNG.randint(3, 6),
+                    inv_d=_so - RNG.randint(12, 22))
+        _won_seen += 1
+        if _won_seen in (4, 11, 19):          # three jobs where materials blew the budget
+            _job["cost_factor"] = 1.9
+            _job["desc"] = "Decking was rotten under the old shingles; far more material than quoted."
+    else:
+        _job.update(phase="lost", qd=_d - RNG.randint(3, 6), why=RNG.choice(_WHY))
+    HISTORY.append(_job)
+JOBS = JOBS + HISTORY
+
 TIER_MAT = {"good": ("m_shingle", 3), "better": ("m_shingle_ir", 3), "best": ("m_shingle_ir", 3)}
 SP = {"dana": sales_a, "marcus": sales_b}
 BANK = env["account.journal"].search([("type", "=", "bank")], limit=1)
@@ -337,7 +408,7 @@ def material_lines(j):
     ]
     if sq >= 24:
         lines.append((P["m_osb"], max(2, sq // 10)))
-    return lines
+    return [(p, math.ceil(q * j.get("cost_factor", 1.0))) for p, q in lines]
 
 
 for j in JOBS:
@@ -475,6 +546,59 @@ for j in JOBS:
                     env["account.payment.register"].with_context(active_model="account.move", active_ids=bill.ids).create({
                         "payment_date": ago(j["po_d"] - 30), "journal_id": BANK.id,
                     })._create_payments()
+
+# ----------------------------------------------------- pipeline polish (idempotent)
+# real close dates: Odoo stamped every won/lost lead with the seed day
+for j in JOBS:
+    lead = X(f"lead_{j['k']}")
+    if not lead:
+        continue
+    if j["phase"] == "lost" or j["phase"].startswith(("permit", "ordered", "scheduled", "inprogress", "punch", "complete")):
+        days = max(j.get("qd", 6) - 4, 1) if j["phase"] == "lost" else j["so_d"]
+        env.cr.execute("UPDATE crm_lead SET date_closed=%s WHERE id=%s", [NOW - timedelta(days=days), lead.id])
+    # early-stage leads carry an estimate so the pipeline shows real money, not $0
+    if j["phase"] in ("lead_new", "inspection") and j["sq"] and not lead.expected_revenue:
+        lead.expected_revenue = round(sum(p.list_price * q for p, q in order_lines(j)), 2)
+
+# follow-up activities: overdue calls, quotes with no next step, upcoming meetings
+env = env(context=dict(env.context, mail_activity_quick_update=True))  # no notification mails
+LEAD_MODEL = env["ir.model"]._get_id("crm.lead")
+ACT = {k: env.ref(f"mail.mail_activity_data_{k}").id for k in ("call", "todo", "email", "meeting")}
+PLAN = {  # job -> (type, summary, deadline in days from today; negative = overdue)
+    "j01": ("call", "Call to qualify the instant-estimate request", 0),
+    "j02": ("call", "Hail damage - call before the adjuster visit", -2),   # hot lead nobody called yet
+    "j03": ("call", "Referral from Linda Chen - qualify and book inspection", 1),
+    "j06": ("todo", "Confirm inspection time with the homeowner", 0),
+    "j07": ("meeting", "Walk all three roofs with the property manager", 2),
+    "j08": ("todo", "Bring moisture meter to the leak inspection", 1),
+    "j10": ("call", "Walk through the Better package - discount needs approval", 1),
+    "j11": ("call", "Answer warranty questions before the other bid lands", 2),
+    "j12": ("email", "Send financing options", 1),
+    "j13": ("email", "Follow up on quote (sent 12 days ago, no reply)", -5),
+    "j14": ("call", "Ask whether the adjuster has decided", -3),
+    # j15 (church, $80k quote) deliberately has NO next step -- the at-risk deal to find
+}
+for k, (typ, summary, days) in PLAN.items():
+    lead = X(f"lead_{k}")
+    job = next(j for j in JOBS if j["k"] == k)
+    if lead:
+        ensure("mail.activity", f"act_{k}", {
+            "res_model_id": LEAD_MODEL, "res_id": lead.id, "activity_type_id": ACT[typ], "summary": summary,
+            "date_deadline": TODAY + timedelta(days=days), "user_id": SP[job["sp"]].id,
+        })
+
+# customer tags
+cats = {k: ensure("res.partner.category", f"pcat_{k}", {"name": n})[0] for k, n in [
+    ("repeat", "Repeat Customer"), ("ins", "Insurance Claim"), ("comm", "Commercial / HOA")]}
+_booked = Counter(j["who"] for j in JOBS if j["who"] and j["phase"].startswith(("permit", "ordered", "scheduled", "inprogress", "punch", "complete")))
+for who, n in _booked.items():
+    if n >= 2:
+        partners[who].write({"category_id": [(4, cats["repeat"].id)]})
+for j in JOBS:
+    if j["who"] and "ins" in j["tags"] and j["phase"].startswith(("permit", "ordered", "scheduled", "inprogress", "punch", "complete")):
+        partners[j["who"]].write({"category_id": [(4, cats["ins"].id)]})
+    if j["who"] and j["who"].startswith("k"):
+        partners[j["who"]].write({"category_id": [(4, cats["comm"].id)]})
 
 # ------------------------------------------------------------------- chatter history
 # Realistic threads so Teo (customer service) and Ofira have something to answer from.

@@ -68,6 +68,10 @@ payment. 34 jobs spread across every phase: 43 partners, 34 leads (pipeline stag
 renamed to *New / Inspection Scheduled / Quote Sent / Won*), 25 quotes, 16 orders,
 16 project tasks in *Roof Jobs*, 16 purchase orders, 7 customer invoices (4 paid,
 1 partial, 2 overdue), 7 vendor bills, calendar inspections, and chatter threads.
+A further ~46 historic jobs (about six months, won/paid and lost, three with blown material budgets),
+follow-up activities (some overdue, one big quote deliberately with no next step), customer tags and
+real close dates make trends readable. `DEMO-SCRIPT.md` lists the questions to ask each agent and
+`bootstrap_demo.sh facts` prints the correct answers from the database.
 All people, `555-01xx` phones and `@example.com` emails are fictional. Idempotent
 (keyed by external id `aivory_seed.*`); dates are relative to today.
 

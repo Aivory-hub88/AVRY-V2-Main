@@ -29,6 +29,7 @@ from markupsafe import Markup
 from odoo import SUPERUSER_ID, api, models
 from odoo.modules.registry import Registry
 
+from odoo.addons.aivory_cerveau_odoo.models.aivory_format import render_reply
 from odoo.addons.aivory_cerveau_odoo.models.aivory_api import (
     REPLY,
     SHOW,
@@ -51,8 +52,8 @@ def _deliver(dbname, channel_id, bot_partner_id, base_url, api_key, text, sessio
         kind, reply = post_agent_message(api_key, text, session_id=session_id, base_url=base_url)
         if kind not in (REPLY, SHOW) or not reply:
             return  # SILENT: config/auth problem, already logged -- don't spill it into a channel
-        fmt = '<p>{}</p>' if kind == REPLY else '<p><i>{}</i></p>'
-        body = Markup(fmt).format(html.escape(reply).replace('\n', '<br/>'))
+        # REPLY: agent markdown -> safe HTML. SHOW: a system notice, kept as one italic line.
+        body = render_reply(reply) if kind == REPLY else Markup('<p><i>{}</i></p>').format(reply)
         with Registry(dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             env['discuss.channel'].browse(channel_id).message_post(

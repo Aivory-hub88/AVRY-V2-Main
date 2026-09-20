@@ -3,7 +3,8 @@
 #
 #   ./ops/odoo-demo/bootstrap_demo.sh modules   # install CRM/Project/Purchase/... into $ODOO_DB
 #   ./ops/odoo-demo/bootstrap_demo.sh agent     # internal aivory-agent user + API key + base URL
-#   ./ops/odoo-demo/bootstrap_demo.sh seed      # roofer-ops dataset (idempotent)
+#   ./ops/odoo-demo/bootstrap_demo.sh seed      # roofer-ops dataset + 6-month history (idempotent)
+#   ./ops/odoo-demo/bootstrap_demo.sh facts     # read-only ground truth for the demo questions
 #   ./ops/odoo-demo/bootstrap_demo.sh all       # modules -> agent -> (freeze golden) -> seed
 #
 # Run on the VPS from the repo root. Everything goes through `odoo shell` inside the
@@ -42,11 +43,13 @@ cmd_modules() {
 }
 cmd_agent() { oshell ops/odoo-demo/bootstrap_agent.py 2>&1 | quiet; }
 cmd_seed()  { oshell ops/odoo-demo/seed_roofer_ops.py 2>&1 | quiet; }
+cmd_facts() { oshell ops/odoo-demo/demo_facts.py 2>&1 | quiet; }
 
 case "${1:-}" in
   modules) cmd_modules ;;
   agent)   cmd_agent ;;
   seed)    cmd_seed ;;
+  facts)   cmd_facts ;;
   all)
     cmd_modules
     cmd_agent
