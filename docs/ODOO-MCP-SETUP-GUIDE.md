@@ -13,7 +13,7 @@ This guide walks you through giving an Aivory Cerveau agent real access to your 
 ## Step 1 — Generate an Odoo API key
 
 1. Log into Odoo as the user whose access level the agent should have — **create a dedicated user for this if you can**, scoped to only the modules (Sales, Invoicing, Inventory, etc.) the agent actually needs, rather than reusing an admin account.
-2. Go to your user's **Preferences → Account Security → API Keys → New API Key**.
+2. Go to your user's **Preferences → Account Security → API Keys → New API Key** (Odoo 16–18). On **Odoo 19** the tab is called **Security** and the button **Add API Key**; Odoo 19 also caps a key's lifetime at 90 days, so plan to rotate it.
 3. Give it a description like "Aivory agent" and copy the key immediately — Odoo only shows it once.
 
 ## Step 2 — Run the MCP server
