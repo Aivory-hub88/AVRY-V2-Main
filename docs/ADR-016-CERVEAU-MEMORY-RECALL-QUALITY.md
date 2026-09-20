@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented and tested; deployed 11:10 CST, rolled back by the owner 11:14 CST (§16-§17). P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§13). P1 implemented; deployed and rolled back once (§16-§17); shadow evaluation deployed with it 13:57 CST (§20-§21); the first data changes the diagnosis (§21). P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -324,4 +324,29 @@ It is computed from a snapshot of the pool taken before either arm mutates it, s
 **Reading the result.** `ops/cerveau-memory-shadow-report.py` (run on the VPS, aggregates only) summarises the events from `runtime-trace*.jsonl`: share of recalls that injected nothing although the pool had acceptable rows, and how often rerank or a 0.3 floor would have kept more. Decision rule agreed in §18: if the filter is discarding real candidates in a meaningful share of turns, P3 has a case; if `injected` is close to what the alternatives keep, the fixture overstated the problem and the memory track can stop here.
 
 **To run it:** merge the branch to `cerveau-main`, deploy following the checklist in `services/cerveau/README.md` (this build also carries P1, see §19), wait a few days of normal traffic, then run the report. After deploy, first confirm the events actually reach the trace file (`grep -c "memory_inject shadow eval"` in the newest `runtime-trace*.jsonl`); if the log level filters them out, the level needs raising, which is a config matter and not a code change.
+
+## 21. Shadow evaluation deployed; the first probes point at a different root cause (2026-09-20 13:57 CST)
+
+**Deployed** by the assistant on the owner's instruction after CI was green (`build-release`, `postgres-tests`, `tenant-isolation`, `redis-tests`; release from `8afd8a18c`): binary `cd01b9a090b38ef54bfc1ebe178186a7d5c49a8744c05d56c7111baeb2c4efd8`, `doctor` 0 errors, health 200, backup `zeroclaw-cerveau.bak-pre-shadow-20260920`. This build also carries P1 (§19). The shadow events reach `runtime-trace.jsonl` (INFO is not filtered). Rollback: restore that backup; the new columns are inert for the older binary.
+
+**What a controlled probe showed (synthetic tenants, rows deleted afterwards).** A fact was stored, then asked about in a later turn:
+
+| turn | session header | `pool` | `injected` | best raw score |
+|---|---|---|---|---|
+| ask, no session header | none | **1** | **1** | **0.922** |
+| ask, `X-Session-Id: sessX` | set | **0** | **0** | none |
+| ask, new session id | set | **0** | **0** | none |
+
+The same fact, the same tenant. With a session id the auto-injection recall returns **nothing at all**; without one it finds the fact with a high score.
+
+**Why (code + data).** `loop_.rs:3469` passes `sessions: vec![session_id...]` to `render_memory_context`, which recalls with `session_id = $2` (`m.session_id = $2`). Every memory row in production has `session_id IS NULL` (**558 of 558**: all engine autosaves and all `memory_store` rows are written without a session tag). A session-scoped recall can therefore never match any of them, in any session, and a memory written in session A can never be injected in session B. What is injected, when a session id is present, is only whatever is tagged with that same id, which today is nothing.
+
+**What this changes.**
+- The decay (§9), the 0.4 floor (§12) and rerank (§13) were tuned against a filter that, for session-scoped turns, never receives candidates. Fresh exact matches score around 0.92 without a session, so the floor and decay matter far less than §12 estimated, and the "0.286" figure is not the dominant effect.
+- **Whether real traffic is affected depends on which channels send a session id.** The shadow events will show it directly: the share of recalls with `pool = 0` (the report prints it). The dashboard and console flows are likely to send one; this has not been verified in the trace yet (5 events so far, all from probes).
+- Agents still reach memory through the `memory_recall` tool, which passes no session; that is why explicit recall works (86%, §18) while injection is empty.
+
+**Candidate fix, not applied.** The renderer already supports several scopes (`sessions` is a list, results are key-deduplicated); tenant turns could pass `[current session, None]` so session-less rows, which is all of them, are found. It changes what enters prompts for every session-scoped channel, so it needs the owner's decision, a canary-style rollout and this ADR's benchmark extended with a session-scoped variant first. Note that memory is already isolated per tenant and agent alias by `agent_id`, so recalling across sessions stays inside one tenant's own memory, the same scope the `memory_recall` tool already uses.
+
+**Next, in order.** (1) Let the shadow events accumulate on real traffic for a few days and read `ops/cerveau-memory-shadow-report.py` (empty-pool share first). (2) If real traffic is session-scoped, add the session-scoped variant to the benchmark and measure `[session, None]`. (3) Only then decide on a change. Rerank, backfill and P3 stay on hold; P3 in particular may be moot.
 
