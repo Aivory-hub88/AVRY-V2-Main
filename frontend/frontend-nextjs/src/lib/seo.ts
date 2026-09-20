@@ -89,8 +89,8 @@ export function createOrganization(siteUrl: PublicSiteUrl) {
     logo: {
       '@type': 'ImageObject',
       '@id': `${siteUrl}/#logo`,
-      url: absoluteUrlForSite(siteUrl, '/icon.svg'),
-      contentUrl: absoluteUrlForSite(siteUrl, '/icon.svg'),
+      url: absoluteUrlForSite(siteUrl, '/New_Favicon_2026.svg'),
+      contentUrl: absoluteUrlForSite(siteUrl, '/New_Favicon_2026.svg'),
       caption: 'Aivory logo',
     },
     image: { '@id': `${siteUrl}/#logo` },
