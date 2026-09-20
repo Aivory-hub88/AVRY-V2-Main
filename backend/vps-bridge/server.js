@@ -1120,13 +1120,16 @@ const WORKFLOW_DIRECT_PERSONA = "[You are the Aivory Workflow Copilot, the autom
 async function handleConsoleDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const history = Array.isArray(body.history) ? body.history : [];
+  // /aria/stream nests history inside context — accept both shapes
+  const history = Array.isArray(body.history) ? body.history
+    : Array.isArray(body.context && body.context.history) ? body.context.history : [];
   const userState = (body.context && body.context.user_state) ? body.context.user_state : '';
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
 
   if (!apiKey) {
     res.write('data: ' + JSON.stringify({ type: 'error', error: 'AI engine not configured' }) + '\n\n');
@@ -1183,12 +1186,14 @@ async function handleConsoleDirect(req, res) {
         try {
           const j = JSON.parse(data);
           const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-          if (delta) { accumulated += delta; }
+          // Stream each delta immediately instead of buffering — TTFT = first token
+          if (delta) { accumulated += delta; res.write('data: ' + JSON.stringify({ type: 'chunk', content: delta }) + '\n\n'); }
         } catch (e) { /* skip keepalive / non-JSON */ }
       }
     }
-    const finalText = accumulated || 'I did not catch that just now - could you try again?';
-    res.write('data: ' + JSON.stringify({ type: 'chunk', content: finalText }) + '\n\n');
+    if (!accumulated) {
+      res.write('data: ' + JSON.stringify({ type: 'chunk', content: 'I did not catch that just now - could you try again?' }) + '\n\n');
+    }
     res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
     res.end();
   } catch (err) {
@@ -1219,6 +1224,7 @@ async function handleWorkflowClarifyDirect(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
 
   if (!apiKey) {
     res.write('data: ' + JSON.stringify({ type: 'error', error: 'AI engine not configured' }) + '\n\n');
@@ -1272,7 +1278,7 @@ async function handleWorkflowClarifyDirect(req, res) {
         try {
           const j = JSON.parse(data);
           const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-          if (delta) { accumulated += delta; }
+          if (delta) { accumulated += delta; res.write('data: ' + JSON.stringify({ type: 'chunk', content: delta }) + '\n\n'); }
         } catch (e) { /* skip keepalive / non-JSON */ }
       }
     }
@@ -1283,9 +1289,8 @@ async function handleWorkflowClarifyDirect(req, res) {
       // recurrence shows up in `pm2 logs vps-bridge` instead of silently
       // degrading to the fallback text below.
       console.warn('[handleWorkflowClarifyDirect] empty completion for message:', userMessage.slice(0, 100));
+      res.write('data: ' + JSON.stringify({ type: 'chunk', content: 'I did not catch that - could you try again?' }) + '\n\n');
     }
-    const finalText = accumulated || 'I did not catch that - could you try again?';
-    res.write('data: ' + JSON.stringify({ type: 'chunk', content: finalText }) + '\n\n');
     res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
     res.end();
   } catch (err) {
@@ -1616,6 +1621,10 @@ function handleConsoleRouter(req, res) {
 }
 
 app.post('/console/stream', handleConsoleRouter);
+// Floating assistant (Next.js /api/aira/stream) posts { message, context: { history } }
+// — same fast direct path as console, not Zeroclaw. Mounted here because the
+// thin proxy previously had no /aria/stream route at all (404).
+app.post('/aria/stream', handleConsoleRouter);
 app.post('/aivory-assistant/stream', handleStreamRequest);
 app.post('/blueprint/generate', handleStreamRequest);
 
