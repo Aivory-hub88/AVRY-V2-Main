@@ -1,6 +1,6 @@
 # ADR-016 — Cerveau memory recall quality: close the Postgres gaps, then measure before changing the ranker
 
-**Status:** Proposed (2026-09-20). P0 harness built with a keyword-mode baseline (§11); hybrid baseline pending embeddings. P1 not started. P2 and later are gated on P0 numbers.
+**Status:** Proposed (2026-09-20). P0 done: harness plus keyword and hybrid baselines (§11-§12). P1 not started. P2 and later are gated on P0 numbers.
 **Date:** 2026-09-20
 **Related:** [ADR-004](ADR-004-CERVEAU-MEMORY-LIFECYCLE.md) (Postgres lifecycle, embedding dims), [ADR-007](ADR-007-CERVEAU-COGNEE-INTEGRATION.md) (graph memory), [ADR-013](ADR-013-CERVEAU-STAGE2-TENANT-LEARNING.md).
 **Number:** 015 is taken by `ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md` (another session, not yet committed).
@@ -153,4 +153,35 @@ Consequences for the plan:
 - These figures are **inflated by the small corpus**: each agent has about 34 rows, so a random top-5 already hits about 15% of the time, and the OR `to_tsquery` over the `simple` text-search config keeps stopwords, so a query such as "what time do reports get sent?" matches many rows on filler words. Do not compare these numbers with production; use them only to compare a change against the same fixture. A larger corpus with more distractors is the obvious next improvement and needs the embeddings step below.
 - The `injected` pipeline and the whole `hybrid` mode need precomputed embeddings and are **not measured yet**. That is the number that would quantify G4 (the 7-day cliff) on the `old` queries.
 
-**To finish P0:** run `OPENROUTER_API_KEY=... python3 gen_embeddings.py` once (same model and 768 dimensions as production, about 80 short strings, a fraction of a cent, no private data), then `RECALL_BENCH_WRITE_BASELINE=1 cargo test ... --test pg_recall_bench` against a Postgres that has pgvector (the CI service container has it; a local Postgres 16 needs `pgvector` installed). Commit `embeddings.json` (about 1.5 MB) and the updated baseline.
+**Update:** the embeddings step and the hybrid baseline are done, see §12. The "pending" statements above describe the state before that.
+
+## 12. P0 result: hybrid baseline and what it says about G4 (2026-09-20)
+
+`embeddings.json` (75 vectors, `text-embedding-3-small`, 768 dims, same as production) was generated on the VPS using its existing OpenRouter key inside the remote shell; the key was never printed, written to a file or committed, and the temporary directory was removed. The baseline was recorded on Postgres 17 with pgvector 0.8.6 (CI uses Postgres 16 with pgvector; scoring is the same SQL). Branch `feat/memory-recall-bench`, commit `ebb94aae6`.
+
+hit@5 by pipeline (35 answerable queries):
+
+| kind | n | raw | floor only (0.4) | injected (7-day decay + 0.4) |
+|---|---|---|---|---|
+| all | 35 | 1.000 | 0.771 | **0.286** |
+| exact | 6 | 1.000 | 1.000 | 0.500 |
+| paraphrase | 11 | 1.000 (MRR 0.909) | 0.455 | 0.364 |
+| indonesian | 8 | 1.000 | 0.750 | 0.125 |
+| multi | 3 | 1.000 | 1.000 | 0.333 |
+| old (answer aged 18-70 d) | 6 | 1.000 | 1.000 | **0.000** |
+
+**Findings**
+
+1. **Retrieval itself is not the problem.** Raw hybrid recall finds the answer in the top 5 for every query, and ranks it first for almost all (MRR 0.971). The keyword-only paraphrase weakness (0.727) disappears once vectors are on. **This weakens the case for P2 (RRF):** on this fixture there is nothing left for it to win, so it stays gated and is likely to be dropped unless a larger corpus shows otherwise.
+2. **The injection filter discards most of what retrieval found.** From 1.000 raw to 0.286 injected. Two causes stack:
+   - **The 0.4 floor is close to typical relevance (new finding, call it G5).** The expected answer's raw hybrid score averages about 0.49 (max 0.70), regardless of age. With vector score `1 − cosine` weighted 0.7, a correct match rarely scores far above 0.4. The floor alone removes 23 points of hit@5 (paraphrase falls to 0.455, Indonesian to 0.750) with **no** decay at all.
+   - **The 7-day half-life then finishes the job.** A non-Core memory with a raw score of 0.5 drops below 0.4 after **2.3 days**; 0.6 after 4.1 days; 0.7 after 5.7 days; even a perfect 1.0 lasts only 9.3 days. So in practice a non-Core memory is auto-injected for roughly its first week at best. Only `core` rows are exempt.
+3. **Corrects the wording of §9.** §9 said rows fall out "after 7 days". The measured horizon is 2 to 6 days for a typical match.
+
+**Caveats:** the fixture's answers are mostly aged rows (2 of 35 expected hits are 7 days old or less), while production has 188 of 343 `daily` rows in that first week, so the loss in production is smaller than 0.286 for fresh-heavy traffic but of the same nature for anything older. The corpus is small and synthetic; treat the figures as a yardstick for comparing changes, not as production hit rates.
+
+**Consequences for the plan**
+- **P3 becomes the main work item and grows.** It must fix both the decay curve and the floor: the floor should be applied to a score that is calibrated (rank-based or normalised), not to a raw hybrid similarity that centres on 0.5. Until then, tuning the decay alone would still leave 23 points on the table.
+- **P2 (RRF) is downgraded** from "likely" to "only if a larger corpus shows a gain"; note that RRF scores live around 0.03, so adopting it would force the floor to be redefined anyway (rank cut-off instead of an absolute score).
+- **A cheap interim mitigation exists and is reversible:** lowering `memory.min_relevance_score` (for example to 0.2) and/or turning `rerank_enabled` on (which replaces the decay with a recency blend) are config-only changes. Rerank's importance term is still 0 until P1 (G1), so its effect is recency plus retrieval only. Neither should be applied to production before the benchmark shows the result with that setting; the harness can be extended with these variants in an hour.
+- P1 is unchanged and still worth doing (G1, G2 are real defects), but it is no longer on the critical path for the user-visible symptom.
