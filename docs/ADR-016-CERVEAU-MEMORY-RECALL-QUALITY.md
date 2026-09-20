@@ -21,7 +21,7 @@ Tenant memory lives in `cerveau.memories` on Postgres; production has pgvector o
 | G1 | **`importance` is never written on Postgres.** `store_with_agent` takes `_importance` and ignores it; the column is only created by the pgvector migration. Every row has `importance = NULL`. | `postgres.rs:1031` (`_importance: Option<f64>`), `postgres.rs:1493-1496` |
 | G2 | **Supersede is a no-op.** `superseded_by` is hard-coded `None` when a row is read, there is no such column on Postgres, and `conflict::mark_superseded` is written against `rusqlite`. Recall never filters superseded rows. | `postgres.rs:460`, `conflict.rs:42-53` |
 | G3 | **Score fusion is linear over incomparable scales.** Keyword is `ts_rank_cd` (unbounded, length-dependent, ×2 for key matches) and vector is `1 − cosine`; they are added with `keyword_weight`/`vector_weight`. The weights cannot be tuned meaningfully because the two terms are not on a common scale. | `postgres.rs:597-604`, `1168-1175` |
-| G4 | **Recall decay is one flat 7-day half-life for everything non-Core**, applied at injection time when `rerank_enabled` is off. Whether the live config has `rerank_enabled` on is **unknown** (not checked; see §7). | `decay.rs:5-6`, `memory_inject.rs:334` |
+| G4 | **Recall decay is one flat 7-day half-life for everything non-Core**, applied at injection time. **Confirmed live (2026-09-20): `memory.rerank_enabled = false`**, so this is the path that runs in production, and it is followed by `min_relevance_score = 0.4`. | `decay.rs:5-6`, `memory_inject.rs:334`, live `/home/ubuntu/.zeroclaw-cerveau/config.toml:558` |
 
 **G1 has two consequences that the earlier analysis missed:**
 
@@ -84,7 +84,7 @@ Evaluate whether uteke's tag-overlap contradiction pre-filter is worth adding **
 
 ## 7. Open items to settle before P2/P3
 
-1. Read the live config for `memory.rerank_enabled` (and the rerank weights) on the VPS. It decides whether G4 is a live bug or dormant code. Not checked in this session.
+1. ~~Read the live config for `memory.rerank_enabled`.~~ **Done 2026-09-20:** `rerank_enabled = false`, `rerank_threshold = 5`, `min_relevance_score = 0.4`, `search_mode = "hybrid"`, `vector_weight = 0.7`, `keyword_weight = 0.3`, `retrieval_stages = ["cache","fts","vector"]`, `embedding_dimensions = 768`, `vector_enabled = true` (see §9).
 2. Re-verify the uteke figures in §4 against its source; they were carried over from an earlier read.
 3. Decide whether to backfill importance for the existing rows (default: no).
 4. Confirm how many tenants are near their ADR-004 row caps, to know how urgent the budget consequence of G1 is (use the `ops/cerveau-ledger-health.sql` style of read-only query on the VPS).
@@ -93,3 +93,13 @@ Evaluate whether uteke's tag-overlap contradiction pre-filter is worth adding **
 
 **Good:** the shipped rerank and budget code start working as designed; every ranking change is backed by a number; risk stays low because P1 is additive and P2-P4 are gated.
 **Cost:** P0 is real work before any visible improvement; the corpus is small, so some effects will be within noise and the honest outcome of P2/P3 may be "no change".
+
+## 9. Live configuration finding (2026-09-20)
+
+Read from the production config, `[memory]` section. Consequences:
+
+- **G4 is live, and stricter than "flat decay".** With rerank off, auto-injected recall is `apply_time_decay` (7-day half-life) and then dropped if the score is below `min_relevance_score = 0.4`. A non-Core memory whose raw hybrid score is 0.8 falls below 0.4 after 7 days and is **not injected**; at 14 days a raw 0.8 becomes 0.2. Only `Core`-category rows are exempt. So whether a fact survives in the auto-injected context depends on which category the agent chose when calling `memory_store`. The explicit `memory_recall` tool does not decay, so the agent can still find such rows by asking, but it will not see them unprompted.
+- **Turning `rerank_enabled` on today would not help.** The rerank blend replaces decay, but its importance term is 0 for every Postgres row (G1). Recency alone would replace the flat decay. Fix G1 first, then evaluate enabling it in P3.
+- **The config validator's message is stale.** `schema.rs:11805-11812` still says the rerank stage "is not yet implemented", yet `memory_inject.rs:318` runs it. Harmless while the flag is off; if we turn it on, the warning will appear and should be removed as part of P3.
+- **The `purge_after_days = 30` / `archive_after_days = 7` / `conversation_retention_days = 30` keys do not govern Postgres rows** (ADR-004 §1). Retention for tenants is the ADR-004 lifecycle job only.
+- **Not yet measured:** which categories tenants' agents actually store under. That determines how many rows are exposed to the 7-day cliff. Add a read-only count of `cerveau.memories` by `category` and age bucket to P0 (one query on the VPS, no product change).
