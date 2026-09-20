@@ -300,5 +300,28 @@ After §17 and §18 the owner chose to **keep P1 on `cerveau-main`** (the altern
 
 To make that risk visible instead of silent, the deploy checklist in `services/cerveau/README.md` ("Deploying the Cerveau binary") now lists P1 under "known behaviour that ships with `cerveau-main`", says that a deploy containing it must say so, and records that `memory.rerank_enabled` / `memory.min_relevance_score` are configuration decisions outside any binary deploy.
 
-Unchanged and still on hold, pending real data: rerank, the importance backfill and P3. Recommended next step (§18): observability plus a shadow evaluation of auto-injection, with no behaviour change.
+Unchanged and still on hold, pending real data: rerank, the importance backfill and P3. Next step (§18), now built (§20): observability plus a shadow evaluation of auto-injection, with no behaviour change.
+
+## 20. Observability and shadow evaluation built (2026-09-20), not deployed
+
+`AVRY-Cerveau` branch `feat/memory-recall-bench`, commit `8afd8a18c` (on top of `cerveau-main` `88e363786`; not merged, not deployed). `render_memory_context` in `memory_inject.rs` now emits **one structured log event per auto-injection recall**, message `memory_inject shadow eval`, with counts only (no keys, no content):
+
+| field | meaning |
+|---|---|
+| `pool` | candidates recalled |
+| `ineligible` | candidates the renderer skips whatever their score (autosave notes, history blobs, tool results) |
+| `injected` | what the model actually received this turn |
+| `decay_kept` | what the flat 7-day decay plus the floor would keep |
+| `floor_only_kept` | what the floor alone would keep |
+| `rerank_kept` / `rerank_f03_kept` | what the rerank blend would keep at the configured floor / at 0.3 |
+| `rerank_only` / `decay_only` | rows exactly one of the two arms keeps |
+| `score_max`, `score_p50`, `floor`, `active_arm`, `agent_alias`, `turn_id` | context |
+
+It is computed from a snapshot of the pool taken before either arm mutates it, so **the injected context is byte-identical** to before (the 31 existing `memory_inject` tests pass unchanged). Four new unit tests pin the counts (mutation-checked: removing the decay from the shadow arm fails them) and clippy is clean. Cost per recall: one clone of at most a few entries and a few small passes.
+
+**Two known approximations.** With rerank off, production recalls only `limit` candidates (no over-fetch), so the rerank counts are for the same small pool and slightly understate what rerank would do with its usual 4x pool. The eligibility check (`should_skip_entry`) is applied in every count, which the synthetic fixture never modelled; the real ineligible share is one of the things this will reveal.
+
+**Reading the result.** `ops/cerveau-memory-shadow-report.py` (run on the VPS, aggregates only) summarises the events from `runtime-trace*.jsonl`: share of recalls that injected nothing although the pool had acceptable rows, and how often rerank or a 0.3 floor would have kept more. Decision rule agreed in §18: if the filter is discarding real candidates in a meaningful share of turns, P3 has a case; if `injected` is close to what the alternatives keep, the fixture overstated the problem and the memory track can stop here.
+
+**To run it:** merge the branch to `cerveau-main`, deploy following the checklist in `services/cerveau/README.md` (this build also carries P1, see §19), wait a few days of normal traffic, then run the report. After deploy, first confirm the events actually reach the trace file (`grep -c "memory_inject shadow eval"` in the newest `runtime-trace*.jsonl`); if the log level filters them out, the level needs raising, which is a config matter and not a code change.
 
