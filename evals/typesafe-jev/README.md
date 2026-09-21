@@ -47,9 +47,26 @@ field list it under `unscored`.
 ```bash
 python3 run_eval.py validate                       # offline
 python3 run_eval.py payload tri-P01-id             # exact request body for one case
-TYPESAFE_API_KEY=... python3 run_eval.py run       # ~97 requests, about $0.004 for a full pass
+python3 run_eval.py probe                          # one ~$0.00001 request: auth, base URL, model name, key limit
+python3 run_eval.py run --budget 0.25              # ~97 requests, about $0.004 for a full pass; hard USD cap
 python3 run_eval.py report results/<file>.jsonl    # metrics and PASS/FAIL against thresholds.json
 ```
+
+### Via OpenRouter (same price, $0.042 per million input tokens)
+
+Jev is on OpenRouter as `typesafe/jev-1.13` and the alias `~typesafe/jev-latest`. It is hidden from the default model
+list because its output modality is `decisions`; list it with `GET /api/v1/models?output_modalities=all`.
+OpenRouter serves the same System One API, so only the base URL and key change:
+
+```bash
+export TYPESAFE_BASE_URL=https://openrouter.ai/api
+export TYPESAFE_API_KEY_FILE=~/.config/aivory/openrouter-jev.key   # or OPENROUTER_API_KEY
+python3 run_eval.py probe --model jev-1.13
+python3 run_eval.py run --model jev-1.13 --budget 0.25
+```
+
+Use a dedicated OpenRouter key with a small credit limit rather than a production key. Responses carry
+`usage.cost`, which `run` sums against `--budget` before each uncached request.
 
 Responses are cached in `.cache/` (keyed by base URL, model and payload), so re-running `report` or repeating a
 `run` costs nothing. A `run` also records per-request latency, which the docs do not state.

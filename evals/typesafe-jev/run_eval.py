@@ -3,7 +3,8 @@
 
   run_eval.py validate                      offline: check fixtures, estimate cost
   run_eval.py payload tri-P01-id            offline: print the exact request for one case
-  run_eval.py run [--suite triage|bant|all] call the API (needs TYPESAFE_API_KEY); caches every response
+  run_eval.py probe                         one ~$0.00001 request: checks auth, base URL, model name, key limit
+  run_eval.py run [--suite triage|bant|all] call the API; caches every response; --budget caps spend (default $0.25)
   run_eval.py report results/<file>.jsonl   metrics + pass/fail against thresholds.json
 
 Set TYPESAFE_BASE_URL to point at a local stand-in (see fake_jev.py).
@@ -204,10 +205,70 @@ def cached_call(payload, key, cache_dir):
     return entry, False
 
 
-def cmd_run(args):
+def get_key():
+    """TYPESAFE_API_KEY, or OPENROUTER_API_KEY when pointed at OpenRouter (TYPESAFE_BASE_URL=https://openrouter.ai/api)."""
     key = os.environ.get("TYPESAFE_API_KEY", "")
+    if not key and "openrouter.ai" in BASE_URL:
+        key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not key and os.environ.get("TYPESAFE_API_KEY_FILE"):  # keeps the key out of shell history and chat
+        key = Path(os.environ["TYPESAFE_API_KEY_FILE"]).expanduser().read_text().strip()
+    return key
+
+
+def call_cost(resp):
+    """USD for one response: OpenRouter reports usage.cost; otherwise price the input tokens (output is free)."""
+    u = resp.get("usage") or {}
+    if u.get("cost") is not None:
+        return float(u["cost"])
+    return u.get("input_tokens", 0) * PRICE_PER_M_INPUT / 1e6
+
+
+class Budget:
+    """Hard spend cap, checked before every uncached request. Cached responses cost nothing."""
+
+    def __init__(self, limit):
+        self.limit, self.spent, self.lock = limit, 0.0, __import__("threading").Lock()
+
+    def reserve_ok(self):
+        with self.lock:
+            return self.spent < self.limit
+
+    def add(self, usd):
+        with self.lock:
+            self.spent += usd
+
+
+def cmd_probe(args):
+    """One tiny request: verifies auth, base URL and model name for ~$0.00001, and shows the key's remaining limit."""
+    key = get_key()
     if not key:
-        print("TYPESAFE_API_KEY not set (a run needs it; validate/payload/report do not)", file=sys.stderr)
+        print("no key: set TYPESAFE_API_KEY (or OPENROUTER_API_KEY with an OpenRouter base URL)", file=sys.stderr)
+        return 2
+    payload = {"state": "Hello there!", "model": args.model,
+               "questions": {"is_greeting": {"type": "noul", "instructions": "Is this message a greeting?"}}}
+    t0 = time.perf_counter()
+    resp = call_api(payload, key)
+    ms = round((time.perf_counter() - t0) * 1000)
+    print(f"endpoint={API_URL}\nrequested model={args.model}  served model={resp.get('model')}  provider={resp.get('provider')}")
+    print(f"answer={resp['answers']['is_greeting']}  latency={ms}ms  usage={resp.get('usage')}  cost=${call_cost(resp):.8f}")
+    if "openrouter.ai" in BASE_URL:
+        try:
+            req = urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {key}"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                d = json.load(r).get("data", {})
+            print("key limit={} remaining={} usage={} (values as reported by OpenRouter)".format(
+                d.get("limit"), d.get("limit_remaining"), d.get("usage")))
+        except Exception as e:  # informational only
+            print("could not read key info:", e)
+    return 0
+
+
+def cmd_run(args):
+    key = get_key()
+    if not key:
+        print("no API key (a run needs one; validate/payload/report do not): set TYPESAFE_API_KEY, "
+              "or OPENROUTER_API_KEY with TYPESAFE_BASE_URL=https://openrouter.ai/api, "
+              "or TYPESAFE_API_KEY_FILE=<path to a file holding the key>", file=sys.stderr)
         return 2
     questions = load_questions()
     cache_dir = HERE / ".cache"
@@ -217,11 +278,20 @@ def cmd_run(args):
     jobs = [(s, c) for s in suites for c in load_cases(s)]
     if args.limit:
         jobs = jobs[: args.limit]
+    budget = Budget(args.budget)
+    skipped = []
 
     def work(job):
         suite, case = job
-        entry, hit = cached_call(payload_for(suite, case, args.model, questions), key, cache_dir)
+        payload = payload_for(suite, case, args.model, questions)
+        h = hashlib.sha256((API_URL + "\n" + json.dumps(payload, sort_keys=True)).encode()).hexdigest()
+        if not (cache_dir / f"{h}.json").exists() and not budget.reserve_ok():
+            skipped.append(case["id"])
+            return None
+        entry, hit = cached_call(payload, key, cache_dir)
         r = entry["response"]
+        if not hit:
+            budget.add(call_cost(r))
         return {"id": case["id"], "suite": suite, "model": r.get("model"), "answers": r["answers"],
                 "usage": r.get("usage"), "latency_ms": entry["latency_ms"], "cache_hit": hit}
 
@@ -230,14 +300,17 @@ def cmd_run(args):
     with cf.ThreadPoolExecutor(max_workers=args.workers) as ex:
         for fut in cf.as_completed([ex.submit(work, j) for j in jobs]):
             try:
-                rows.append(fut.result())
+                row = fut.result()
+                if row:
+                    rows.append(row)
             except Exception as e:  # keep going; one failed case must not hide the rest
                 fails += 1
                 print("FAILED:", e, file=sys.stderr)
     rows.sort(key=lambda r: r["id"])
     out.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-    print(f"{len(rows)} ok, {fails} failed -> {out.relative_to(HERE)}")
-    return 1 if fails else 0
+    print(f"{len(rows)} ok, {fails} failed, {len(skipped)} skipped by budget -> {out.relative_to(HERE)}")
+    print(f"spent ${budget.spent:.6f} of ${args.budget:g} cap on uncached requests")
+    return 1 if fails or skipped else 0
 
 
 # --------------------------------------------------------------------------- report
@@ -506,7 +579,11 @@ def main():
     p.add_argument("--model", default="jev-latest")
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--budget", type=float, default=0.25, help="hard USD cap on uncached spend (default 0.25)")
     p.set_defaults(fn=cmd_run)
+    p = sub.add_parser("probe")
+    p.add_argument("--model", default="jev-1.13")
+    p.set_defaults(fn=cmd_probe)
     p = sub.add_parser("report")
     p.add_argument("results", nargs="+")
     p.set_defaults(fn=cmd_report)

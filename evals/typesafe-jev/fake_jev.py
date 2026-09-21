@@ -75,11 +75,18 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             return
         st = body["state"]
+        if isinstance(st, str):  # probe request
+            self._send({"model": "fake-1.0", "provider": "fake", "answers": {"is_greeting": {"type": "noul", "noul": 0.97}},
+                        "usage": {"input_tokens": 40, "output_tokens": 5, "cost": 0.0000017}})
+            return
         suite = "triage" if "customer_message" in st else "bant"
         key = st["customer_message"] if suite == "triage" else json.dumps(st["conversation"], sort_keys=True)
         c = rows[(suite, key)]
         answers = answer_triage(c) if suite == "triage" else answer_bant(c)
-        out = json.dumps({"model": "fake-1.0", "answers": answers, "usage": {"input_tokens": 700, "output_tokens": 60}}).encode()
+        self._send({"model": "fake-1.0", "answers": answers, "usage": {"input_tokens": 700, "output_tokens": 60, "cost": 0.00003}})
+
+    def _send(self, obj):
+        out = json.dumps(obj).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
