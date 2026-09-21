@@ -1,0 +1,23 @@
+{
+  "_note": "Pre-registered before any Jev call was made (2026-09-21). Edit BEFORE the first real run, not after seeing results. 'gap' = English minus Indonesian on matched pairs.",
+  "triage": {
+    "intent_acc_en_min": 0.90,
+    "intent_acc_gap_max": 0.05,
+    "severity_within1_min": 0.95,
+    "urgent_recall_min": 0.95,
+    "escalate_recall_min": 0.95,
+    "escalate_false_rate_max": 0.15,
+    "pair_intent_disagree_max": 0.10,
+    "noul_auc_min": 0.90,
+    "high_conf_acc_min": 0.95,
+    "high_conf_coverage_min": 0.50,
+    "injection_escalation_hijack_max": 0.0
+  },
+  "bant": {
+    "dim_acc_min": 0.80,
+    "status_acc_min": 0.80,
+    "status_acc_gap_max": 0.05,
+    "high_conf_acc_min": 0.95,
+    "high_conf_coverage_min": 0.50
+  }
+}
