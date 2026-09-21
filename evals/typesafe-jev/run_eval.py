@@ -170,12 +170,12 @@ def cmd_payload(args):
 
 
 # --------------------------------------------------------------------------- run
-def call_api(payload, key, retries=6):
+def call_api(payload, key, retries=6, url=None):
     body = json.dumps(payload).encode()
     last = None
     for attempt in range(retries):
         req = urllib.request.Request(
-            API_URL, data=body, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            url or API_URL, data=body, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
         )
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
@@ -193,22 +193,29 @@ def call_api(payload, key, retries=6):
     raise RuntimeError(f"retries exhausted: {last}")
 
 
-def cached_call(payload, key, cache_dir):
-    h = hashlib.sha256((API_URL + "\n" + json.dumps(payload, sort_keys=True)).encode()).hexdigest()  # URL in the key: fake_jev answers must never satisfy a real run
-    path = cache_dir / f"{h}.json"
+def cache_path(cache_dir, url, payload):
+    # URL in the key: fake_jev answers must never satisfy a real run
+    return cache_dir / (hashlib.sha256((url + "\n" + json.dumps(payload, sort_keys=True)).encode()).hexdigest() + ".json")
+
+
+def cached_call(payload, key, cache_dir, url=None):
+    url = url or API_URL
+    path = cache_path(cache_dir, url, payload)
     if path.exists():
         return json.loads(path.read_text()), True
     t0 = time.perf_counter()
-    resp = call_api(payload, key)
+    resp = call_api(payload, key, url=url)
     entry = {"response": resp, "latency_ms": round((time.perf_counter() - t0) * 1000)}
     path.write_text(json.dumps(entry))
     return entry, False
 
 
-def get_key():
+def get_key(openrouter=False):
     """TYPESAFE_API_KEY, or OPENROUTER_API_KEY when pointed at OpenRouter (TYPESAFE_BASE_URL=https://openrouter.ai/api)."""
     key = os.environ.get("TYPESAFE_API_KEY", "")
-    if not key and "openrouter.ai" in BASE_URL:
+    if openrouter:
+        key = os.environ.get("OPENROUTER_API_KEY", "") or key
+    elif not key and "openrouter.ai" in BASE_URL:
         key = os.environ.get("OPENROUTER_API_KEY", "")
     if not key and os.environ.get("TYPESAFE_API_KEY_FILE"):  # keeps the key out of shell history and chat
         key = Path(os.environ["TYPESAFE_API_KEY_FILE"]).expanduser().read_text().strip()
@@ -238,6 +245,62 @@ class Budget:
             self.spent += usd
 
 
+CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
+LLM_SYSTEM = ("You are a precise classifier inside a software pipeline. You are given a STATE and QUESTIONS about it. "
+              "Answer every question using only the state. Reply with one JSON object and nothing else.")
+
+
+def llm_payload(suite, case, model, questions):
+    """Baseline request: the SAME state and question definitions Jev gets, wrapped in a plain chat prompt."""
+    spec = {}
+    for qid, q in questions[suite].items():
+        if q["type"] == "choice":
+            fmt = {"choice": "<one of the option keys in criteria>", "confidence": "<0 to 1: how sure you are>"}
+        elif q["type"] == "score":
+            fmt = {"level": "<integer index into criteria, 0 = first item>", "confidence": "<0 to 1: how sure you are>"}
+        else:
+            fmt = {"probability": "<0 to 1: probability that the answer is yes/true>"}
+        spec[qid] = {"question": q, "answer_format": fmt}
+    user = json.dumps({"state": state_for(suite, case), "questions": spec}, ensure_ascii=False)
+    user += "\n\nReturn one JSON object mapping each question id to its answer, in that question's answer_format."
+    return {"model": model, "temperature": 0, "max_tokens": 1500, "reasoning": {"enabled": False},
+            "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": LLM_SYSTEM}, {"role": "user", "content": user}]}
+
+
+def parse_llm(resp, qs):
+    """Turn a chat completion into the same `answers` shape System One returns, so `report` works unchanged."""
+    text = resp["choices"][0]["message"]["content"].strip()
+    if text.startswith("```"):
+        text = text.strip("`").split("\n", 1)[1].rsplit("```", 1)[0] if "\n" in text else text.strip("`")
+    obj = json.loads(text)
+    clamp = lambda x: max(0.0, min(1.0, float(x)))
+    answers = {}
+    for qid, q in qs.items():
+        a = obj[qid]
+        if q["type"] == "choice":
+            c = a["choice"]
+            if c not in q["criteria"]:
+                raise ValueError(f"{qid}: unknown option {c!r}")
+            answers[qid] = {"type": "choice", "choice": c, "confidence": clamp(a.get("confidence", 0.5)),
+                            "probabilities": {k: (1.0 if k == c else 0.0) for k in q["criteria"]}}
+        elif q["type"] == "score":
+            lvl = int(a["level"])
+            if not 0 <= lvl < len(q["criteria"]):
+                raise ValueError(f"{qid}: level {lvl} out of range")
+            answers[qid] = {"type": "score", "score": float(lvl), "confidence": clamp(a.get("confidence", 0.5)),
+                            "probabilities": {str(i): (1.0 if i == lvl else 0.0) for i in range(len(q["criteria"]))}}
+        else:
+            answers[qid] = {"type": "noul", "noul": clamp(a["probability"])}
+    return answers
+
+
+def llm_usage(resp):
+    u = resp.get("usage") or {}
+    return {"input_tokens": u.get("prompt_tokens", 0), "output_tokens": u.get("completion_tokens", 0), "cost": u.get("cost"),
+            "reasoning_tokens": (u.get("completion_tokens_details") or {}).get("reasoning_tokens")}
+
+
 def cmd_probe(args):
     """One tiny request: verifies auth, base URL and model name for ~$0.00001, and shows the key's remaining limit."""
     key = get_key()
@@ -264,7 +327,7 @@ def cmd_probe(args):
 
 
 def cmd_run(args):
-    key = get_key()
+    key = get_key(openrouter=args.backend == "llm")
     if not key:
         print("no API key (a run needs one; validate/payload/report do not): set TYPESAFE_API_KEY, "
               "or OPENROUTER_API_KEY with TYPESAFE_BASE_URL=https://openrouter.ai/api, "
@@ -281,21 +344,31 @@ def cmd_run(args):
     budget = Budget(args.budget)
     skipped = []
 
+    llm = args.backend == "llm"
+    url = CHAT_URL if llm else API_URL
+
     def work(job):
         suite, case = job
-        payload = payload_for(suite, case, args.model, questions)
-        h = hashlib.sha256((API_URL + "\n" + json.dumps(payload, sort_keys=True)).encode()).hexdigest()
-        if not (cache_dir / f"{h}.json").exists() and not budget.reserve_ok():
+        payload = (llm_payload if llm else payload_for)(suite, case, args.model, questions)
+        if not cache_path(cache_dir, url, payload).exists() and not budget.reserve_ok():
             skipped.append(case["id"])
             return None
-        entry, hit = cached_call(payload, key, cache_dir)
+        entry, hit = cached_call(payload, key, cache_dir, url=url)
         r = entry["response"]
         if not hit:
-            budget.add(call_cost(r))
+            budget.add(call_cost(r) if not llm else float(llm_usage(r)["cost"] or 0))
+        if llm:
+            try:
+                answers = parse_llm(r, questions[suite])
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError) as e:
+                raise RuntimeError(f"{case['id']}: unparseable LLM answer ({e})")
+            return {"id": case["id"], "suite": suite, "model": r.get("model"), "answers": answers,
+                    "usage": llm_usage(r), "latency_ms": entry["latency_ms"], "cache_hit": hit}
         return {"id": case["id"], "suite": suite, "model": r.get("model"), "answers": r["answers"],
                 "usage": r.get("usage"), "latency_ms": entry["latency_ms"], "cache_hit": hit}
 
-    out = HERE / "results" / f"{time.strftime('%Y%m%d-%H%M%S')}-{args.suite}.jsonl"
+    slug = args.model.replace("/", "_") if llm else "jev"
+    out = HERE / "results" / f"{time.strftime('%Y%m%d-%H%M%S')}-{args.suite}-{slug}.jsonl"
     rows, fails = [], 0
     with cf.ThreadPoolExecutor(max_workers=args.workers) as ex:
         for fut in cf.as_completed([ex.submit(work, j) for j in jobs]):
@@ -471,8 +544,11 @@ def report_triage(cases, results, thresholds):
         lat.sort()
         print(f"\nlatency (uncached, n={len(lat)}): p50={lat[len(lat)//2]}ms p95={lat[int(len(lat)*0.95)-1]}ms max={lat[-1]}ms")
     use = [r["usage"]["input_tokens"] for r in results if r.get("usage")]
+    costs = [r["usage"]["cost"] for r in results if r.get("usage") and r["usage"].get("cost") is not None]
     if use:
-        print(f"input tokens per case: mean={sum(use)/len(use):.0f}  -> ${sum(use)/len(use)/1e6*PRICE_PER_M_INPUT:.6f}/case")
+        est = f"${sum(use)/len(use)/1e6*PRICE_PER_M_INPUT:.6f}/case at Jev list price"
+        real = f"; reported usage.cost mean=${sum(costs)/len(costs):.6f}/case" if costs else ""
+        print(f"input tokens per case: mean={sum(use)/len(use):.0f}  -> {est}{real}")
 
     ch = Checks(thresholds["triage"])
     ch.add("intent_acc_en_min", en_acc, "min")
@@ -580,6 +656,8 @@ def main():
     p.add_argument("--workers", type=int, default=6)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--budget", type=float, default=0.25, help="hard USD cap on uncached spend (default 0.25)")
+    p.add_argument("--backend", choices=["systemone", "llm"], default="systemone",
+                   help="llm = baseline: same state and questions sent to a chat model via OpenRouter")
     p.set_defaults(fn=cmd_run)
     p = sub.add_parser("probe")
     p.add_argument("--model", default="jev-1.13")
