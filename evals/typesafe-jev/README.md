@@ -18,6 +18,8 @@ Background and findings from the docs review: memory note `typesafe-jev-evaluati
 | `run_eval.py` | `validate`, `payload`, `run`, `report` (stdlib only) |
 | `decide.py` | Confidence-gated policy: Jev-shaped answers → `handle` / `confirm` / `escalate` (ADR-017 P0, backend-agnostic) |
 | `test_decide.py` | Offline unit tests for `decide.py` (no network, no key) |
+| `replay.py` | Replay `judge_shadow` trace rows through a judge backend; stub today, live backend later (ADR-017 P2 exit gate) |
+| `test_replay.py` | Offline self-test for `replay.py` on a synthetic trace (no network, no key) |
 | `fake_jev.py` | Local stand-in API to test the harness itself. Its numbers say nothing about Jev |
 
 All text is synthetic. No production or tenant data, so sending it to a third party is not a privacy question

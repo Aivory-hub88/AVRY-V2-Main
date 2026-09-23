@@ -52,6 +52,8 @@ Deferred: speculative fan-out, hierarchical classification, entity alignment (no
   - Cross-backend decision agreement deepseek vs fake: 49/67; divergences are almost all deepseek=confirm vs fake=handle, i.e. the policy degrades gracefully to confirm under a less-confident backend and never jumps a level (no handle↔escalate flips except on corrupted cases).
   - Gate met: escalation recall 26/26 with no over-escalation. P2 may proceed after the rebase.
 - **P2 — Cerveau `judge` tool (after the v0.8.5 rebase).** A narrow tool reading `questions.json`, calling the existing provider with a JSON schema, returning typed answers; the turn loop applies `decide.py`-equivalent policy in Rust. Shadow mode first (decisions logged, behaviour unchanged), same discipline as ADR-016 §20.
+- **P2 exit gate tooling. DONE 2026-09-23** (`evals/typesafe-jev/replay.py` + `test_replay.py`, stub backend 6/6): parses `judge_shadow` rows out of runtime-trace JSONL, replays the embedded judge requests, compares vs logged gate actions. Awaiting real gated-write traffic; swap the stub for a live backend when it arrives.
+- **Correction (source-fixed, needs a deploy to take effect):** the embedded `escalate_on: ["explicit_instruction"]` hint in emitted events is backwards — high authorization must NOT escalate. Fixed to `[]` in source; `replay.py` owns the policy and ignores the hint by design, and the live daemon keeps emitting the old hint until the next deploy.
 - **P3 — Recall/citation/scoring consumers** (§4 items 4–7), each gated on its own shadow numbers.
 
 ## 6. P2 tool spec (no deploy in this change — needs the v0.8.5 rebase window)
