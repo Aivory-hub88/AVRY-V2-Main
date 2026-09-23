@@ -4,6 +4,12 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-23 — shared Od-MCP 0.3.0 + backend/dashboard redeploy (Odoo self-serve live)
+
+**Found:** `odoo-mcp.aivory.uk` resolved (Cloudflare) but had **no Traefik route** — plain Traefik 404 on `/health` and `/mcp`. The backend `connect_odoo` flow could never have worked end-to-end, independent of the missing `/admin/instances` endpoint.
+**Deployed:** Od-MCP source synced to VPS, `docker build -t od-mcp:0.3.0`, container recreated on `aivory-network` with Traefik labels (`Host(odoo-mcp.aivory.uk)`, websecure + letsencrypt, port 8787) keeping the same env/mounts/port publish. Live verified: external `/health` 200, `/mcp` correctly 401 without bearer, admin add+delete self-test OK (smoke instance removed after). `avry-backend` (now includes `odoo_username` forwarding — verified loaded in the live container) and `avry-user-dashboard` (username field present in served chunks) rebuilt from ff-merged trees (live dirt preserved) and recreated healthy; api 200.
+**Not yet proven:** a real tenant Odoo connect (needs tenant URL + API key); every leg is verified except that last mile. **Hygiene note:** `OD_MCP_ADMIN_TOKEN` was displayed in cleartext during this deploy's verification — rotate it (shared-server env + backend env together) at the next opportunity per standing rule.
+
 ## 2026-09-23 — judge_shadow live (ADR-017 P2 log-only half)
 
 **Merged:** `AVRY-Cerveau` PR #5 → `cerveau-main` as `0c4addf` (branch `feat/judge-shadow-adr-017`, squash). CI green both gates on the merge push (quick 9m2s, build 33m53s). `gate_tool_approval` is now a thin wrapper (inner renamed, call sites unchanged) emitting one `judge_shadow` trace event per non-`Safe` decision — full judge request (state + fixed explicit_instruction/severity questions) plus gate action, tier, requirement and pending_id, joined on `trace_id`; velocity-park covered with `requirement=velocity_park`. Args scrubbed + truncated, Safe reads excluded. Local evidence 4 shadow + 198 turn + 674 tools + 128 approval tests green, clippy clean on touched files.
