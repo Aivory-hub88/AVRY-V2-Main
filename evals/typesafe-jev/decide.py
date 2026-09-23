@@ -100,6 +100,51 @@ def decide_triage(answers, policy=None):
     return {"action": action, "reasons": reasons}
 
 
+def escalate_gold(case):
+    """Gold-policy reference for triage. Mirrors run_eval.escalate_gold:
+    True = escalate, False = don't, None = undecidable (unscored field)."""
+    g, un = case["gold"], set(case.get("unscored", []))
+    if g["severity"] >= 3:
+        return True
+    if any(c in un for c in ESCALATE_NOULS):
+        return None
+    return any(g[c] for c in ESCALATE_NOULS)
+
+
+def gold_decision(suite, case):
+    """Gold-policy action reference. Triage: escalate / non-escalate / None.
+    BANT: the action decide_bant takes at full confidence."""
+    if suite == "triage":
+        g = escalate_gold(case)
+        return None if g is None else ("escalate" if g else "non-escalate")
+    return {"qualified": "handle", "needs_followup": "confirm",
+            "unqualified": "handle"}[bant_status(case["gold"])]
+
+
+def summarize(cases, results_by_id):
+    """Decision summary over result rows. `cases` = {id: (suite, case)}.
+    Returns {"dist": {action: n}, "agree": int, "scored": int,
+             "esc_tp": int, "esc_gold": int} (escalation fields triage only)."""
+    out = {"dist": {}, "agree": 0, "scored": 0, "esc_tp": 0, "esc_gold": 0}
+    for cid, (suite, case) in cases.items():
+        if cid not in results_by_id:
+            continue
+        act = (decide_triage if suite == "triage" else decide_bant)(results_by_id[cid]["answers"])["action"]
+        out["dist"][act] = out["dist"].get(act, 0) + 1
+        g = gold_decision(suite, case)
+        if g is None:
+            continue
+        out["scored"] += 1
+        if suite == "triage":
+            pred = "escalate" if act == "escalate" else "non-escalate"
+            out["agree"] += pred == g
+            out["esc_gold"] += g == "escalate"
+            out["esc_tp"] += pred == "escalate" == g
+        else:
+            out["agree"] += act == g
+    return out
+
+
 def bant_status(dims):
     """Deterministic BANT policy. Mirrors bant-qualification skill / run_eval."""
     neg = sum(v == "negative" for v in dims.values())

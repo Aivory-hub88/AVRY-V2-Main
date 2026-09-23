@@ -45,7 +45,7 @@ Deferred: speculative fan-out, hierarchical classification, entity alignment (no
 
 ## 5. Plan
 
-- **P0 — Policy layer (this change).** `evals/typesafe-jev/decide.py`: pure functions `decide_triage(answers)` / `decide_bant(answers)` mapping Jev-shaped answers (from *any* backend: fake, Jev, `--llm`) to `{action, reasons}` with per-stakes thresholds in code, plus offline unit tests. No network, no key, stdlib only.
+- **P0 — Policy layer (this change).** `evals/typesafe-jev/decide.py`: pure functions `decide_triage(answers)` / `decide_bant(answers)` mapping Jev-shaped answers (from *any* backend: fake, Jev, `--llm`) to `{action, reasons}` with per-stakes thresholds in code, plus offline unit tests. No network, no key, stdlib only. `run_eval.py report` prints a DECISIONS section from the same module (informational, never gates PASS/FAIL), and `services/cerveau/skills/judge/` stages the judge contract + `questions.json` for the next `./sync.sh deploy` (verified it would transfer; not deployed here — deploy restarts the daemon).
 - **P1 — Shadow compare. DONE 2026-09-23** (`shadow_compare.py`, committed with P0). `decide.py` over stored backends:
   - deepseek (`--llm`, 97 cases triage+bant): agreement vs gold policy **89/92**; triage escalation recall **26/26**, zero over-escalation. The misses are confirm/handle splits on non-escalate cases, which the binary gold reference cannot adjudicate.
   - fake_jev (67 triage, ~1/7 answers corrupted by construction): 57/62 — the corrupted cases correctly sink to confirm/escalate on lowered confidence, which is the designed behaviour, not a policy failure.

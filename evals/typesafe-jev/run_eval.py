@@ -628,6 +628,27 @@ def report_bant(cases, results, thresholds):
     return ch.print("bant")
 
 
+def report_decisions(results):
+    """Decision layer over the answers (decide.py, ADR-017 P0): what would
+    Cerveau DO with these judgments — handle / confirm / escalate — and how
+    that compares to the gold policy. Informational: never gates PASS/FAIL."""
+    try:
+        import decide
+    except ImportError:
+        print("\n===== DECISIONS =====\nskipped (decide.py not found)")
+        return
+    cases = {c["id"]: ("triage", c) for c in load_cases("triage")}
+    cases.update({c["id"]: ("bant", c) for c in load_cases("bant")})
+    by_id = {r["id"]: r for r in results if r["id"] in cases}
+    s = decide.summarize(cases, by_id)
+    print(f"\n===== DECISIONS ({len(by_id)} cases, decide.py) =====")
+    print(f"  actions: {s['dist']}")
+    print(f"  agreement vs gold policy: {s['agree']}/{s['scored']}", end="")
+    if s["esc_gold"]:
+        print(f"  triage escalation recall: {s['esc_tp']}/{s['esc_gold']}", end="")
+    print("  (informational)")
+
+
 def cmd_report(args):
     results = [json.loads(line) for f in args.results for line in open(f, encoding="utf-8") if line.strip()]
     thresholds = load_thresholds()
@@ -638,6 +659,7 @@ def cmd_report(args):
         ok &= report_triage(load_cases("triage"), [r for r in results if r["suite"] == "triage"], thresholds)
     if any(r["suite"] == "bant" for r in results):
         ok &= report_bant(load_cases("bant"), [r for r in results if r["suite"] == "bant"], thresholds)
+    report_decisions(results)
     print("\nOVERALL:", "PASS" if ok else "FAIL (see above; a fail means 'not proven', not 'unusable')")
     return 0 if ok else 1
 

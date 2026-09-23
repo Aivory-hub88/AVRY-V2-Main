@@ -41,10 +41,10 @@ warn() { echo -e "\033[1;33m[!]\033[0m $*"; }
 case "${1:-}" in
   deploy)
     log "Deploying skills + identity → ${HOST}:${REMOTE_DIR}"
-    rsync -az "${RSYNC_PATH_ARGS[@]}" --delete \
+    rsync -az ${RSYNC_PATH_ARGS[@]+"${RSYNC_PATH_ARGS[@]}"} --delete \
       --exclude='._*' --exclude='.DS_Store' \
       "${LOCAL_DIR}/skills/"       "${HOST}:${REMOTE_DIR}/skills/"
-    rsync -az "${RSYNC_PATH_ARGS[@]}" "${LOCAL_DIR}/identity.md" "${LOCAL_DIR}/soul.md" "${HOST}:${REMOTE_DIR}/"
+    rsync -az ${RSYNC_PATH_ARGS[@]+"${RSYNC_PATH_ARGS[@]}"} "${LOCAL_DIR}/identity.md" "${LOCAL_DIR}/soul.md" "${HOST}:${REMOTE_DIR}/"
     log "Deploying product-agent personas → ${HOST}:${REMOTE_DIR}/agents/"
     for a in ${PRODUCT_AGENTS}; do
       tar -czf - -C "${LOCAL_DIR}/agents" "${a}/workspace/IDENTITY.md" \
@@ -65,7 +65,7 @@ case "${1:-}" in
     ;;
   status)
     log "Diffing local vs VPS (dry run)..."
-    rsync -azn "${RSYNC_PATH_ARGS[@]}" --delete --exclude='._*' --exclude='.DS_Store' \
+    rsync -azn ${RSYNC_PATH_ARGS[@]+"${RSYNC_PATH_ARGS[@]}"} --delete --exclude='._*' --exclude='.DS_Store' \
       "${LOCAL_DIR}/skills/" "${HOST}:${REMOTE_DIR}/skills/"
     for a in ${PRODUCT_AGENTS}; do
       ssh "${HOST}" "${SUDO_PREFIX}cat ${REMOTE_DIR}/agents/${a}/workspace/IDENTITY.md" \
