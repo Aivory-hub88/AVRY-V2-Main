@@ -4,6 +4,19 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-23 — judge tool merged + deployed (ADR-017 P2 engine half)
+
+**Merged:** `AVRY-Cerveau` PR #4 → `cerveau-main` as `97a8df4` (branch `feat/judge-tool-adr-017`, squash). CI green both gates on the merge push (quick 8m9s, build 31m16s). New `judge` tool in `zeroclaw-tools` (one bounded LLM call, temp 0, policy handle/confirm/escalate in code, fail-closed parse), registered alongside `llm_task`; local evidence 11/11 judge + 674/674 runtime tools tests, clippy/rustfmt clean.
+**Deployed:** rolling `cerveau-cd` release (built from `97a8df4`, sha256 verified) swapped onto `tencent-vps` as `/usr/local/bin/zeroclaw-cerveau` (backup `zeroclaw-cerveau.bak-pre-judge-20260923` kept for rollback), daemon restarted, `active`/`NRestarts=0`, `/health` 200, `doctor` 87 ok / 0 errors, new binary confirmed to contain the judge strings the old one lacked. Judge skill content (`skills/judge/`) was deployed earlier the same day via `./sync.sh deploy`.
+**Not yet:** shadow-mode traffic comparison (P2 exit gate) and any behaviour change — the tool is registered but nothing calls it yet. Rollback = copy the `.bak` back + restart.
+
+## 2026-09-22 — Latency re-measured: preload proven, prompt proven, smalltalk-speed unproven
+
+**Method:** `ops/latency_after.py [cutoff]` (new; groups `runtime-trace*.jsonl` by `trace_id`, splits at the 2026-09-19T16:25Z config-live cutoff). BEFORE = 232 turns (reproduces the ADR-015 baseline: 86% Lex search-hop vs their 87%, prompt 48K vs 50.9K). AFTER = 61 turns.
+**Lex tool turns, before → after (n=106 → 13):** need `tool_search` **86% → 8%**; wall median **59.0s (with hop) → 10.0s** (before-no-hop median was already 12.2s, so the ~47s hop was the dominant cost and preload removed it); prompt median **48,158 → 11,582** (Lex compact skill mode, same window — separate cause, same direction); LLM calls 4 → 3.
+**Smalltalk:** 7 fast-path classifications fired (event exists) but the event carries no `trace_id`, so per-turn speed cannot be joined — speedup still unproven, as honestly stated on 09-19/20. No-tool turns 3.6s → 4.4s is mix noise, not a regression (small n, different agents).
+**Caveats:** AFTER n is small (13 Lex turns) and traffic mix differs (Odoo turns in window). Re-run in a week with more traffic before calling it closed.
+
 ## 2026-09-19 — LLM latency chain inventory + v0.8.5 rebase risk register
 
 **Timeout chain (must stay ordered, outer > inner):** dashboard authedFetch (no hard cap; user-abortable) → backend `telegram_service` 195s → bridge `CERVEAU_FETCH_TIMEOUT_MS` 185s → Cerveau 180s turn wall-clock cap → per-iteration `step_timeout_secs` + `max_tool_iterations` 10 + cost budget seam (fail-closed). Break/graceful wrap-ups add at most ONE bounded provider call (step timeout + budget honored, single-call asserted in tests).
@@ -11,6 +24,7 @@
 1. `7708bd0a8` retries rejected tool turns with reasoning disabled — a whole-turn retry = up to 2× latency on rejection paths. Keep, but watch tail latency after rebase.
 2. `818024454` retries replay-safe empty streams once — bounded (+1 call max), safe to take.
 3. `160102b34` rewrote `finish_after_max_iterations` (streaming summary, display hygiene, protocol suppression) — our `finish_after_loop_break` is a forked copy of the OLD shape and MUST converge onto the new function during rebase (same for the new `safety_net.rs`), or behavior drifts silently. Guard installed: timeout-honoring wrap-up test.
+   **Resolved 2026-09-22 (`AVRY-Cerveau@ba4c52a1d`, CI green all 4 gates):** audited the other 4 items — all already satisfied in-tree (retry bounded to 1 with tests asserting exactly 2 bodies; denial wording + `pending_id` contract intact; semantic-empty compatible with canned fallback; `safety_net.rs` present at `agent/`). The one real drift was `finish_after_loop_break` emitting raw provider text: ported the display-hygiene contract (think-strip, terminal-marker strip, protocol suppression to the safe notice, whitespace-only → canned fallback; history keeps raw text). 3 new tests; 16/16 `max_iter` green.
 4. `240b5a19e` replaces "Denied by user." with explanatory denial text — overlaps our gate messaging; adopt upstream wording, keep our pending_id contract.
 5. `f7d2df34a` rejects semantic-empty terminal completions — compatible with our canned fallback (always non-empty text).
 **Rule for the rebase:** no new unbounded retry anywhere on the turn path; every added provider call needs a timeout + budget accounting + a test-Upstream `reliable.rs` retry loop stays the single retry owner.
