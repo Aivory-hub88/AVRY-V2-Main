@@ -16,6 +16,8 @@ Background and findings from the docs review: memory note `typesafe-jev-evaluati
 | `questions.json` | The Jev question definitions under test (Choice, Score, Noul). Single source; a later Cerveau tool should read the same file |
 | `thresholds.json` | Pass criteria, **fixed before any call was made** |
 | `run_eval.py` | `validate`, `payload`, `run`, `report` (stdlib only) |
+| `decide.py` | Confidence-gated policy: Jev-shaped answers → `handle` / `confirm` / `escalate` (ADR-017 P0, backend-agnostic) |
+| `test_decide.py` | Offline unit tests for `decide.py` (no network, no key) |
 | `fake_jev.py` | Local stand-in API to test the harness itself. Its numbers say nothing about Jev |
 
 All text is synthetic. No production or tenant data, so sending it to a third party is not a privacy question
