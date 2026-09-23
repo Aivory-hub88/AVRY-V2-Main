@@ -4,6 +4,12 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-23 — judge_shadow live (ADR-017 P2 log-only half)
+
+**Merged:** `AVRY-Cerveau` PR #5 → `cerveau-main` as `0c4addf` (branch `feat/judge-shadow-adr-017`, squash). CI green both gates on the merge push (quick 9m2s, build 33m53s). `gate_tool_approval` is now a thin wrapper (inner renamed, call sites unchanged) emitting one `judge_shadow` trace event per non-`Safe` decision — full judge request (state + fixed explicit_instruction/severity questions) plus gate action, tier, requirement and pending_id, joined on `trace_id`; velocity-park covered with `requirement=velocity_park`. Args scrubbed + truncated, Safe reads excluded. Local evidence 4 shadow + 198 turn + 674 tools + 128 approval tests green, clippy clean on touched files.
+**Deployed:** rolling `cerveau-cd` from `0c4addf` (sha256 verified, shadow strings confirmed present, absent in old binary), backup `zeroclaw-cerveau.bak-pre-judge-shadow-20260923` kept, daemon restarted, `active`/`NRestarts=0`, `/health` 200, `doctor` 87 ok / 0 errors, zero panic/error in startup log.
+**Still open (P2 exit gate):** replay logged `judge_shadow` events through a judge backend once real gated-write traffic accumulates, and compare vs gate decisions — no behaviour change until those numbers match P1. Rollback = copy the `.bak` back + restart.
+
 ## 2026-09-23 — judge tool merged + deployed (ADR-017 P2 engine half)
 
 **Merged:** `AVRY-Cerveau` PR #4 → `cerveau-main` as `97a8df4` (branch `feat/judge-tool-adr-017`, squash). CI green both gates on the merge push (quick 8m9s, build 31m16s). New `judge` tool in `zeroclaw-tools` (one bounded LLM call, temp 0, policy handle/confirm/escalate in code, fail-closed parse), registered alongside `llm_task`; local evidence 11/11 judge + 674/674 runtime tools tests, clippy/rustfmt clean.
