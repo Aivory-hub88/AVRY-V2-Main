@@ -10,6 +10,10 @@
 **Deployed:** Od-MCP source synced to VPS, `docker build -t od-mcp:0.3.0`, container recreated on `aivory-network` with Traefik labels (`Host(odoo-mcp.aivory.uk)`, websecure + letsencrypt, port 8787) keeping the same env/mounts/port publish. Live verified: external `/health` 200, `/mcp` correctly 401 without bearer, admin add+delete self-test OK (smoke instance removed after). `avry-backend` (now includes `odoo_username` forwarding — verified loaded in the live container) and `avry-user-dashboard` (username field present in served chunks) rebuilt from ff-merged trees (live dirt preserved) and recreated healthy; api 200.
 **Not yet proven:** a real tenant Odoo connect (needs tenant URL + API key); every leg is verified except that last mile. **Hygiene note:** `OD_MCP_ADMIN_TOKEN` was displayed in cleartext during this deploy's verification — rotate it (shared-server env + backend env together) at the next opportunity per standing rule.
 
+## 2026-09-24 — hint-fix deployed (PR #9, `b595238`)
+
+5-line fix: emitted `escalate_on` no longer lists `explicit_instruction`. Same deploy procedure (sha256 OK, strings confirmed, backup `.bak-pre-hint-fix-20260924`, restart): `active`/`NRestarts=0`, health 200, doctor 87 ok / 0 errors, zero panic/error. Shadow events from here carry the corrected hint; `replay.py` ignores hints by design either way.
+
 ## 2026-09-23 — judge_shadow live (ADR-017 P2 log-only half)
 
 **Merged:** `AVRY-Cerveau` PR #5 → `cerveau-main` as `0c4addf` (branch `feat/judge-shadow-adr-017`, squash). CI green both gates on the merge push (quick 9m2s, build 33m53s). `gate_tool_approval` is now a thin wrapper (inner renamed, call sites unchanged) emitting one `judge_shadow` trace event per non-`Safe` decision — full judge request (state + fixed explicit_instruction/severity questions) plus gate action, tier, requirement and pending_id, joined on `trace_id`; velocity-park covered with `requirement=velocity_park`. Args scrubbed + truncated, Safe reads excluded. Local evidence 4 shadow + 198 turn + 674 tools + 128 approval tests green, clippy clean on touched files.
