@@ -4,6 +4,13 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-24 — Odoo 401 fixed: shared Od-MCP 0.3.1 (query-token auth)
+
+**Symptom (live report, dashboard screenshot):** Odoo card `verification_failed`, `server returned HTTP 401` on `https://odoo-mcp.aivory.uk/mcp?token=...`.
+**Root cause (reproduced locally first):** every HTTP/SSE/WS handler passed an empty query string to tenant resolution, so `?token=`/`?access_token=` — the exact form backend registers (`/mcp?token=`, no `Authorization` header) — always 401'd. Header-bearer calls worked, which is why earlier curl self-tests missed it.
+**Fix (`v0.3.1`):** parse the query map at each HTTP entry point (initialize, stateless POST, SSE, messages, health) and the WS handshake; header still wins when both present. 12/12 tests (new `bearer_from_query_token` regression test). Release pipeline green, tenant tarball + latest marker published.
+**Deployed:** `od-mcp:0.3.1` rebuilt on VPS, container recreated with identical config/labels, pre-existing file instances preserved. Verified externally end-to-end (the dashboard's exact flow): `initialize` + `tools/list` via `?token=` → 200 with all 18 tools; smoke instance deleted after.
+
 ## 2026-09-23 — shared Od-MCP 0.3.0 + backend/dashboard redeploy (Odoo self-serve live)
 
 **Found:** `odoo-mcp.aivory.uk` resolved (Cloudflare) but had **no Traefik route** — plain Traefik 404 on `/health` and `/mcp`. The backend `connect_odoo` flow could never have worked end-to-end, independent of the missing `/admin/instances` endpoint.
