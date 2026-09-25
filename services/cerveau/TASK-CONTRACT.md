@@ -43,6 +43,15 @@ can create a row for another. So:
 reason names the approver or missing input — approval waits live here),
 `done` = delivered and verified against the `Done when` criteria.
 
+An approval wait means a real parked tool call (a pending-approval id from
+the gate), named in the blocked reason. An agent holding work for the user's
+go-ahead on its own (an unsent draft) asks in its reply and opens no row:
+such a row has nothing that can resolve it and stays overdue forever (seen
+2026-09-24 with Ofira's "Hold welcome email draft … pending operator
+approval"). Every product agent's IDENTITY carries this as "Holding work for
+approval". The board shows the real approvals under Waiting next to blocked
+rows, and any open row can be stopped from its card.
+
 ## Timeout (derived, human-enforced)
 
 - Child SLA: 15 minutes from creation.
