@@ -60,6 +60,24 @@ struct Claims {
     user_id: Option<String>,
     #[serde(default)]
     account_type: Option<String>,
+    /// "access" / "refresh" on tokens issued since the backend started
+    /// tagging them; absent on older tokens.
+    #[serde(default, rename = "type")]
+    kind: Option<String>,
+    /// Only refresh tokens carry this (it names their server-side session).
+    #[serde(default)]
+    session_id: Option<String>,
+}
+
+/// Refresh tokens share the HS256 secret but are not bearer credentials:
+/// they live 30 days and keep verifying after logout. Accept access tokens
+/// only; a legacy (untyped) refresh token is recognised by its session_id.
+fn is_access_claims(c: &Claims) -> bool {
+    match c.kind.as_deref() {
+        Some("access") => true,
+        None => c.session_id.is_none(),
+        _ => false,
+    }
 }
 
 #[derive(Clone, Default)]
@@ -155,6 +173,9 @@ fn verify_credential(auth: &AuthConfig, credential: Option<&str>) -> Option<Iden
     )
     .ok()?;
     let c = data.claims;
+    if !is_access_claims(&c) {
+        return None;
+    }
     let user_id = c.user_id.or(c.sub).filter(|s| !s.is_empty())?;
     match c.account_type.as_deref() {
         Some("admin") | Some("superadmin") => Some(Identity::Admin { user_id }),
@@ -777,4 +798,46 @@ async fn main() {
     info!("aivory-collab listening on {} (y-octo yrs compat, ws /yjs/:room)", addr);
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+#[cfg(test)]
+mod token_kind_tests {
+    use super::*;
+
+    fn auth() -> AuthConfig {
+        AuthConfig { jwt_secret: Some(b"test-secret".to_vec()), ..Default::default() }
+    }
+
+    fn token(claims: serde_json::Value) -> String {
+        let mut c = claims;
+        c["exp"] = serde_json::json!(4_102_444_800u64); // 2100-01-01
+        jsonwebtoken::encode(
+            &jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256),
+            &c,
+            &jsonwebtoken::EncodingKey::from_secret(b"test-secret"),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn access_tokens_verify() {
+        let t = token(serde_json::json!({ "user_id": "u1", "type": "access" }));
+        assert!(matches!(verify_credential(&auth(), Some(&t)), Some(Identity::User { .. })));
+        let legacy = token(serde_json::json!({ "user_id": "u1", "account_type": "free" }));
+        assert!(matches!(verify_credential(&auth(), Some(&legacy)), Some(Identity::User { .. })));
+    }
+
+    #[test]
+    fn refresh_tokens_are_rejected() {
+        let typed = token(serde_json::json!({ "user_id": "u1", "session_id": "s1", "type": "refresh" }));
+        let legacy = token(serde_json::json!({ "user_id": "u1", "session_id": "s1" }));
+        assert!(verify_credential(&auth(), Some(&typed)).is_none());
+        assert!(verify_credential(&auth(), Some(&legacy)).is_none());
+    }
+
+    #[test]
+    fn other_token_kinds_are_rejected() {
+        let t = token(serde_json::json!({ "user_id": "u1", "type": "impersonation" }));
+        assert!(verify_credential(&auth(), Some(&t)).is_none());
+    }
 }
