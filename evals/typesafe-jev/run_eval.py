@@ -151,6 +151,11 @@ def cmd_validate(_):
         if any(t["role"] not in ("prospect", "agent") for t in c["conversation"]):
             problems.append(f"{c['id']}: bad role")
 
+    for suite, qs in questions.items():
+        for qid, q in qs.items():
+            if q["type"] == "noul" and set(q.get("criteria") or {}) != {"true", "false"}:
+                problems.append(f"{suite}.{qid}: noul criteria must be a {{true, false}} object (System One 400s otherwise)")
+
     approval = load_cases("approval")
     ids = [c["id"] for c in approval]
     for dup in {i for i in ids if ids.count(i) > 1}:
