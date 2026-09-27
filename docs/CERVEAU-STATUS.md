@@ -4,6 +4,12 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-27 — judge_shadow question set v2 deployed (PRs #13 + #14, `7daab3a`)
+
+**Why:** two gaps found by the synthetic approval eval (`evals/typesafe-jev`, ADR-017). (1) The `explicit_instruction` Noul `criteria` was a string, which Jev's System One API rejects with HTTP 400, so no logged `judge_shadow` request could be replayed through Jev. (2) Severity rubric v1 left "large" undefined and put "external messages send" at level 2, so bulk sends to hundreds of people graded 2 (severe recall 0.60 Jev / 0.73 deepseek). Rubric v2 names concrete boundaries: ≥ Rp50 juta, ≥ 50 recipients, bulk deletes, automations acting on many people. On 20 held-out cases with pre-registered thresholds, both backends pass every threshold.
+**Deployed:** squash-merged #13 (`870eb15`) and #14 (`7daab3a`); the diff from live `46c4b93` touched only `judge_shadow.rs`, with no schema change and no gate behaviour change. Rolling `cerveau-cd` built from `7daab3a`: sha256 OK, release body names the commit, and the new strings are present (absent in the old binary). The live binary hash was confirmed as the `46c4b93` build before the swap. `doctor` with the new binary: 87 ok / 0 errors, warnings identical to the old binary. Backup `.bak-pre-rubric-v2-20260927`, restart: `active`, `NRestarts=0`, health 200, zero panic/error in the startup log.
+**Not done:** no synthetic `/webhook` probe, because a `judge_shadow` row only appears on a real gated write. The next gated write will carry the v2 question set. Rollback = copy the `.bak` back + restart.
+
 ## 2026-09-24 — Odoo 401 fixed: shared Od-MCP 0.3.1 (query-token auth)
 
 **Symptom (live report, dashboard screenshot):** Odoo card `verification_failed`, `server returned HTTP 401` on `https://odoo-mcp.aivory.uk/mcp?token=...`.
