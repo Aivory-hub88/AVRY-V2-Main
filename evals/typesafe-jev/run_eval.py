@@ -741,6 +741,9 @@ def report_approval(cases, results, thresholds):
     print(f"  matched EN/ID pairs ({len(full)}): authorization prediction differs {pct(flips, len(full))}")
 
     sev = severity_block([(c, a["severity"]) for c, a in rows], "severity (full state)")
+    hold = severity_block([(c, a["severity"]) for c, a in rows if "holdout_v2" in c.get("tags", [])],
+                          "severity (full state, holdout_v2 only: written after rubric v2, never tuned on)")
+    hold_exp = [ok for (c, _), ok in zip(scored, correct) if "holdout_v2" in c.get("tags", [])]
 
     t = thresholds["approval"]
     ch = Checks(t)
@@ -752,6 +755,10 @@ def report_approval(cases, results, thresholds):
     ch.add("severe_recall_min", sev["severe_recall"], "min")
     ch.add("high_conf_acc_min", sev["hi_acc"], "min")
     ch.add("high_conf_coverage_min", sev["hi_cov"], "min")
+    ch.add("holdout_explicit_acc_min", sum(hold_exp) / len(hold_exp) if hold_exp else None, "min")
+    ch.add("holdout_severity_lenient_min", hold["lenient"], "min")
+    ch.add("holdout_severe_recall_min", hold["severe_recall"], "min")
+    ch.add("holdout_under_graded_max", hold["under"], "max")
     return ch.print("approval")
 
 
@@ -762,7 +769,12 @@ def report_approval_features(cases, results, thresholds):
     rows = [(by_id[r["id"]], r["answers"]["severity"]) for r in results if r["id"] in by_id]
     print(f"\n===== APPROVAL_FEATURES ({len(rows)} cases, no user text) =====")
     sev = severity_block(rows, "severity (features only)")
+    hold = severity_block([(c, a) for c, a in rows if "holdout_v2" in c.get("tags", [])],
+                          "severity (features only, holdout_v2 only)")
     ch = Checks(thresholds["approval_features"])
+    ch.add("holdout_severity_lenient_min", hold["lenient"], "min")
+    ch.add("holdout_severe_recall_min", hold["severe_recall"], "min")
+    ch.add("holdout_under_graded_max", hold["under"], "max")
     ch.add("severity_lenient_min", sev["lenient"], "min")
     ch.add("severity_within1_min", sev["within1"], "min")
     ch.add("severe_recall_min", sev["severe_recall"], "min")

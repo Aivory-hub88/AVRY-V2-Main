@@ -29,12 +29,20 @@
     "severity_within1_min": 0.95,
     "severe_recall_min": 0.95,
     "high_conf_acc_min": 0.95,
-    "high_conf_coverage_min": 0.5
+    "high_conf_coverage_min": 0.5,
+    "holdout_explicit_acc_min": 0.9,
+    "holdout_severity_lenient_min": 0.85,
+    "holdout_severe_recall_min": 0.9,
+    "holdout_under_graded_max": 0
   },
   "approval_features": {
     "severity_lenient_min": 0.8,
     "severity_within1_min": 0.95,
     "severe_recall_min": 0.9,
-    "under_graded_max": 0
-  }
+    "under_graded_max": 0,
+    "holdout_severity_lenient_min": 0.8,
+    "holdout_severe_recall_min": 0.85,
+    "holdout_under_graded_max": 1
+  },
+  "_note_approval_v2": "holdout_v2 thresholds pre-registered 2026-09-27 with severity rubric v2, before any call on the 20 holdout cases. The 40 original cases were relabelled after their results were seen, so only holdout_v2 is an honest test."
 }
