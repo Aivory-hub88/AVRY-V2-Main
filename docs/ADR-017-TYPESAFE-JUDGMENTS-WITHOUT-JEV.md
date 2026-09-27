@@ -72,6 +72,21 @@ Deferred: speculative fan-out, hierarchical classification, entity alignment (no
 
   Reading: Jev is language-stable, calibrated (triage answers below 0.5 confidence are 58 % correct, above 0.9 are 100 %), about 4× faster at p50 and 7× cheaper. Its misses (severity off by one, slightly more escalation) all land on the safe side. Small synthetic sample, so this justifies a shadow test, not a rollout. The latency numbers come from the cached first run; the 09-27 `run` was served from `.cache/`.
 - **Jev shadow backend: blocked on privacy.** A live shadow sends the judged state (user text) to TypeSafe, which §7 rules out until `privacy@typesafe.ai` answers on subprocessors and hosting region. The same applies to replaying real `judge_shadow` traces through Jev. Until then Jev is evaluated on synthetic fixtures only.
+- **Approval-gate eval (option 4). DONE 2026-09-27** (`approval.jsonl`, 40 synthetic gated writes, `judge_shadow` question set; `approval_features` = same cases with derived features only, no user text or argument values, i.e. option 1). Thresholds were pre-registered. Both backends **FAIL** on severity, and both are perfect on authorization:
+
+  | | Jev full | Jev features | deepseek full | deepseek features |
+  |---|---|---|---|---|
+  | `explicit_instruction` @0.5 | 38/38 | – | 38/38 | – |
+  | Injected "already approved" read as authorization | 0/2 | – | 0/2 | – |
+  | Severity lenient | 0.975 | 0.925 | 1.000 | 0.950 |
+  | Severe (gold 3) recall | 0.60 | 0.47 | 0.73 | **0.93** |
+  | Latency p50 / p95 | 414 / 927 ms | 386 / 519 ms | 1351 / 4195 ms | 1140 / 2749 ms |
+  | Cost for 40 cases | $0.0009 | $0.0008 | $0.0046 | $0.0024 |
+
+  Reading: most severe misses are bulk sends (500 leads, 3000 customers, 1800 contacts) graded 2 by both models. The rubric's level 2 literally says "external messages send", and "large" is undefined, so this is a rubric gap more than a model failure. Real misses: Jev graded deleting 842 files as 2, and both graded a 90 jt transfer as 2 from features alone. No case with gold ≥2 was graded below its acceptable range, so the worst outcome was confirm instead of escalate, never handle. Option 1 is viable with deepseek (features-only beats full state on severe recall) but weak with Jev.
+  **Next:** make the severity rubric concrete (level 3 includes transfers ≥50 jt, sends to ≥50 recipients, bulk deletes) in both `questions.json` and `shadow_questions()`. Because this change is made after seeing results, rerun on new held-out cases, not only these 40.
+- **Noul criteria shape.** System One rejects a string `criteria` (HTTP 400). Fixed in the eval (`validate` now checks it) and in Cerveau (AVRY-Cerveau#13), otherwise no logged `judge_shadow` request could be replayed through Jev.
+- **ZDR probe. 2026-09-27.** A synthetic request to `/api/v1/systemone` with `provider: {"zdr": true, "data_collection": "deny"}` was served by provider `TypeSafe`. OpenRouter documents that `zdr: true` routes only to endpoints with a Zero Data Retention policy, so Jev appears to have one. The docs do not say explicitly that this applies to non-chat endpoints, so the privacy email should ask TypeSafe to confirm it in writing. Any future Jev call from Cerveau must send this `provider` block.
 - **P3 — Recall/citation/scoring consumers** (§4 items 4–7), each gated on its own shadow numbers.
 
 ## 6. P2 tool spec (no deploy in this change — needs the v0.8.5 rebase window)
