@@ -13,6 +13,7 @@ Background and findings from the docs review: memory note `typesafe-jev-evaluati
 |---|---|
 | `triage.jsonl` | 67 synthetic support messages: 20 matched EN/ID pairs, plus Indonesian-native, code-mixed, near-miss and adversarial cases |
 | `bant.jsonl` | 30 synthetic prospect conversations: 12 matched EN/ID pairs, plus informal, code-mixed, numeric and date cases |
+| `approval.jsonl` | 40 synthetic gated-write tool calls for the approval gate (16 EN/ID pairs + informal, code-mixed, injection, negation, retraction, numeric). Each case carries the full `judge_shadow` state and a derived-features-only variant (ADR-017 option 1: no user text, no argument values) |
 | `questions.json` | The Jev question definitions under test (Choice, Score, Noul). Single source; a later Cerveau tool should read the same file |
 | `thresholds.json` | Pass criteria, **fixed before any call was made** |
 | `run_eval.py` | `validate`, `payload`, `run`, `report` (stdlib only) |
@@ -53,6 +54,7 @@ python3 run_eval.py validate                       # offline
 python3 run_eval.py payload tri-P01-id             # exact request body for one case
 python3 run_eval.py probe                          # one ~$0.00001 request: auth, base URL, model name, key limit
 python3 run_eval.py run --budget 0.25              # ~97 requests, about $0.004 for a full pass; hard USD cap
+python3 run_eval.py run --suite approval_both      # 80 requests: approval gate, full state vs features only
 python3 run_eval.py report results/<file>.jsonl    # metrics and PASS/FAIL against thresholds.json
 ```
 
