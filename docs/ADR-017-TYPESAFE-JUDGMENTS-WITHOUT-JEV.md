@@ -1,6 +1,6 @@
 # ADR-017 — TypeSafe-shaped judgments for Cerveau, with no Jev dependency
 
-**Status:** Proposed (2026-09-23).
+**Status:** Proposed (2026-09-23). Updated 2026-09-27 with the first real Jev eval (§5).
 **Date:** 2026-09-23
 **Related:** [ADR-015](ADR-015-CERVEAU-TOOL-CALLING-VS-HERMES.md) (tool-calling shape), [ADR-016](ADR-016-CERVEAU-MEMORY-RECALL-QUALITY.md) (recall quality; its shadow-eval discipline is reused here), `evals/typesafe-jev/` (question definitions + harness + LLM baseline).
 **Basis:** the [`typesafe-ai` skill](https://github.com/typesafe-ai/skills/tree/main/skills/typesafe-ai) (`SKILL.md`) plus the [live TypeSafe docs](https://docs.typesafe.ai/llms.txt) (patterns: confidence-routing, intent-routing, composite-scoring; cookbooks: `llm_guardrails`, `rerank_typesafe`, `citation_check`, `sde_cascade`), read with the assumption **no Jev API is used**.
@@ -54,6 +54,24 @@ Deferred: speculative fan-out, hierarchical classification, entity alignment (no
 - **P2 — Cerveau `judge` tool (after the v0.8.5 rebase).** A narrow tool reading `questions.json`, calling the existing provider with a JSON schema, returning typed answers; the turn loop applies `decide.py`-equivalent policy in Rust. Shadow mode first (decisions logged, behaviour unchanged), same discipline as ADR-016 §20.
 - **P2 exit gate tooling. DONE 2026-09-23** (`evals/typesafe-jev/replay.py` + `test_replay.py`, stub backend 6/6): parses `judge_shadow` rows out of runtime-trace JSONL, replays the embedded judge requests, compares vs logged gate actions. Awaiting real gated-write traffic; swap the stub for a live backend when it arrives.
 - **Correction (source-fixed, needs a deploy to take effect):** the embedded `escalate_on: ["explicit_instruction"]` hint in emitted events is backwards — high authorization must NOT escalate. Fixed to `[]` in source; `replay.py` owns the policy and ignores the hint by design, and the live daemon keeps emitting the old hint until the next deploy.
+- **P2 schema-typed extraction. PR open (AVRY-Cerveau#12, draft, 2026-09-27).** On native-tool providers `judge` offers one `submit_judgments` tool whose parameters are a JSON Schema derived from the questions (Choice → `enum`, Score → integer range, Noul/confidence → 0..=1). This is the Rig (`0xPlaygrounds/rig`) extractor pattern on Cerveau's own provider layer, with no dependency. `parse_answers` still fails closed; other providers stay on the text path; output gains `extraction: tool_call|text`.
+- **Real Jev run. DONE 2026-09-27** (`results/20260927-140024-all-jev.jsonl`, `typesafe/jev-1.13-20260917` via OpenRouter, 97 cases). The earlier `20260923-093807-triage-jev.jsonl` was `fake-1.0`, so this is the first real Jev number. **OVERALL PASS** on every pre-registered threshold, as did the deepseek baseline:
+
+  | | Jev 1.13 | deepseek v4.1-flash |
+  |---|---|---|
+  | Triage escalation recall | 26/26 | 26/26 |
+  | False-escalation rate | 0.083 | 0.028 |
+  | Intent lenient accuracy | 1.000 | 0.985 |
+  | EN/ID pair intent disagreement | 0.000 | 0.050 |
+  | Severity exact / within-1 | 0.627 / 1.000 | 0.746 / 1.000 |
+  | BANT status accuracy | 1.000 | 1.000 |
+  | `decide.py` agreement vs gold | 88/92 | 89/92 |
+  | Accuracy at confidence ≥0.9 (triage) | 1.000 (coverage 0.679) | 1.000 (coverage 0.604) |
+  | Latency p50 / p95 | 648 / 804 ms | 2966 / 17197 ms |
+  | Cost per case | ~$0.000044 | ~$0.000308 |
+
+  Reading: Jev is language-stable, calibrated (triage answers below 0.5 confidence are 58 % correct, above 0.9 are 100 %), about 4× faster at p50 and 7× cheaper. Its misses (severity off by one, slightly more escalation) all land on the safe side. Small synthetic sample, so this justifies a shadow test, not a rollout. The latency numbers come from the cached first run; the 09-27 `run` was served from `.cache/`.
+- **Jev shadow backend: blocked on privacy.** A live shadow sends the judged state (user text) to TypeSafe, which §7 rules out until `privacy@typesafe.ai` answers on subprocessors and hosting region. The same applies to replaying real `judge_shadow` traces through Jev. Until then Jev is evaluated on synthetic fixtures only.
 - **P3 — Recall/citation/scoring consumers** (§4 items 4–7), each gated on its own shadow numbers.
 
 ## 6. P2 tool spec (no deploy in this change — needs the v0.8.5 rebase window)
