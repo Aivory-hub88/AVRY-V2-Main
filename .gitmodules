@@ -46,3 +46,6 @@
 [submodule "services/avry-mail"]
 	path = services/avry-mail
 	url = https://github.com/Aivory-hub88/AVRY-Mail.git
+[submodule "services/avry-crm"]
+	path = services/avry-crm
+	url = https://github.com/Aivory-hub88/avry-crm.git
