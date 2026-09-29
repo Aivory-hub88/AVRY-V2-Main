@@ -446,6 +446,46 @@ async function getAgentProfile(userId, agentType, internalKey) {
   return profile;
 }
 
+// ADR-020 P1 — which of this tenant's agents are deployed, forwarded to
+// Cerveau as X-Active-Agents so delegation can be limited to teammates the
+// user actually has. Fail-open: any error yields [] and the header is
+// omitted, which Cerveau treats as "no filtering" (today's behaviour).
+const _activeAgentsCache = new Map(); // user_id -> { at, agents }
+const ACTIVE_AGENTS_TTL_MS = () => Math.max(5000, parseInt(process.env.ACTIVE_AGENTS_TTL_MS, 10) || 30000);
+const ACTIVE_AGENTS_ENABLED = () => (process.env.ACTIVE_AGENTS_HEADER || 'on').toLowerCase() !== 'off';
+const AGENT_TYPE_RE = /^[a-z_]{1,64}$/;
+
+async function getActiveAgents(userId, internalKey) {
+  if (!ACTIVE_AGENTS_ENABLED() || !userId || !internalKey) return [];
+  const cached = _activeAgentsCache.get(userId);
+  if (cached && Date.now() - cached.at < ACTIVE_AGENTS_TTL_MS()) return cached.agents;
+  let agents = [];
+  try {
+    const res = await fetch(
+      `${BACKEND_URL()}/api/v1/active-agents/internal/${encodeURIComponent(userId)}`,
+      { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(3000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      agents = (Array.isArray(data && data.agents) ? data.agents : [])
+        .map((a) => a && a.agent_type)
+        .filter((t) => typeof t === 'string' && AGENT_TYPE_RE.test(t));
+    }
+  } catch (err) {
+    console.error('[telegram-agent] active-agents lookup failed (no roster filter this turn):', err.message);
+  }
+  _activeAgentsCache.set(userId, { at: Date.now(), agents });
+  return agents;
+}
+
+/** Deployed agents plus the agent handling this turn (it is active by definition). */
+function activeAgentsHeader(agents, currentAgentType) {
+  if (!agents.length) return null; // nothing known -> don't filter
+  const set = new Set(agents);
+  if (currentAgentType && AGENT_TYPE_RE.test(currentAgentType)) set.add(currentAgentType);
+  return [...set].join(',');
+}
+
 /**
  * Render the operator's identity config as a fenced DATA block. The security
  * rules above it stay authoritative: the block explicitly cannot grant
@@ -835,6 +875,11 @@ async function callCerveau(ctx, userText) {
     throw new Error('Cerveau not configured (missing webhook secret)');
   }
 
+  const activeAgents = activeAgentsHeader(
+    await getActiveAgents(ctx.user_id, ctx.internalKey),
+    ctx.agent_type
+  );
+
   let res;
   try {
     res = await fetch(CERVEAU_WEBHOOK_URL(), {
@@ -845,6 +890,7 @@ async function callCerveau(ctx, userText) {
         'X-Tenant-Id': ctx.user_id,
         'X-Agent-Type': ctx.agent_type,
         'X-Session-Id': ctx.session_id,
+        ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
       },
       body: JSON.stringify({ message: userText }),
       signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
@@ -1103,3 +1149,4 @@ module.exports._internals = {
   resolveCerveauApproval,
 };
 module.exports.calculate = calculate;
+module.exports.activeAgentsHeader = activeAgentsHeader;
