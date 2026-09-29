@@ -1,0 +1,72 @@
+# ADR-020 — Dynamic agent discovery and Teams: the user's deployed/selected agents define who talks to whom
+
+**Status:** Proposed 2026-09-29. **P1 and P2 shipped and deployed 2026-09-29** (avry-backend#7/#8 endpoint, AVRY-V2-Main#12 bridge header, AVRY-Cerveau#15 delegate scoping, Cerveau `f802b2c`); P3+ not started. Live end-to-end check (a real turn delegating to an undeployed agent) still pending. Every "today" claim below was read on 2026-09-29 from live `config.toml` on `:3100`, `AVRY-Cerveau@7daab3a8a`, and `avry-user-dashboard` main, i.e. before P1/P2.
+**Related:** ADR-008 (delegation engine), ADR-014 (envelope/ledger, `context_id`), ADR-019 (Team Space rooms).
+
+## 1. Decision
+
+Users do not configure agent-to-agent wiring. They **pick agents and deploy** them; Aivory derives the roster.
+
+- **Active agent** = union of (A) any agent with a channel deployment (Telegram binding, Slack installation, API key, later WhatsApp/Odoo) and (B) any agent the user explicitly selects in a **Room**. Both count; no extra setup step.
+- **"Room" is a user-dashboard surface, and there are two:** the **AI Console** Room (Mission Control, `@mention` of agents, Direct/Room toggle) and the **Workspace** (Team Space threads and docs, where agents are invited per space/doc). Both are first-class Team channels (§3.3), same as Telegram/Slack.
+- **Team** = a named set of agents owned by one user/tenant, attachable to one or more channels (a Telegram group, a Slack channel, an Odoo widget, a WhatsApp group, an API key). Members of a Team discover each other automatically.
+- Discovery is **per turn**, from the tenant's active set. Agents outside it are invisible and undelegatable.
+
+## 2. Today (verified)
+
+| Fact | Where |
+|---|---|
+| Delegate roster is a pure function of `Config` (no tenant): `reachable_delegate_target_configs`. Live wiring is global: Aira→5 (`independent`, depth 2), Geno↔4 specialists (`bounded`, depth 1), specialists→Geno only. | `zeroclaw-config/src/schema.rs:4127`, live `config.toml` |
+| `delegate` builds its target list from that function. | `zeroclaw-runtime/src/tools/delegate.rs:1301` |
+| `TENANT_CONTEXT` is scoped per turn and already read by `delegate.rs`; it carries `tenant_id`, `platform_user_id`, `agent_type`, **no roster**. | `agent/tenant.rs:35,324` |
+| vps-bridge fills `X-Tenant-Id` / `X-Agent-Type`. | `backend/vps-bridge/telegram-agent.js:845,1013` |
+| Dashboard "deployments" = Telegram bindings + Slack installations + agent API keys. WhatsApp and Odoo have **no deploy route** in the backend yet. | `lib/agentChat.ts:75`, `app/routes/{telegram,slack,agent_api_keys}.py` |
+| Workspace already records invited agents per doc: `dashboard.workspace_agent_acl(doc_id, agent_type, role)`; Team Space tasks are keyed by `space_id` (`workspace_agent_tasks`). Console Room state (which agents were @mentioned, floor holder) lives client-side in the dashboard, not in a table. | `migrations/workspace-agent-acl.sql`, `workspace-space-agent-tasks.sql` |
+| Team Space agents act only when `@`-mentioned; proactive posts never mention agents (loop guard). | ADR-019 |
+
+## 3. Design
+
+### 3.1 Active set
+New backend read model `GET /api/v1/active-agents` (internal, service token): per tenant, `[{agent_type, sources:[telegram|slack|api_key|team|...]}]`. Deployment sources are derived from existing tables; Team membership from the new `teams` tables (§3.3). No new source of truth for deployments.
+
+### 3.2 Delivery to Cerveau
+vps-bridge adds `X-Active-Agents: a,b,c` beside `X-Tenant-Id`/`X-Agent-Type` (allow-list of the 6 known types, capped length). The gateway authenticates it the same way as the other two and stores `active_agents` on `TenantContext`.
+
+### 3.3 Teams
+```
+teams(id, tenant_id, name, created_at)
+team_members(team_id, agent_type, PRIMARY KEY(team_id, agent_type))
+team_channels(team_id, kind, ref, PRIMARY KEY(team_id, kind, ref))  -- kind: console|workspace|telegram|slack|odoo|whatsapp|api_key
+```
+A channel message on `team_channels` resolves to the Team; that Team's members are the active set for the turn (plus the tenant-wide set from §3.1 unless the Team is marked `isolated`). `console` and `workspace` channels need no new deploy route: a Console Room maps to the tenant's Team named in the Room toggle; a Workspace `space_id` maps to a Team whose members are seeded from `workspace_agent_acl` (invited agents), so inviting an agent to a space makes it discoverable to the others in that space with no extra step. The Console Room's client-side state moves to `team_members` when the user saves the group. Channels that do not exist yet (WhatsApp, Odoo) plug in by adding a `kind` and a deploy route; nothing else changes.
+
+### 3.4 Cerveau (Rust, AVRY-Cerveau)
+- `TenantContext.active_agents: Option<Vec<String>>`.
+- Roster = `reachable_delegate_targets(caller)` ∩ `active_agents` when present; unchanged when absent (**fail-open to today's behaviour**, so an old bridge is safe).
+- Apply in both places: `parameters_schema` (what the model sees) and delegate admission (what actually runs). Doing only the first is a prompt-level filter, not a control.
+- **Mesh:** allow specialist↔specialist within the active set by treating same-team agents as implicit delegates (`delegate_same_risk_profile`-style rule keyed on `active_agents`). Depth stays 1 for specialists, 2 for Aira.
+- **Intro card:** prepend a short "active teammates" block (name, title, one-line specialty from `agent_roster`) to the turn's system context. Text is engine-generated, not user content.
+
+### 3.5 Guardrails (unchanged, restated)
+`max_delegation_depth`, per-agent hourly/daily budgets, `context_turn_cap` (ADR-014 P1), loop detector, `velocity_gate`, untrusted framing of peer output. Agents still do not start conversations on their own: a human message or Aira starts every chain. Open-ended agent↔agent chat is a separate, later decision.
+
+## 4. Phasing
+
+1. **P0 — this ADR, review.**
+2. **P1 — Backend + bridge:** `active-agents` read model (deployments only), header, tests. No behaviour change until Cerveau reads it.
+3. **P2 — Cerveau:** `active_agents` in `TenantContext`, roster intersection in schema + admission, tests incl. absent-header and empty-set cases. CI, rolling release, deploy via the standard swap recipe.
+4. **P3 — Teams:** tables, dashboard "create team, pick agents, attach channels". Console Room and Workspace first (in-dashboard, no external dependency), then Telegram group + Slack channel (routes exist).
+5. **P4 — New channels:** WhatsApp, Odoo deploy routes as `team_channels` kinds.
+6. **P5 — Mesh + intro card** behind a flag, canary on one tenant, watch delegate cost/loop metrics for a week.
+
+## 5. Open questions
+
+- Should a Team be able to include another user's agents? Assumed **no** (tenant-scoped).
+- `isolated` Teams: default off (tenant-wide set still visible) or on?
+- WhatsApp provider (Cloud API vs. via Composio) and Odoo widget auth are their own ADRs.
+- Confirm live `chief_of_staff` mode: live config has `independent`, `services/cerveau/ROOM-DELEGATES.md` says `bounded`. Doc is stale or config drifted.
+
+## 6. Not verified
+- How the Console Room persists its agent set across sessions (believed client-only; to confirm in `components/office/*` and `useChat`).
+- Whether the gateway rejects unknown headers or needs an allow-list entry for `X-Active-Agents`.
+- Whether any tool other than `delegate` (e.g. `send_message_to_peer`, `peer_groups.room_team`) also needs the same intersection.
