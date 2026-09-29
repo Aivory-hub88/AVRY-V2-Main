@@ -12,6 +12,16 @@ Users do not configure agent-to-agent wiring. They **pick agents and deploy** th
 - **Team** = a named set of agents owned by one user/tenant, attachable to one or more channels (a Telegram group, a Slack channel, an Odoo widget, a WhatsApp group, an API key). Members of a Team discover each other automatically.
 - Discovery is **per turn**, from the tenant's active set. Agents outside it are invisible and undelegatable.
 
+### 1.1 Decisions (owner, 2026-09-29)
+
+1. **A Team belongs to exactly one user** (the leader). No cross-user agents; `teams` carries the leader's `user_id` and there is no sharing model.
+2. **Teams are `isolated` by default.** A turn arriving on a channel bound to a Team may delegate only within that Team's members. Channels not bound to a Team (e.g. a 1:1 chat with one agent) use the tenant-wide active set (P2 behaviour).
+3. **Workspace agents belong to the leader.** In a Workspace, the leader is the workspace owner (`workspace_members.role = 'owner'`). Other members are humans who *interact with* the leader's deployed agents; they do not deploy their own there.
+4. **Agent turns in a Workspace run in the leader's tenant**, not the requesting member's. The member is the *requester*, recorded for attribution and audit, and still needs `canWrite` on the space.
+5. **Credits for those turns are billed to the leader.**
+
+**Gap this exposes (verified):** `lib/spaceAgentRun.ts:134` forwards the acting user's own JWT to `/api/v1/telegram/agent-chat`, so today a member's `@Lex` runs in the *member's* tenant (their memory, their credits/tier, their deployments). That contradicts decisions 3-5 and must change in P3: the dashboard calls a backend mode that acts on behalf of the leader using a service credential plus `acting_as` (leader) and `requested_by` (member), which the backend verifies against `workspace_members` (member must belong to the workspace; `acting_as` must be that workspace's owner; a caller cannot name an arbitrary `acting_as`). The member-JWT path must not be usable for Workspace agent turns.
+
 ## 2. Today (verified)
 
 | Fact | Where |
@@ -38,7 +48,7 @@ teams(id, tenant_id, name, created_at)
 team_members(team_id, agent_type, PRIMARY KEY(team_id, agent_type))
 team_channels(team_id, kind, ref, PRIMARY KEY(team_id, kind, ref))  -- kind: console|workspace|telegram|slack|odoo|whatsapp|api_key
 ```
-A channel message on `team_channels` resolves to the Team; that Team's members are the active set for the turn (plus the tenant-wide set from §3.1 unless the Team is marked `isolated`). `console` and `workspace` channels need no new deploy route: a Console Room maps to the tenant's Team named in the Room toggle; a Workspace `space_id` maps to a Team whose members are seeded from `workspace_agent_acl` (invited agents), so inviting an agent to a space makes it discoverable to the others in that space with no extra step. The Console Room's client-side state moves to `team_members` when the user saves the group. Channels that do not exist yet (WhatsApp, Odoo) plug in by adding a `kind` and a deploy route; nothing else changes.
+A channel message on `team_channels` resolves to the Team; that Team's members are the active set for the turn (isolated by default, §1.1). A Workspace space resolves to the *leader's* Team for that space and the turn runs in the leader's tenant (§1.1). `console` and `workspace` channels need no new deploy route: a Console Room maps to the tenant's Team named in the Room toggle; a Workspace `space_id` maps to a Team whose members are seeded from `workspace_agent_acl` (invited agents), so inviting an agent to a space makes it discoverable to the others in that space with no extra step. The Console Room's client-side state moves to `team_members` when the user saves the group. Channels that do not exist yet (WhatsApp, Odoo) plug in by adding a `kind` and a deploy route; nothing else changes.
 
 ### 3.4 Cerveau (Rust, AVRY-Cerveau)
 - `TenantContext.active_agents: Option<Vec<String>>`.
@@ -55,14 +65,16 @@ A channel message on `team_channels` resolves to the Team; that Team's members a
 1. **P0 — this ADR, review.**
 2. **P1 — Backend + bridge:** `active-agents` read model (deployments only), header, tests. No behaviour change until Cerveau reads it.
 3. **P2 — Cerveau:** `active_agents` in `TenantContext`, roster intersection in schema + admission, tests incl. absent-header and empty-set cases. CI, rolling release, deploy via the standard swap recipe.
-4. **P3 — Teams:** tables, dashboard "create team, pick agents, attach channels". Console Room and Workspace first (in-dashboard, no external dependency), then Telegram group + Slack channel (routes exist).
+4. **P3 — Teams:** backend `acting_as`/`requested_by` mode for Workspace agent turns (leader tenant, leader-billed; replaces the member-JWT path in `spaceAgentRun.ts`) first, then tables, dashboard "create team, pick agents, attach channels". Console Room and Workspace first (in-dashboard, no external dependency), then Telegram group + Slack channel (routes exist).
 5. **P4 — New channels:** WhatsApp, Odoo deploy routes as `team_channels` kinds.
 6. **P5 — Mesh + intro card** behind a flag, canary on one tenant, watch delegate cost/loop metrics for a week.
 
 ## 5. Open questions
 
-- Should a Team be able to include another user's agents? Assumed **no** (tenant-scoped).
-- `isolated` Teams: default off (tenant-wide set still visible) or on?
+- ~~Cross-user Teams~~ — decided **no** (§1.1).
+- ~~`isolated` default~~ — decided **on** (§1.1).
+- Workspace credit billing — decided **leader** (§1.1). Open: what happens when the leader is out of credits (members' agent calls should fail with a clear message, not fall back to member credits).
+- Workspace with several leaders/owners: pick the doc/space owner as `acting_as`; confirm behaviour for ownerless (claimable) docs.
 - WhatsApp provider (Cloud API vs. via Composio) and Odoo widget auth are their own ADRs.
 - Confirm live `chief_of_staff` mode: live config has `independent`, `services/cerveau/ROOM-DELEGATES.md` says `bounded`. Doc is stale or config drifted.
 
