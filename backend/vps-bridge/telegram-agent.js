@@ -478,6 +478,17 @@ async function getActiveAgents(userId, internalKey) {
   return agents;
 }
 
+/** Validate a backend-supplied Team list: known-shaped tokens only, capped, de-duplicated. */
+function sanitizeTeamAgents(value) {
+  if (!Array.isArray(value)) return null;
+  const out = [];
+  for (const t of value) {
+    if (typeof t === 'string' && AGENT_TYPE_RE.test(t) && !out.includes(t)) out.push(t);
+    if (out.length >= 16) break;
+  }
+  return out.length ? out : null;
+}
+
 /** Deployed agents plus the agent handling this turn (it is active by definition). */
 function activeAgentsHeader(agents, currentAgentType) {
   if (!agents.length) return null; // nothing known -> don't filter
@@ -875,8 +886,11 @@ async function callCerveau(ctx, userText) {
     throw new Error('Cerveau not configured (missing webhook secret)');
   }
 
+  // A Team-scoped list from the backend (ADR-020 P3) wins over the tenant-wide
+  // deployment lookup; absent or empty means "not team-scoped".
+  const teamAgents = Array.isArray(ctx.active_agents) && ctx.active_agents.length ? ctx.active_agents : null;
   const activeAgents = activeAgentsHeader(
-    await getActiveAgents(ctx.user_id, ctx.internalKey),
+    teamAgents || (await getActiveAgents(ctx.user_id, ctx.internalKey)),
     ctx.agent_type
   );
 
@@ -965,6 +979,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       channel,
       internalKey,
       orKey,
+      active_agents: sanitizeTeamAgents(req.body.active_agents),
     };
 
     try {
@@ -1150,3 +1165,4 @@ module.exports._internals = {
 };
 module.exports.calculate = calculate;
 module.exports.activeAgentsHeader = activeAgentsHeader;
+module.exports.sanitizeTeamAgents = sanitizeTeamAgents;
