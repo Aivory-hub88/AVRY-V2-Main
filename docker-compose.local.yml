@@ -393,6 +393,22 @@ services:
       retries: 5
       start_period: 10s
 
+  avry-crm-db:
+    image: postgres:16-alpine
+    container_name: avry-crm-db
+    <<: *python-defaults
+    environment:
+      - POSTGRES_USER=avry_crm
+      - POSTGRES_PASSWORD=${CRM_DB_PASSWORD:-avry_crm_dev}
+      - POSTGRES_DB=avry_crm
+    volumes:
+      - crm_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avry_crm -d avry_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   avry-crm:
     build:
       context: services/avry-crm
@@ -403,7 +419,10 @@ services:
       - "8091:8091"
     environment:
       - PORT=8091
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgres://avry_crm:${CRM_DB_PASSWORD:-avry_crm_dev}@avry-crm-db:5432/avry_crm
+    depends_on:
+      avry-crm-db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/health"]
       interval: 10s
@@ -481,6 +500,7 @@ volumes:
   n8n_data:
   n8n_as_code_drafts:
   careers_cv_data:
+  crm_db_data:
 
 networks:
   aivory-network:
