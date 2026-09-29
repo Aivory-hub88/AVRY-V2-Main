@@ -454,7 +454,7 @@ services:
       - "traefik.http.routers.avry-careers.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-careers.loadbalancer.server.port=8089"
 
-  # ── CRM (internal only: no ports, no Traefik labels; reached by the dashboard proxy) ──
+  # ── CRM (REST is internal only; only /crm/mcp is routed publicly via Traefik) ──
 
   avry-crm-db:
     image: postgres:16-alpine
@@ -491,6 +491,20 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    # Only /crm/mcp is public (agents reach it through the tenant MCP verifier and
+    # Cerveau). The REST API stays internal; Traefik strips /crm so the service sees /mcp.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.avry-crm-mcp.rule=Host(`api.aivory.id`) && PathPrefix(`/crm/mcp`)"
+      - "traefik.http.routers.avry-crm-mcp.entrypoints=websecure"
+      - "traefik.http.routers.avry-crm-mcp.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.avry-crm-mcp.priority=30"
+      - "traefik.http.routers.avry-crm-mcp.middlewares=avry-crm-mcp-rl,avry-crm-mcp-strip"
+      - "traefik.http.middlewares.avry-crm-mcp-rl.ratelimit.average=30"
+      - "traefik.http.middlewares.avry-crm-mcp-rl.ratelimit.burst=60"
+      - "traefik.http.middlewares.avry-crm-mcp-strip.stripprefix.prefixes=/crm"
+      - "traefik.http.services.avry-crm-mcp.loadbalancer.server.port=8091"
 
   # ── Collab (y-octo + OctoBase) — aivory-collab:3200 ──────────────────────
   aivory-collab:
