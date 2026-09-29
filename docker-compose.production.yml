@@ -454,6 +454,44 @@ services:
       - "traefik.http.routers.avry-careers.tls.certresolver=letsencrypt"
       - "traefik.http.services.avry-careers.loadbalancer.server.port=8089"
 
+  # ── CRM (internal only: no ports, no Traefik labels; reached by the dashboard proxy) ──
+
+  avry-crm-db:
+    image: postgres:16-alpine
+    container_name: avry-crm-db
+    <<: *python-defaults
+    environment:
+      - POSTGRES_USER=avry_crm
+      - POSTGRES_PASSWORD=${CRM_DB_PASSWORD:?set CRM_DB_PASSWORD}
+      - POSTGRES_DB=avry_crm
+    volumes:
+      - avry-crm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avry_crm -d avry_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  avry-crm:
+    build:
+      context: services/avry-crm
+      dockerfile: Dockerfile
+    container_name: avry-crm
+    <<: *python-defaults
+    environment:
+      - PORT=8091
+      - DATABASE_URL=postgres://avry_crm:${CRM_DB_PASSWORD:?set CRM_DB_PASSWORD}@avry-crm-db:5432/avry_crm
+      - CRM_SERVICE_TOKEN=${CRM_SERVICE_TOKEN:?set CRM_SERVICE_TOKEN}
+    depends_on:
+      avry-crm-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # ── Collab (y-octo + OctoBase) — aivory-collab:3200 ──────────────────────
   aivory-collab:
     build:
@@ -535,6 +573,8 @@ services:
       - BACKEND_SERVICE_URL=http://avry-backend:8081
       - COLLAB_URL=${COLLAB_URL:-http://aivory-collab:3200}
       - COLLAB_SERVICE_TOKEN=${COLLAB_SERVICE_TOKEN}
+      - CRM_URL=http://avry-crm:8091
+      - CRM_SERVICE_TOKEN=${CRM_SERVICE_TOKEN:?set CRM_SERVICE_TOKEN}
       - NEXT_PUBLIC_API_URL=https://backend.aivory.id
       - NEXT_PUBLIC_ZEROCLAW_URL=https://api.aivory.id
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
@@ -716,6 +756,7 @@ services:
       - "traefik.http.routers.avry-mail-web.priority=10"
 
 volumes:
+  avry-crm-db-data:
   avry-backend-data:
   n8n_data:
   n8n_as_code_drafts:
