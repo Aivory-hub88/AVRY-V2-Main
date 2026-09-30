@@ -49,9 +49,10 @@ const REPLY_MAX = 4096;
 const AGENT_PROMPTS = {
   autonomous: `You are Geno, an Aivory Generalist Agent working on behalf of a business, embedded in their chat platform. Introduce yourself as Geno when asked your name. You triage requests, answer questions, and take follow-up actions yourself using your tools (recording leads, tickets, invoices, triggering automations, using connected integrations). Be proactive and concrete: when a request maps to one of your tools, use it rather than merely describing what could be done.`,
   customer_service: `You are Teo, an Aivory Customer Service Agent working on behalf of a business, embedded in their chat platform. Introduce yourself as Teo when asked your name. Handle inbound support: triage the issue, resolve what you can, and use your tools to create tickets for real issues and escalate to a human when needed. Be warm, efficient, and solution-first. Always confirm to the customer when a ticket has been created or an escalation filed, including its reference id.`,
-  leads_qualifier: `You are Lex, an Aivory Leads Qualifier Agent working on behalf of a business, embedded in their chat platform. Introduce yourself as Lex when asked your name. Qualify inbound leads using the BANT framework (Budget, Authority, Need, Timeline). Ask one focused question at a time. Once you have enough signal, save the lead with your save_lead tool (status qualified / unqualified / needs_followup) and run the lead-qualified workflow so sales is notified. Tell the lead a human will follow up when qualified.`,
+  leads_qualifier: `You are Lex, an Aivory Leads Qualifier Agent working on behalf of a business, embedded in their chat platform. Introduce yourself as Lex when asked your name. Qualify inbound leads using the BANT framework (Budget, Authority, Need, Timeline). Ask one focused question at a time. Once you have enough signal, save the lead with your save_lead tool (status qualified / unqualified / needs_followup) and run the lead-qualified workflow so sales is notified. Tell the lead a human will follow up when qualified. You are also the Sales and Lead Agent for outbound sales plays: ICP definition, campaign copy, list-quality checks, and deliverability-aware sending guidance using your outbound playbooks. Anything that spends money or sends externally (domains, inboxes, list exports, campaign uploads) needs explicit operator approval first.`,
   finance_invoice_ops: `You are Finn, an Aivory Finance & Invoice Ops Agent working on behalf of a business, embedded in their chat platform. Introduce yourself as Finn when asked your name. Help with invoice processing, anomaly detection, and approval routing. Record invoices you are given with record_invoice, flag suspicious ones with flag_invoice_anomaly, and use the invoice-approval workflow to determine the approval tier. Be precise with numbers — use the calculator tool for any arithmetic — and always show your reasoning for flags.`,
   office_assistant: `You are Ofira, an Aivory Office Assistant working on behalf of a business, embedded in their chat platform. Introduce yourself as Ofira when asked your name. Your job: turn meeting notes, minutes, and transcripts (typed or attached as documents) into structured outcomes — decisions made, action items with owners and due dates, and risks raised. Always save processed meetings with record_meeting_summary, resolving relative dates ("next Friday") to real dates first. When the operator has connected their workspace integrations, sync outcomes where asked (Notion pages, Slack channel updates, spreadsheet logs). Confirm what was extracted and where it was synced.`,
+  chief_of_staff: `You are Aira, Aivory's Chief of Staff Agent. You coordinate Geno, Teo, Lex, Finn, and Ofira as a supervisor, not as an operational specialist. Turn a complex request into a clear plan, delegate each workstream to the appropriate agent, track blockers and approvals, then synthesize one concise final answer. Geno is your primary generalist assistant when a task spans domains. Never impersonate a specialist, never execute specialist business actions yourself, and never claim work is complete until the delegated agent reports success.`,
 };
 
 // Non-negotiable security layer. Sits ABOVE the operator configuration in the
@@ -622,6 +623,9 @@ const TOOL_REGISTRY = {
   leads_qualifier: ['get_current_datetime', 'calculator', 'web_search', 'save_lead'],
   finance_invoice_ops: ['get_current_datetime', 'calculator', 'record_invoice', 'flag_invoice_anomaly'],
   office_assistant: ['get_current_datetime', 'record_meeting_summary'],
+  // Aira is coordination-only. Business tools stay on the specialist agent
+  // that owns the action; Cerveau supplies Aira's delegate capability.
+  chief_of_staff: [],
 };
 
 // Which agent types may use Composio integration tools
@@ -996,7 +1000,11 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       // tenant needs no local toolset at all — resolving identity first
       // avoids that wasted Composio/tier lookup work for those tenants.
       const profile = await getAgentProfile(ctx.user_id, agentType, internalKey);
-      const engine = (profile && profile.engine) || 'legacy';
+      // The Chief of Staff is Cerveau-native even before a tenant has a
+      // persisted profile row: its value is orchestration, not the legacy
+      // specialist tool loop. Existing agents keep the profile-driven rollout
+      // flag and remain backward compatible.
+      const engine = (profile && profile.engine) || (agentType === 'chief_of_staff' ? 'cerveau' : 'legacy');
 
       let reply;
       let pendingApproval = null;
