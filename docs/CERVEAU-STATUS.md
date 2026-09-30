@@ -4,6 +4,48 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-27 — judge_shadow question set v2 deployed (PRs #13 + #14, `7daab3a`)
+
+**Why:** two gaps found by the synthetic approval eval (`evals/typesafe-jev`, ADR-017). (1) The `explicit_instruction` Noul `criteria` was a string, which Jev's System One API rejects with HTTP 400, so no logged `judge_shadow` request could be replayed through Jev. (2) Severity rubric v1 left "large" undefined and put "external messages send" at level 2, so bulk sends to hundreds of people graded 2 (severe recall 0.60 Jev / 0.73 deepseek). Rubric v2 names concrete boundaries: ≥ Rp50 juta, ≥ 50 recipients, bulk deletes, automations acting on many people. On 20 held-out cases with pre-registered thresholds, both backends pass every threshold.
+**Deployed:** squash-merged #13 (`870eb15`) and #14 (`7daab3a`); the diff from live `46c4b93` touched only `judge_shadow.rs`, with no schema change and no gate behaviour change. Rolling `cerveau-cd` built from `7daab3a`: sha256 OK, release body names the commit, and the new strings are present (absent in the old binary). The live binary hash was confirmed as the `46c4b93` build before the swap. `doctor` with the new binary: 87 ok / 0 errors, warnings identical to the old binary. Backup `.bak-pre-rubric-v2-20260927`, restart: `active`, `NRestarts=0`, health 200, zero panic/error in the startup log.
+**Not done:** no synthetic `/webhook` probe, because a `judge_shadow` row only appears on a real gated write. The next gated write will carry the v2 question set. Rollback = copy the `.bak` back + restart.
+
+## 2026-09-24 — Odoo 401 fixed: shared Od-MCP 0.3.1 (query-token auth)
+
+**Symptom (live report, dashboard screenshot):** Odoo card `verification_failed`, `server returned HTTP 401` on `https://odoo-mcp.aivory.uk/mcp?token=...`.
+**Root cause (reproduced locally first):** every HTTP/SSE/WS handler passed an empty query string to tenant resolution, so `?token=`/`?access_token=` — the exact form backend registers (`/mcp?token=`, no `Authorization` header) — always 401'd. Header-bearer calls worked, which is why earlier curl self-tests missed it.
+**Fix (`v0.3.1`):** parse the query map at each HTTP entry point (initialize, stateless POST, SSE, messages, health) and the WS handshake; header still wins when both present. 12/12 tests (new `bearer_from_query_token` regression test). Release pipeline green, tenant tarball + latest marker published.
+**Deployed:** `od-mcp:0.3.1` rebuilt on VPS, container recreated with identical config/labels, pre-existing file instances preserved. Verified externally end-to-end (the dashboard's exact flow): `initialize` + `tools/list` via `?token=` → 200 with all 18 tools; smoke instance deleted after.
+
+## 2026-09-23 — shared Od-MCP 0.3.0 + backend/dashboard redeploy (Odoo self-serve live)
+
+**Found:** `odoo-mcp.aivory.uk` resolved (Cloudflare) but had **no Traefik route** — plain Traefik 404 on `/health` and `/mcp`. The backend `connect_odoo` flow could never have worked end-to-end, independent of the missing `/admin/instances` endpoint.
+**Deployed:** Od-MCP source synced to VPS, `docker build -t od-mcp:0.3.0`, container recreated on `aivory-network` with Traefik labels (`Host(odoo-mcp.aivory.uk)`, websecure + letsencrypt, port 8787) keeping the same env/mounts/port publish. Live verified: external `/health` 200, `/mcp` correctly 401 without bearer, admin add+delete self-test OK (smoke instance removed after). `avry-backend` (now includes `odoo_username` forwarding — verified loaded in the live container) and `avry-user-dashboard` (username field present in served chunks) rebuilt from ff-merged trees (live dirt preserved) and recreated healthy; api 200.
+**Not yet proven:** a real tenant Odoo connect (needs tenant URL + API key); every leg is verified except that last mile. **Hygiene note:** `OD_MCP_ADMIN_TOKEN` was displayed in cleartext during this deploy's verification — rotate it (shared-server env + backend env together) at the next opportunity per standing rule.
+
+## 2026-09-24 — hint-fix deployed (PR #9, `b595238`)
+
+5-line fix: emitted `escalate_on` no longer lists `explicit_instruction`. Same deploy procedure (sha256 OK, strings confirmed, backup `.bak-pre-hint-fix-20260924`, restart): `active`/`NRestarts=0`, health 200, doctor 87 ok / 0 errors, zero panic/error. Shadow events from here carry the corrected hint; `replay.py` ignores hints by design either way.
+
+## 2026-09-23 — judge_shadow live (ADR-017 P2 log-only half)
+
+**Merged:** `AVRY-Cerveau` PR #5 → `cerveau-main` as `0c4addf` (branch `feat/judge-shadow-adr-017`, squash). CI green both gates on the merge push (quick 9m2s, build 33m53s). `gate_tool_approval` is now a thin wrapper (inner renamed, call sites unchanged) emitting one `judge_shadow` trace event per non-`Safe` decision — full judge request (state + fixed explicit_instruction/severity questions) plus gate action, tier, requirement and pending_id, joined on `trace_id`; velocity-park covered with `requirement=velocity_park`. Args scrubbed + truncated, Safe reads excluded. Local evidence 4 shadow + 198 turn + 674 tools + 128 approval tests green, clippy clean on touched files.
+**Deployed:** rolling `cerveau-cd` from `0c4addf` (sha256 verified, shadow strings confirmed present, absent in old binary), backup `zeroclaw-cerveau.bak-pre-judge-shadow-20260923` kept, daemon restarted, `active`/`NRestarts=0`, `/health` 200, `doctor` 87 ok / 0 errors, zero panic/error in startup log.
+**Still open (P2 exit gate):** replay logged `judge_shadow` events through a judge backend once real gated-write traffic accumulates, and compare vs gate decisions — no behaviour change until those numbers match P1. Rollback = copy the `.bak` back + restart.
+
+## 2026-09-23 — judge tool merged + deployed (ADR-017 P2 engine half)
+
+**Merged:** `AVRY-Cerveau` PR #4 → `cerveau-main` as `97a8df4` (branch `feat/judge-tool-adr-017`, squash). CI green both gates on the merge push (quick 8m9s, build 31m16s). New `judge` tool in `zeroclaw-tools` (one bounded LLM call, temp 0, policy handle/confirm/escalate in code, fail-closed parse), registered alongside `llm_task`; local evidence 11/11 judge + 674/674 runtime tools tests, clippy/rustfmt clean.
+**Deployed:** rolling `cerveau-cd` release (built from `97a8df4`, sha256 verified) swapped onto `tencent-vps` as `/usr/local/bin/zeroclaw-cerveau` (backup `zeroclaw-cerveau.bak-pre-judge-20260923` kept for rollback), daemon restarted, `active`/`NRestarts=0`, `/health` 200, `doctor` 87 ok / 0 errors, new binary confirmed to contain the judge strings the old one lacked. Judge skill content (`skills/judge/`) was deployed earlier the same day via `./sync.sh deploy`.
+**Not yet:** shadow-mode traffic comparison (P2 exit gate) and any behaviour change — the tool is registered but nothing calls it yet. Rollback = copy the `.bak` back + restart.
+
+## 2026-09-22 — Latency re-measured: preload proven, prompt proven, smalltalk-speed unproven
+
+**Method:** `ops/latency_after.py [cutoff]` (new; groups `runtime-trace*.jsonl` by `trace_id`, splits at the 2026-09-19T16:25Z config-live cutoff). BEFORE = 232 turns (reproduces the ADR-015 baseline: 86% Lex search-hop vs their 87%, prompt 48K vs 50.9K). AFTER = 61 turns.
+**Lex tool turns, before → after (n=106 → 13):** need `tool_search` **86% → 8%**; wall median **59.0s (with hop) → 10.0s** (before-no-hop median was already 12.2s, so the ~47s hop was the dominant cost and preload removed it); prompt median **48,158 → 11,582** (Lex compact skill mode, same window — separate cause, same direction); LLM calls 4 → 3.
+**Smalltalk:** 7 fast-path classifications fired (event exists) but the event carries no `trace_id`, so per-turn speed cannot be joined — speedup still unproven, as honestly stated on 09-19/20. No-tool turns 3.6s → 4.4s is mix noise, not a regression (small n, different agents).
+**Caveats:** AFTER n is small (13 Lex turns) and traffic mix differs (Odoo turns in window). Re-run in a week with more traffic before calling it closed.
+
 ## 2026-09-19 — LLM latency chain inventory + v0.8.5 rebase risk register
 
 **Timeout chain (must stay ordered, outer > inner):** dashboard authedFetch (no hard cap; user-abortable) → backend `telegram_service` 195s → bridge `CERVEAU_FETCH_TIMEOUT_MS` 185s → Cerveau 180s turn wall-clock cap → per-iteration `step_timeout_secs` + `max_tool_iterations` 10 + cost budget seam (fail-closed). Break/graceful wrap-ups add at most ONE bounded provider call (step timeout + budget honored, single-call asserted in tests).
@@ -11,6 +53,7 @@
 1. `7708bd0a8` retries rejected tool turns with reasoning disabled — a whole-turn retry = up to 2× latency on rejection paths. Keep, but watch tail latency after rebase.
 2. `818024454` retries replay-safe empty streams once — bounded (+1 call max), safe to take.
 3. `160102b34` rewrote `finish_after_max_iterations` (streaming summary, display hygiene, protocol suppression) — our `finish_after_loop_break` is a forked copy of the OLD shape and MUST converge onto the new function during rebase (same for the new `safety_net.rs`), or behavior drifts silently. Guard installed: timeout-honoring wrap-up test.
+   **Resolved 2026-09-22 (`AVRY-Cerveau@ba4c52a1d`, CI green all 4 gates):** audited the other 4 items — all already satisfied in-tree (retry bounded to 1 with tests asserting exactly 2 bodies; denial wording + `pending_id` contract intact; semantic-empty compatible with canned fallback; `safety_net.rs` present at `agent/`). The one real drift was `finish_after_loop_break` emitting raw provider text: ported the display-hygiene contract (think-strip, terminal-marker strip, protocol suppression to the safe notice, whitespace-only → canned fallback; history keeps raw text). 3 new tests; 16/16 `max_iter` green.
 4. `240b5a19e` replaces "Denied by user." with explanatory denial text — overlaps our gate messaging; adopt upstream wording, keep our pending_id contract.
 5. `f7d2df34a` rejects semantic-empty terminal completions — compatible with our canned fallback (always non-empty text).
 **Rule for the rebase:** no new unbounded retry anywhere on the turn path; every added provider call needs a timeout + budget accounting + a test-Upstream `reliable.rs` retry loop stays the single retry owner.
