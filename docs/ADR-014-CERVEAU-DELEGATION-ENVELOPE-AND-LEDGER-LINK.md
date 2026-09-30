@@ -417,13 +417,13 @@ Health check: `ops/cerveau-ledger-health.sql` (read-only, 13 checks, verified ag
 
 **Exit-gate status:** follow-up sees priors ✓ (e2e, not yet live); cap returns `rejected` ✓ (e2e, not yet live); killed-daemon ⇒ `outcome=lost` ✓ (no new code — `reconcile_lost` + ledger reconcile, covered by the existing reconciler test).
 
-**Still open:** deploy (needs the usual swap recipe; VPS still runs `4085ccc`), then live: a real follow-up turn using a prior `context_id`, a cap refusal in production traffic, and a stall/restart showing `outcome=lost/timed_out` on a delegated row. Known gap (not in the gate): on a reaper stall-timeout the registry goes `TimedOut` and the ledger row settles, but the result *file* still says `Running` — `check_result` would show "working" for a dead delegation. Fix in a follow-up: reconcile writes the terminal file too.
+**Still open:** deploy (needs the usual swap recipe; VPS still runs `4085ccc`), then live: a real follow-up turn using a prior `context_id`, a cap refusal in production traffic, and a stall/restart showing `outcome=lost/timed_out` on a delegated row. ~~Known gap: on a reaper stall-timeout the result *file* still says `Running`, so `check_result` would show "working" for a dead delegation.~~ **Retracted 2026-09-30 (§15.3): not a gap.** Every reader (`check_result`, `await_sessions`, the list view) consults the registry first, and the reaper's verdict overrides a stale `Running` file (`reaper_verdicts_win_over_a_stale_running_file`). Only the raw file content is stale, and nothing reads it as state. Fix in a follow-up: reconcile writes the terminal file too.
 
 ---
 
 ## 15. State on 2026-09-30 (what actually runs, and what is still open)
 
-Written after a full pass: production ledger health, the deployed engine's history, and the notes that had piled up in §11-§14. Everything here was read on 2026-09-30; "not re-checked" means carried over from §13 without looking at the code again.
+Written after a full pass: production ledger health, the deployed engine's history, and the notes that had piled up in §11-§14. Everything here was read on 2026-09-30. "Verified" means checked against the code that runs; "not re-checked" means carried over from §13 unread.
 
 ### 15.1 The engine in production
 
@@ -458,14 +458,14 @@ No problem row in any of the nine PROBLEM checks. Volume is very low (nothing fi
 | Item | Origin | State |
 |---|---|---|
 | P1 has not run on a real turn: follow-up seeing prior results, cap refusal, stall/restart showing `lost`/`timed_out` | §14 | open, needs a live turn |
-| Reaper stall-timeout leaves the result *file* at `Running`, so `check_result` says "working" for a dead delegation | §14 | open (known gap, engine fix) |
+| ~~Reaper stall-timeout leaves the result file at `Running`~~ | §14 | **not a gap**: all readers reconcile against the registry (`reconciled_loss_label`); retracted |
 | Stop on a *running* delegated row halting it | §12.1 | open, the owner presses Stop in Mission Control (the raw `cancelled` write cannot be issued from the assistant session) |
-| SLA 15/60 min duplicated in identity docs, `TASK-CONTRACT.md`, `lib/airaTasks.ts` | §13 | open, not re-checked |
-| Archive retention 40 days duplicated across two repos | §13 | open, not re-checked |
-| `chief_of_staff` hard-coded as the parent in the dashboard | §13 | open, not re-checked |
-| Stop on a parent does not reach its children | §13 | open, not re-checked |
-| `task_create` has no dedupe or title cap | §13 | open, not re-checked (check 9 is clean today) |
-| `task_list` shows only the 20 newest finished tasks per agent | §13 | open, not re-checked |
+| SLA 15/60 min in three places | §13 | open, verified: the only code constants are `CHILD_SLA_MINUTES`/`PARENT_SLA_MINUTES` in `lib/airaTasks.ts`; the identity docs and `TASK-CONTRACT.md` repeat the numbers as prose (drift risk, no engine constant) |
+| Archive retention 40 days in two repos | §13 | open, verified: two independent constants, `ARCHIVE_RETENTION_DAYS = 40` in `task_ledger.rs` (prunes) and in `lib/airaArchive.ts` (caps the board's look-back) |
+| `chief_of_staff` hard-coded as the parent in the dashboard | §13 | open, verified (`lib/airaTasks.ts` picks the earliest `chief_of_staff` row) |
+| Stop on a parent does not reach its children | §13 | open, verified: `app/api/aira/tasks/[taskId]/route.ts` cancels the one row by `task_id`; `parent_task_id` is still not populated (§12), so there is nothing to cascade along |
+| `task_create` has no dedupe or title cap | §13 | open, verified: it only rejects an empty title (`crates/zeroclaw-tools/src/task_ledger.rs`); check 9 is clean today |
+| `task_list` shows only the 20 newest finished tasks per agent | §13 | open, verified: `ARCHIVE_LIST_LIMIT = 20` (`scope=session` scans 200) |
 | Orphan sweep (30 min) vs child SLA (15 min) | §13 | narrowed: the sweep skips delegated rows since A2; own-task rows unchanged |
 | A sync delegation that succeeds leaves no engine row | §13 | by design |
 
