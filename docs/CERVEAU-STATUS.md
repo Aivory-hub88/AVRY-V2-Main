@@ -4,6 +4,24 @@
 
 **Last updated:** 2026-09-12 (Fleet down to a single `zeroclaw-cerveau` instance — `-b` decommissioned, see below, so any earlier entry mentioning "both instances"/`:3100`+`-b` now describes history, not the current topology. Memory/self-evolution reliability fixes DEPLOYED + LIVE-VERIFIED; ADR-013 Stage-2 tenant learning designed, Phase 1 DEPLOYED + LIVE-VERIFIED with `[skill_insights].enabled = true`.)
 
+## 2026-09-30 — Google Drive, Sheets and Docs for agents (Composio MCP), edit and share included
+
+**What.** Agents can now use Google Drive, Sheets and Docs through Composio-hosted MCP servers, the same pattern as Gmail/Calendar (`requires_composio_toolkit`, `tenant_entity_query_param = "user_id"`, so only a tenant that connected the toolkit itself gets the tools). Four servers: `aivory-googledrive-files` (16 tools), `aivory-googledrive-share` (6), `aivory-googlesheets-data` (25), `aivory-googledocs-docs` (10); Cerveau names `composio-googledrive-files|share`, `composio-googlesheets-data`, `composio-googledocs-docs`, bundles `storage-googledrive`, `sharing-googledrive`, `sheets-googlesheets`, `docs-googledocs`. Managed OAuth2 auth configs (one per toolkit; Docs' was created for this).
+
+**Who gets what.** Geno and Ofira: Drive + Sharing + Sheets + Docs. Finn and Lex: Drive + Sheets (no sharing). Teo and Aira: none. Sharing is its own server precisely so it can be given to two agents only.
+
+**Policy.** Reads and reversible writes (create, append, edit cell values, format, sort, insert rows/columns, rename, move, copy) are `reversible` + `auto_approve`, like Gmail/Calendar. Delete, clear, whole-content overwrite, bulk find/replace and every permission change (`CREATE/UPDATE/PATCH/DELETE_PERMISSION`, batch) are `irreversible` and never in `auto_approve`, so they park for a human. Deliberately not exposed: `GOOGLESHEETS_EXECUTE_SQL` (arbitrary statements).
+
+**Composio quirks worth keeping (found the hard way).**
+- `GET /api/v3/tools` returns the *base* version (`00000000_00`): Sheets 36 tools, Drive 51. Pass `toolkit_versions=latest` for the real catalog (Sheets 58, Drive 104 at `20260915_00` / `20260925_00`). Tools that only exist in latest (`FIND_REPLACE`, `CREATE_PERMISSION`, `COPY_FILE_ADVANCED`) have no schema without that parameter.
+- The MCP-server API rejects some tools that exist in the catalog (`MCP_InvalidToolsProvided`, "do not belong to googlesheets"): `GOOGLESHEETS_BATCH_UPDATE`, `EXECUTE_SQL`, `SHEET_FROM_JSON`, `GET_BATCH_VALUES`, `GOOGLEDRIVE_ADD_FILE_SHARING_PREFERENCE`, `LIST_FILES`, `COPY_FILE`. Replacements that ARE accepted: `GOOGLESHEETS_BATCH_UPDATE_VALUES_BY_DATA_FILTER` (write a range), `GOOGLEDRIVE_CREATE_PERMISSION` (share), `GOOGLEDRIVE_COPY_FILE_ADVANCED`, `GOOGLEDRIVE_FIND_FILE`. One request with a list of candidates returns every invalid slug at once; a rejected request creates nothing.
+- Permission calls on the same file must not run concurrently (Composio warning).
+- Existing servers are edited with `PATCH /api/v3.1/mcp/{id}` (`allowed_tools`).
+
+**Deploy.** `config.toml` patched twice (backups `config.toml.bak-pre-google-workspace-*` and `config.toml.bak-pre-google-edit-share-*`), each time with a dry run on a copy, a TOML parse, and a structural comparison proving nothing existing was lost or changed; `doctor` unchanged before and after; restarted, health 200, `NRestarts=0`. avry-backend `TOGGLEABLE_TOOLKITS` and the dashboard catalog/labels follow in their own PRs.
+
+**Not yet proven.** No Google account has been connected in production, so nothing has run end to end: whether the Composio-managed Google OAuth app grants scopes wide enough for Drive edit and sharing is unknown until a real connect. The connection sync poller last synced on 2026-08-12 and should be checked at the same time. Context cost: Geno now carries about 57 Google tools once a tenant connects all three toolkits (ADR-010 is the reason to watch latency).
+
 ## 2026-09-27 — judge_shadow question set v2 deployed (PRs #13 + #14, `7daab3a`)
 
 **Why:** two gaps found by the synthetic approval eval (`evals/typesafe-jev`, ADR-017). (1) The `explicit_instruction` Noul `criteria` was a string, which Jev's System One API rejects with HTTP 400, so no logged `judge_shadow` request could be replayed through Jev. (2) Severity rubric v1 left "large" undefined and put "external messages send" at level 2, so bulk sends to hundreds of people graded 2 (severe recall 0.60 Jev / 0.73 deepseek). Rubric v2 names concrete boundaries: ≥ Rp50 juta, ≥ 50 recipients, bulk deletes, automations acting on many people. On 20 held-out cases with pre-registered thresholds, both backends pass every threshold.
