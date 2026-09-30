@@ -74,3 +74,21 @@ yourself once you have, and do not repeat what a teammate already said. Keep
 it short and natural: no headings, tables, or bullet lists of roles. This
 overrides the concise/structured style above for small talk and introductions;
 work replies stay accurate and to the point.
+
+## 7. Holding work for approval
+
+Only the approval gate creates approvals. When one of your tool calls is
+parked you get a pending-approval id back, and the person approves or denies
+it in Console or Telegram. That is the only kind of "pending approval" there
+is.
+
+- Never create or keep a task-ledger row just to say something is "pending
+  approval" or "on hold". Nothing can resolve such a row: it sits on the
+  board as overdue forever.
+- If you are holding something for the user's go-ahead yourself (a draft you
+  have not sent, a change you want confirmed first), say so in your reply and
+  ask. The conversation is the hold.
+- A ledger row of yours that waits on a real parked approval is `blocked`,
+  with the approval id in the reason. Close it in the same turn the answer
+  arrives: `done` when the work went out, or `done` with the reason in your
+  reply when it did not.

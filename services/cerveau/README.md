@@ -62,6 +62,37 @@ cd services/cerveau
 ./sync.sh deploy     # push repo → VPS + restart daemon
 ```
 
+## Deploying the Cerveau binary (checklist)
+
+The daemon is the Rust binary built from `AVRY-Cerveau` `cerveau-main` (CI publishes the rolling
+`cerveau-cd` release). Deploys are done by a person or session running a guarded script on the VPS;
+`./sync.sh deploy` above is for prompts and skills, not the binary. Keep this list current: add a
+line whenever a build changes the schema or leaves a deliberate, not-yet-adopted behaviour on `cerveau-main`.
+
+1. **Deploy the commit you mean to.** `cerveau-main` may contain work from other sessions. Read
+   `git log <live-commit>..origin/cerveau-main` first; everything in it ships. The script must check
+   that the release body names the expected commit, verify the tarball sha256, and refuse unless the
+   live binary hash is a known predecessor.
+2. **`doctor` before the swap** (0 errors), keep a dated backup, check health after, roll back
+   automatically if unhealthy.
+3. **Schema changes run at first start and are idempotent.** Today's list, all additive and safe to
+   roll back over (the previous binary ignores the columns):
+   - ADR-014 A2: six columns and a partial index on `cerveau.agent_tasks`.
+   - ADR-016 P1: `importance`, `superseded_by`, `access_count`, `last_accessed_at` on
+     `cerveau.memories`.
+4. **Known behaviour that ships with `cerveau-main`, decided on purpose.** ADR-016 P1 stays on
+   `cerveau-main` (owner decision, 2026-09-20) although it was rolled back once in production. A
+   build that contains it stores `importance` on every new memory, counts recall hits in
+   `access_count`, hides superseded rows from recall (nothing marks rows superseded yet), and lets
+   `memory_store` take an optional `importance`. It changes nothing a user sees while
+   `memory.rerank_enabled = false`. If you deploy a build that contains it, say so in the deploy note.
+5. **Memory tuning is configuration, not part of a binary deploy.** `memory.rerank_enabled` and
+   `memory.min_relevance_score` in `~/.zeroclaw-cerveau/config.toml` are currently `false` and `0.4`.
+   They were changed and reverted by the owner on 2026-09-20; do not change them as a side effect of
+   a deploy, and only with the owner's explicit go-ahead (see ADR-016 §14 and §18).
+6. **Probe after the swap** with a synthetic tenant through `/webhook` (`X-Tenant-Id`,
+   `X-Agent-Type`, `X-Session-Id`), and delete the probe rows afterwards.
+
 ## How a new entrypoint is added
 
 1. Create `skills/<entrypoint>/SKILL.md` here.
