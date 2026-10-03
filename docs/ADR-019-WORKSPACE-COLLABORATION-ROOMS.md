@@ -78,7 +78,7 @@ Project Request ──(admin approves)──▶ Room
 **Guardrails**
 - `rooms.autonomy`: `observe` (agents read, never post unprompted), `suggest` (default: proactive posts only, no tool writes without a human click), `act` (proactive tool use, risky tiers still gated by the existing approval flow).
 - Per-room budget: max proactive runs per day (default 20) and a cooldown per trigger per agent. Exceeding either posts nothing and records `budget.exceeded` in activity.
-- Proactive posts never `@`-mention other agents. Only humans trigger agent-to-agent chains, so loops can't happen.
+- ~~Proactive posts never `@`-mention other agents. Only humans trigger agent-to-agent chains, so loops can't happen.~~ **Superseded 2026-10-03 by ADR-020 §1.2:** a *reply* may `@`-mention a teammate to hand work over, bounded by depth, turns per chain and turns per agent. Proactive (unprompted) posts still never `@` anyone; a chain always starts from a human message.
 
 **Context**: `buildSpacePayload` grows `<room_brief>`, `<room_files>` (top-k chunks by cosine against the instruction) and `<room_data>` (compact table summary, row cap). These are capped by a token budget so the context stays small (see Cerveau context-budget lessons).
 

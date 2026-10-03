@@ -22,6 +22,16 @@ Users do not configure agent-to-agent wiring. They **pick agents and deploy** th
 
 **Gap this exposes (verified):** `lib/spaceAgentRun.ts:134` forwards the acting user's own JWT to `/api/v1/telegram/agent-chat`, so today a member's `@Lex` runs in the *member's* tenant (their memory, their credits/tier, their deployments). That contradicts decisions 3-5 and must change in P3: the dashboard calls a backend mode that acts on behalf of the leader using a service credential plus `acting_as` (leader) and `requested_by` (member), which the backend verifies against `workspace_members` (member must belong to the workspace; `acting_as` must be that workspace's owner; a caller cannot name an arbitrary `acting_as`). The member-JWT path must not be usable for Workspace agent turns.
 
+### 1.2 Agents hand work to each other (owner decision, 2026-10-03)
+
+Groups and Workspaces exist so agents actually collaborate, so an agent's reply that writes `@Name` now hands work to that teammate, who answers **in their own message** (not as text inside the caller's). This replaces ADR-019's "only humans trigger agent-to-agent chains" and ADR-008's depth-1 rule for Team Space tasks.
+
+- **Rules** (`lib/agentHandoff.ts`, shared by both surfaces): only a deliberate `@Name` (bare names, code, `@all/@here/@everyone` never count); only teammates in the room (the picked Team in the Console, invited agents in a Space); never self. A chain is bounded: depth ≤ 2 hops after the human message, 8 turns per chain, 2 turns per agent (stops ping-pong), no agent queued twice. A parked approval ends that branch; Stop aborts the chain. A roll call forbids `@`.
+- **Console Room:** a turn queue in `handleSendRoom`; the receiver's payload carries `<handoff from= hop= max=>` and the last-hop rule.
+- **Team Space:** `runAgentTask` links the mention, then enqueues and runs a task (`created_by agent:<type>`, `chain_root`, `chain_depth`; `migrations/workspace-agent-handoff.sql`) under the **same user credential**, so acting-as-leader (§1.1), credits billed to the leader and the approval gate are unchanged. The execute route still rejects service credentials.
+- **Cost:** every handoff is a paid turn on the tenant (the leader's in a Space). The caps above are the budget; they are constants, change them in one place.
+- **Not done:** agents still never start a conversation unprompted; every chain starts at a human message. No per-chain credit ceiling beyond the turn cap. Not yet exercised against live Cerveau when this was written.
+
 ## 2. Today (verified)
 
 | Fact | Where |
