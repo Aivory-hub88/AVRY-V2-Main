@@ -6,7 +6,8 @@
   "description": "MCP-to-webhook bridge: exposes tenant-scoped n8n workflows as real MCP servers for Cerveau. Binds tenant identity to the MCP session at connection time (from the connection URL's tenant_id query param), never trusts a tenant_id argument supplied by the calling LLM.",
   "main": "server.mjs",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { listResponse, query, rowsOrNotFound } from '../db.mjs';
+import { forecastFunnel } from '../forecast.mjs';
 
 // Native, zero-signup CRM/lead-pipeline backend for the leads_qualifier agent
 // type. Mirrors customer-service.mjs's structure: tenant_id is injected by the
@@ -337,5 +338,53 @@ export const tools = [
     action: 'pipeline_summary',
     handler: pipelineSummary,
     postProcess: convertPipelineSummary,
+  },
+  {
+    name: 'sales_funnel_forecast',
+    description:
+      "Compute sales funnel metrics and a forecast from weekly counts: step conversion rates (bleed, hold, " +
+      "presentation, quotation and close rates), unit economics (revenue per job, price and cost per unit such " +
+      "as roofing squares, profit margin), projected leads, jobs, revenue and gross profit for the coming weeks, " +
+      "the leads each stage needs to hit a target number of closes, and expected closes from quotes already open. " +
+      "ALWAYS use this tool for these numbers instead of calculating them yourself. " +
+      "Pass one object per week, oldest first, with the same funnel stages filled in every week; omit a stage " +
+      "the business does not track rather than guessing it. Gather the counts from the tenant's connected CRM/ERP " +
+      "or ask the user for them; never invent a count. Read-only: it stores nothing. Quote the returned " +
+      "warnings and assumptions alongside the forecast.",
+    inputSchema: {
+      weeks: z
+        .array(
+          z.object({
+            label: z.string().max(40).optional(),
+            leads: z.number().int().nonnegative(),
+            appointments_set: z.number().int().nonnegative().optional(),
+            appointments_held: z.number().int().nonnegative().optional(),
+            presentations: z.number().int().nonnegative().optional(),
+            quotes: z.number().int().nonnegative().optional(),
+            closes: z.number().int().nonnegative(),
+            revenue: z.number().nonnegative().optional(),
+            units: z.number().nonnegative().optional(),
+            cost: z.number().nonnegative().optional(),
+          }),
+        )
+        .min(2)
+        .max(52),
+      horizon_weeks: z.number().int().min(1).max(12).default(4),
+      weighting: z.enum(['recent', 'equal']).default('recent'),
+      target_closes_per_week: z.number().positive().optional(),
+      open_quotes: z
+        .object({ count: z.number().int().nonnegative(), value: z.number().nonnegative().optional() })
+        .optional(),
+      follow_up_close_rate: z.number().min(0).max(1).optional(),
+      currency: z
+        .string()
+        .regex(/^[A-Z]{3}$/, 'currency must be a 3-letter ISO-4217 code in capitals')
+        .optional(),
+      units_label: z.string().max(40).optional(),
+    },
+    action: 'sales_funnel_forecast',
+    // Pure computation on the arguments: no tenant data is read or written,
+    // so the tenant id the bridge passes in is deliberately unused.
+    handler: async (args) => forecastFunnel(args),
   },
 ];
