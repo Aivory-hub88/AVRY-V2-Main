@@ -15,9 +15,15 @@ const { v4: uuidv4 } = require('uuid');
 
 const QUEUE_NAME = 'diagnostics';
 
-// Model + timeout knobs. DIAGNOSTIC_MODEL is a hybrid-thinking model on
-// OpenRouter; the ladder below disables thinking on tier 1 (see callModel).
-const DIAGNOSTIC_MODEL = process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b';
+// Model + timeout knobs. 2026-10-10: the previous default, qwen/qwen3-235b-a22b,
+// was retired by OpenRouter on 2026-10-09 (404 on every call), and because the
+// fallback tier reused the SAME model, the whole AI analysis went dark. The
+// tiers now use DIFFERENT models so one retirement/outage can't take out both:
+// tier 1 = DeepSeek V4 Flash (already the blueprint worker's model in prod),
+// tier 2 = Qwen 3.7 Plus (OpenRouter's named successor; 9/9 valid JSON in the
+// 2026-10-10 eval). Both run with reasoning OFF.
+const DIAGNOSTIC_MODEL = process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4-flash-0731';
+const DIAGNOSTIC_FALLBACK_MODEL = process.env.DIAGNOSTIC_FALLBACK_MODEL || 'qwen/qwen3.7-plus';
 const DIAGNOSTIC_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_TIMEOUT_MS || '60000', 10);
 const DIAGNOSTIC_FALLBACK_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_FALLBACK_TIMEOUT_MS || '115000', 10);
 
@@ -31,24 +37,40 @@ const redisOptions = {
 const connection = new IORedis(redisOptions);
 const diagnosticQueue = new Queue(QUEUE_NAME, { connection });
 
-const DIAGNOSTIC_SYSTEM_PROMPT = `You are an AI readiness diagnostic expert. Analyze the provided business diagnostic data and return a structured JSON assessment.
+const DIAGNOSTIC_SYSTEM_PROMPT = `You are a business operations diagnostic expert. You assess how ready a business's operations are for automation and AI, based on its answers to the Aivory Business Operations Deep Diagnostic. Return a structured JSON assessment.
 
-You MUST respond with ONLY a valid JSON object — no markdown, no code blocks, no commentary.
+You MUST respond with ONLY a valid JSON object — no markdown, no code blocks, no commentary, no trailing commas.
 
 Return this EXACT JSON structure:
 {
   "ai_readiness_score": <number 0-100>,
-  "maturity_level": "<Nascent|Initiating|Developing|Defined|Optimizing>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "maturity_level": "<Nascent|Initiating|Developing|Defined|Optimising>",
+  "strengths": ["<1 to 3 genuine existing strengths — see rule 4>"],
   "primary_constraints": ["<constraint 1>", "<constraint 2>", "<constraint 3>"],
   "automation_opportunities": ["<opportunity 1>", "<opportunity 2>", "<opportunity 3>"],
-  "narrative_summary": "<2-3 sentence summary of AI readiness>",
-  "recommended_next_step": "<single most important next action>"
+  "narrative_summary": "<2-3 sentence summary>",
+  "recommended_next_step": "<single most important next action>",
+  "translations": {
+    "id": {
+      "strengths": ["<Bahasa Indonesia, same items as strengths>"],
+      "primary_constraints": ["...", "...", "..."],
+      "automation_opportunities": ["...", "...", "..."],
+      "narrative_summary": "<Bahasa Indonesia>",
+      "recommended_next_step": "<Bahasa Indonesia>"
+    }
+  }
 }
 
-Base your assessment on the four diagnostic phases provided: business objectives & KPIs, data & process readiness, risk & constraints, and AI opportunity mapping.
+The input has the four diagnostic phases (business objectives & KPIs, data & process readiness, risk & constraints, opportunity mapping). It may also have a "report_context" object holding the OFFICIAL score and maturity level that the user's report already displays.
 
-Every recommendation — whether it's adopting a no-code automation, building custom software/an SDK/an API, purchasing or installing a specific tool, restructuring a process, or hiring a role — must be tied explicitly to a specific answer or pain point from THIS diagnostic, not a generic best practice. If you recommend building or buying something, name what it should do and which of the business's actual constraints/systems it addresses. Never suggest a solution that doesn't map to a concrete signal in the data provided.`;
+RULES:
+1. Official score: if report_context is present, set ai_readiness_score and maturity_level to exactly its values. In the prose fields never state a different score or a different maturity stage — the user sees the official ones beside your text, and any mismatch reads as a broken report. Prefer not to repeat the score in prose at all. If you name the stage inside translations.id, use report_context.maturity_label_id exactly (e.g. "Berkembang"), never the English name or another translation.
+2. Ground every statement in THIS diagnostic. Every recommendation (adopting a no-code automation, building custom software/an API, buying a tool, restructuring a process, hiring a role) must tie to a specific answer or pain point, name what it should do, and name which actual constraint or system it addresses. Never suggest a solution that doesn't map to a concrete signal in the data.
+3. Never invent figures. Only use numbers that appear in the answers (hours, percentages, budgets, headcount, timelines). Do not estimate savings, ROI or costs — the report computes those separately.
+4. Strengths must be capabilities the business ALREADY has (from its answers) — never targets, ambitions, chosen priority areas, or the fact that it has identified its problems. If the answers support fewer than three genuine strengths, return fewer (at least one) rather than padding the list.
+5. Do not name third-party automation/integration platforms (e.g. Zapier, Make, n8n, IFTTT, Power Automate) — describe the automation itself (trigger, data, outcome); Aivory is the user's automation platform. Do not tell the user to hire an external consultant, agency or partner.
+6. Be respectful: describe gaps factually, never sarcastically or as doubting the user's answers.
+7. Language: the top-level prose fields are in English. "translations.id" carries the SAME content in natural, professional Bahasa Indonesia (keep common business terms such as KPI, dashboard, workflow, ERP, POS in English) — same number of items, same meaning, no added or dropped facts.`;
 
 function ensureArray(value) {
   if (Array.isArray(value)) return value;
@@ -95,12 +117,12 @@ function isUsableDiagnosticResult(result) {
  * the connection active so an idle-response stall surfaces as TTFT in the
  * logs instead of a silent black box.
  */
-async function callModel({ userContent, reasoningEnabled, timeoutMs, tier }) {
+async function callModel({ model, userContent, reasoningEnabled, timeoutMs, tier }) {
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
 
   const body = {
-    model: DIAGNOSTIC_MODEL,
+    model,
     messages: [
       { role: 'system', content: DIAGNOSTIC_SYSTEM_PROMPT },
       { role: 'user', content: userContent },
@@ -113,7 +135,7 @@ async function callModel({ userContent, reasoningEnabled, timeoutMs, tier }) {
   if (!reasoningEnabled) body.reasoning = { enabled: false };
 
   const t0 = Date.now();
-  console.log(`[diag-worker] model call start tier=${tier} model=${DIAGNOSTIC_MODEL} reasoning=${reasoningEnabled ? 'on' : 'off'} promptChars=${userContent.length}`);
+  console.log(`[diag-worker] model call start tier=${tier} model=${model} reasoning=${reasoningEnabled ? 'on' : 'off'} promptChars=${userContent.length}`);
   let orRes;
   try {
     orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -172,7 +194,12 @@ async function callModel({ userContent, reasoningEnabled, timeoutMs, tier }) {
   return content;
 }
 
-/** Fence-tolerant JSON extraction — models occasionally wrap JSON in ```json fences. */
+/**
+ * Fence-tolerant JSON extraction — models occasionally wrap JSON in ```json
+ * fences, and DeepSeek occasionally emits a trailing comma before ] or }
+ * (1 in 9 calls in the 2026-10-10 eval), which used to throw and push the
+ * job onto the slower fallback tier for a purely cosmetic syntax slip.
+ */
 function extractJson(content) {
   try {
     return JSON.parse(content);
@@ -180,7 +207,11 @@ function extractJson(content) {
     const jsonMatch = content.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/) || content.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : null;
     if (!jsonStr) throw new Error('AI engine returned invalid JSON');
-    return JSON.parse(jsonStr);
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      return JSON.parse(jsonStr.replace(/,(\s*[}\]])/g, '$1'));
+    }
   }
 }
 
@@ -197,31 +228,68 @@ function extractJson(content) {
  * case). Tier 2 = reasoning ON (the old behaviour) only when tier 1 failed
  * or produced an unusable assessment.
  */
-async function runDeepDiagnostic(payload) {
-  const userContent = JSON.stringify(payload, null, 2);
+/**
+ * The dashboard sends its deterministic score/maturity inside `phases` as
+ * `_report_context` (so the enqueue route in server.js needs no change).
+ * Split it out and pass it to the model as a sibling `report_context` key.
+ */
+function splitReportContext(payload) {
+  if (!payload || typeof payload !== 'object') return { phases: payload, reportContext: null };
+  const { _report_context: raw, ...phases } = payload;
+  const ok = raw && typeof raw === 'object' &&
+    typeof raw.score === 'number' && raw.score >= 0 && raw.score <= 100 &&
+    typeof raw.maturity_level === 'string' && raw.maturity_level.trim();
+  if (!ok) return { phases, reportContext: null };
+  const reportContext = { score: Math.round(raw.score), maturity_level: raw.maturity_level };
+  if (typeof raw.maturity_label_id === 'string' && raw.maturity_label_id.trim()) reportContext.maturity_label_id = raw.maturity_label_id;
+  return { phases, reportContext };
+}
 
-  // Tier 1: fast, no-reasoning.
+async function runDeepDiagnostic(payload) {
+  const { phases, reportContext } = splitReportContext(payload);
+  const userContent = JSON.stringify(reportContext ? { phases, report_context: reportContext } : phases, null, 2);
+
+  // Tier 1: fast primary model.
   try {
-    const fast = await callModel({ userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_TIMEOUT_MS, tier: 'fast' });
+    const fast = await callModel({ model: DIAGNOSTIC_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_TIMEOUT_MS, tier: 'fast' });
     const result = extractJson(fast);
-    if (isUsableDiagnosticResult(result)) return normalizeDiagnostic(result);
+    if (isUsableDiagnosticResult(result)) return normalizeDiagnostic(result, reportContext);
     console.warn('[diag-worker] tier=fast result unusable — escalating to tier=fallback');
   } catch (err) {
     console.warn(`[diag-worker] tier=fast failed (${err.message}) — escalating to tier=fallback`);
   }
 
-  // Tier 2: reasoning-on — the pre-2026-08-25 behaviour.
-  const content = await callModel({ userContent, reasoningEnabled: true, timeoutMs: DIAGNOSTIC_FALLBACK_TIMEOUT_MS, tier: 'fallback' });
+  // Tier 2: a DIFFERENT model, so a retired/down primary can't sink both.
+  const content = await callModel({ model: DIAGNOSTIC_FALLBACK_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_FALLBACK_TIMEOUT_MS, tier: 'fallback' });
   const result = extractJson(content);
   if (!isUsableDiagnosticResult(result)) {
     throw new Error('Diagnostic generation returned an incomplete/malformed assessment (missing score, maturity_level, or any findings)');
   }
-  return normalizeDiagnostic(result);
+  return normalizeDiagnostic(result, reportContext);
 }
 
-function normalizeDiagnostic(result) {
+/** Indonesian copy, normalized like the top-level fields; null when absent/empty. */
+function normalizeTranslationId(result) {
+  const t = result && result.translations && result.translations.id;
+  if (!t || typeof t !== 'object') return null;
+  const out = {
+    strengths: ensureArray(t.strengths),
+    primary_constraints: ensureArray(t.primary_constraints),
+    automation_opportunities: ensureArray(t.automation_opportunities),
+    narrative_summary: typeof t.narrative_summary === 'string' ? t.narrative_summary : '',
+    recommended_next_step: typeof t.recommended_next_step === 'string' ? t.recommended_next_step : '',
+  };
+  const empty = !out.narrative_summary && !out.recommended_next_step &&
+    out.strengths.length + out.primary_constraints.length + out.automation_opportunities.length === 0;
+  return empty ? null : out;
+}
+
+function normalizeDiagnostic(result, reportContext = null) {
   const diagnosticId = `DIAG_${uuidv4().replace(/-/g, '').substring(0, 12).toUpperCase()}`;
-  const score = result.ai_readiness_score ?? result.score;
+  // The report's deterministic score is authoritative; the model's own
+  // number is only kept when no context was sent (older dashboards).
+  const score = reportContext ? reportContext.score : (result.ai_readiness_score ?? result.score);
+  const idCopy = normalizeTranslationId(result);
   return {
     ...result,
     diagnostic_id: diagnosticId,
@@ -230,7 +298,7 @@ function normalizeDiagnostic(result) {
     // a placeholder that looks like a real assessment.
     ai_readiness_score: score,
     score,
-    maturity_level: result.maturity_level,
+    maturity_level: reportContext ? reportContext.maturity_level : result.maturity_level,
     strengths: ensureArray(result.strengths),
     primary_constraints: ensureArray(result.primary_constraints),
     automation_opportunities: ensureArray(result.automation_opportunities),
@@ -241,7 +309,8 @@ function normalizeDiagnostic(result) {
     // a real finding the way a defaulted score or maturity level would be.
     narrative_summary: result.narrative_summary || result.narrative || '',
     recommended_next_step: result.recommended_next_step || '',
+    translations: idCopy ? { id: idCopy } : undefined,
   };
 }
 
-module.exports = { QUEUE_NAME, redisOptions, connection, diagnosticQueue, runDeepDiagnostic, isUsableDiagnosticResult, ensureArray };
+module.exports = { QUEUE_NAME, redisOptions, connection, diagnosticQueue, runDeepDiagnostic, isUsableDiagnosticResult, ensureArray, extractJson, splitReportContext, normalizeDiagnostic, DIAGNOSTIC_SYSTEM_PROMPT };
