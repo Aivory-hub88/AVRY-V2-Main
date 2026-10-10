@@ -105,3 +105,29 @@ test('a zero rate blocks the reverse funnel instead of dividing by zero', () => 
   assert.equal(r.target, undefined);
   assert.ok(r.warnings.some((w) => w.includes('cannot be computed')));
 });
+
+test('rate override re-runs the funnel with only that step changed', () => {
+  const r = forecastFunnel({
+    weeks: ROOFING, weighting: 'equal', horizon_weeks: 1, target_closes_per_week: 15,
+    rate_overrides: { close_rate: 0.5 },
+  });
+  // Baseline untouched: 200 leads * 0.11 / 2 weeks = 11 closes.
+  assert.equal(r.projection[0].closes, 11);
+  // Same chain with close 22/70 -> 0.5: 11 * 0.5 / (22/70) = 17.5.
+  assert.equal(r.scenario.projection[0].closes, 17.5);
+  assert.equal(r.scenario.lead_to_close_rate, 0.175);
+  assert.equal(r.scenario.change_vs_baseline.closes, 6.5);
+  assert.equal(r.scenario.change_vs_baseline.revenue, 65000);
+  assert.equal(r.scenario.projection[0].quotes, r.projection[0].quotes); // upstream unchanged
+  assert.equal(r.scenario.target_required_per_week.quotes, 30);
+});
+
+test('bleed_rate override sets the set rate; unknown names are ignored with a warning', () => {
+  const r = forecastFunnel({
+    weeks: ROOFING, weighting: 'equal', horizon_weeks: 1,
+    rate_overrides: { bleed_rate: 0.1, nonsense_rate: 0.9 },
+  });
+  assert.deepEqual(r.scenario.rate_overrides, { bleed_rate: 0.1 });
+  assert.equal(r.scenario.projection[0].appointments_set, 90);
+  assert.ok(r.warnings.some((w) => w.includes('"nonsense_rate"')));
+});

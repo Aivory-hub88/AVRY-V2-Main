@@ -111,6 +111,7 @@ export function forecastFunnel(input) {
     follow_up_close_rate: followUpRate,
     currency,
     units_label: unitsLabel,
+    rate_overrides: overrides,
   } = input;
   const warnings = [];
 
@@ -175,28 +176,45 @@ export function forecastFunnel(input) {
   const weeklyOverall = weeks.filter((wk) => wk.leads > 0).map((wk) => wk.closes / wk.leads);
   const sd = weeks.length >= 3 ? stdDev(weeklyOverall) : null;
 
-  const projection = leadsProj.values.map((leads, h) => {
-    const row = { week_ahead: h + 1, leads: round(leads, 1) };
-    let vol = leads;
-    for (const st of steps) {
-      vol = st.rate === null ? null : vol === null ? null : vol * st.rate;
-      row[st.to] = round(vol, 1);
+  // Push projected leads through a set of step rates. Used for the baseline
+  // and again for a what-if scenario with some rates overridden.
+  const project = (stepList, withRange) => {
+    const chainX = stepList.every((st) => st.rate !== null)
+      ? stepList.reduce((acc, st) => acc * st.rate, 1)
+      : null;
+    const rows = leadsProj.values.map((leads, h) => {
+      const row = { week_ahead: h + 1, leads: round(leads, 1) };
+      let vol = leads;
+      for (const st of stepList) {
+        vol = st.rate === null ? null : vol === null ? null : vol * st.rate;
+        row[st.to] = round(vol, 1);
+      }
+      if (withRange && chainX !== null && sd !== null) {
+        row.closes_low = round(leads * Math.max(0, chainX - sd), 1);
+        row.closes_high = round(leads * Math.min(1, chainX + sd), 1);
+      }
+      if (row.closes !== null && isNum(econ.revenue_per_job)) {
+        row.revenue = round(row.closes * econ.revenue_per_job);
+        if (isNum(econ.profit_margin)) row.gross_profit = round(row.revenue * econ.profit_margin);
+      }
+      if (row.closes !== null && isNum(econ.units_per_job)) row.units = round(row.closes * econ.units_per_job, 1);
+      return row;
+    });
+    const sums = { leads: round(leadsProj.values.reduce((a, b) => a + b, 0), 1) };
+    for (const f of ['closes', 'revenue', 'gross_profit', 'units']) {
+      if (rows.every((r) => isNum(r[f]))) sums[f] = round(rows.reduce((a, r) => a + r[f], 0), f === 'closes' || f === 'units' ? 1 : 2);
     }
-    if (chain !== null && sd !== null) {
-      row.closes_low = round(leads * Math.max(0, chain - sd), 1);
-      row.closes_high = round(leads * Math.min(1, chain + sd), 1);
-    }
-    if (row.closes !== null && isNum(econ.revenue_per_job)) {
-      row.revenue = round(row.closes * econ.revenue_per_job);
-      if (isNum(econ.profit_margin)) row.gross_profit = round(row.revenue * econ.profit_margin);
-    }
-    if (row.closes !== null && isNum(econ.units_per_job)) row.units = round(row.closes * econ.units_per_job, 1);
-    return row;
-  });
-  const totals = { leads: round(leadsProj.values.reduce((a, b) => a + b, 0), 1) };
-  for (const f of ['closes', 'revenue', 'gross_profit', 'units']) {
-    if (projection.every((r) => isNum(r[f]))) totals[f] = round(projection.reduce((a, r) => a + r[f], 0), f === 'closes' || f === 'units' ? 1 : 2);
-  }
+    return { rows, sums, chain: chainX };
+  };
+
+  // Leads each stage needs per week to reach `goal` closes at these rates.
+  const requiredFor = (stepList, goal) => {
+    const need = { closes: goal };
+    for (let s = stepList.length - 1; s >= 0; s--) need[stepList[s].from] = need[stepList[s].to] / stepList[s].rate;
+    return Object.fromEntries(stages.map((st) => [st, Math.ceil(need[st] - 1e-9)]));
+  };
+
+  const { rows: projection, sums: totals } = project(steps, true);
 
   const result = {
     success: true,
@@ -220,9 +238,7 @@ export function forecastFunnel(input) {
     if (steps.some((st) => !st.rate)) {
       warnings.push('A step rate is zero or unknown, so the leads needed for the target cannot be computed.');
     } else {
-      const need = { closes: target };
-      for (let s = steps.length - 1; s >= 0; s--) need[steps[s].from] = need[steps[s].to] / steps[s].rate;
-      const required = Object.fromEntries(stages.map((st) => [st, Math.ceil(need[st] - 1e-9)]));
+      const required = requiredFor(steps, target);
       result.target = {
         closes_per_week: target,
         required_per_week: required,
@@ -249,6 +265,44 @@ export function forecastFunnel(input) {
       };
       if (isNum(openQuotes.value)) result.open_quotes.expected_revenue = round(openQuotes.value * rate);
       else if (isNum(econ.revenue_per_job)) result.open_quotes.expected_revenue = round(expected * econ.revenue_per_job);
+    }
+  }
+
+  // 5. What-if: override named step rates and re-run the same projection.
+  // Overriding a rate (not editing counts) is what keeps every other step
+  // unchanged: raising appointments_held alone would also lower the
+  // presentation rate and leave closes where they were.
+  if (overrides && Object.keys(overrides).length) {
+    const applied = {};
+    const scenarioSteps = steps.map((st) => ({ ...st }));
+    for (const [name, value] of Object.entries(overrides)) {
+      const isBleed = name === 'bleed_rate';
+      const step = scenarioSteps.find((st) => st.name === (isBleed ? 'set_rate' : name) || st.key === name);
+      if (!step) {
+        warnings.push(`Override "${name}" does not match a step in this funnel; it was ignored.`);
+        continue;
+      }
+      step.rate = isBleed ? 1 - value : value;
+      applied[name] = value;
+    }
+    if (Object.keys(applied).length) {
+      const sc = project(scenarioSteps, false);
+      const scenario = {
+        rate_overrides: applied,
+        lead_to_close_rate: round(sc.chain, 4),
+        projection: sc.rows,
+        totals: sc.sums,
+        change_vs_baseline: {},
+      };
+      for (const f of ['closes', 'revenue', 'gross_profit', 'units']) {
+        if (isNum(sc.sums[f]) && isNum(totals[f])) {
+          scenario.change_vs_baseline[f] = round(sc.sums[f] - totals[f], f === 'closes' || f === 'units' ? 1 : 2);
+        }
+      }
+      if (result.target && scenarioSteps.every((st) => st.rate)) {
+        scenario.target_required_per_week = requiredFor(scenarioSteps, target);
+      }
+      result.scenario = scenario;
     }
   }
 
