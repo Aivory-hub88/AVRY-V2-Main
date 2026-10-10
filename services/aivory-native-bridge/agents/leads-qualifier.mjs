@@ -345,7 +345,8 @@ export const tools = [
       "Compute sales funnel metrics and a forecast from weekly counts: step conversion rates (bleed, hold, " +
       "presentation, quotation and close rates), unit economics (revenue per job, price and cost per unit such " +
       "as roofing squares, profit margin), projected leads, jobs, revenue and gross profit for the coming weeks, " +
-      "the leads each stage needs to hit a target number of closes, and expected closes from quotes already open. " +
+      "the leads each stage needs to hit a target number of closes, expected closes from quotes already open, and " +
+      "what-if scenarios via rate_overrides. " +
       "ALWAYS use this tool for these numbers instead of calculating them yourself. " +
       "Pass one object per week, oldest first, with the same funnel stages filled in every week; omit a stage " +
       "the business does not track rather than guessing it. Gather the counts from the tenant's connected CRM/ERP " +
@@ -381,6 +382,17 @@ export const tools = [
         .regex(/^[A-Z]{3}$/, 'currency must be a 3-letter ISO-4217 code in capitals')
         .optional(),
       units_label: z.string().max(40).optional(),
+      rate_overrides: z
+        .record(
+          z.enum(['set_rate', 'bleed_rate', 'hold_rate', 'presentation_rate', 'quotation_rate', 'close_rate']),
+          z.number().min(0).max(1),
+        )
+        .optional()
+        .describe(
+          "What-if scenario: step rates (0-1) to replace, e.g. {\"hold_rate\": 0.85}. Pass the SAME weeks as " +
+          "the baseline; never edit the counts to simulate a scenario. The result keeps the baseline and adds a " +
+          "`scenario` block with its projection and change_vs_baseline.",
+        ),
     },
     action: 'sales_funnel_forecast',
     // Pure computation on the arguments: no tenant data is read or written,
