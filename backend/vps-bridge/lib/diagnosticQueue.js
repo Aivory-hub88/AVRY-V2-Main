@@ -19,10 +19,11 @@ const QUEUE_NAME = 'diagnostics';
 // was retired by OpenRouter on 2026-10-09 (404 on every call), and because the
 // fallback tier reused the SAME model, the whole AI analysis went dark. The
 // tiers now use DIFFERENT models so one retirement/outage can't take out both:
-// tier 1 = DeepSeek V4 Flash (already the blueprint worker's model in prod),
-// tier 2 = Qwen 3.7 Plus (OpenRouter's named successor; 9/9 valid JSON in the
-// 2026-10-10 eval). Both run with reasoning OFF.
-const DIAGNOSTIC_MODEL = process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4-flash-0731';
+// tier 1 = DeepSeek V4.1 Flash (Cerveau's model; in the 2026-10-10 eval 9/9
+// valid JSON, 6-10 s, and the only candidate that stopped padding "strengths"
+// with non-strengths on weak profiles), tier 2 = Qwen 3.7 Plus (OpenRouter's
+// named successor to the retired model; 9/9 valid JSON). Both reasoning OFF.
+const DIAGNOSTIC_MODEL = process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4.1-flash';
 const DIAGNOSTIC_FALLBACK_MODEL = process.env.DIAGNOSTIC_FALLBACK_MODEL || 'qwen/qwen3.7-plus';
 const DIAGNOSTIC_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_TIMEOUT_MS || '60000', 10);
 const DIAGNOSTIC_FALLBACK_TIMEOUT_MS = parseInt(process.env.DIAGNOSTIC_FALLBACK_TIMEOUT_MS || '115000', 10);
