@@ -219,6 +219,11 @@ export function forecastFunnel(input) {
   const result = {
     success: true,
     weeks_used: weeks.length,
+    // Plain (unweighted) sums of the input, so the agent can quote a total
+    // for the history table instead of adding a column up itself.
+    history_totals: Object.fromEntries(
+      [...stages, ...money].map((f) => [f, round(weeks.reduce((a, wk) => a + wk[f], 0), 2)]),
+    ),
     weighting,
     currency: currency || null,
     units_label: unitsLabel || null,

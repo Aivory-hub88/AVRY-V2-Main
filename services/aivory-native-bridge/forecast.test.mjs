@@ -131,3 +131,13 @@ test('bleed_rate override sets the set rate; unknown names are ignored with a wa
   assert.equal(r.scenario.projection[0].appointments_set, 90);
   assert.ok(r.warnings.some((w) => w.includes('"nonsense_rate"')));
 });
+
+test('history totals are plain sums of the input weeks', () => {
+  const r = forecastFunnel({ weeks: ROOFING });
+  assert.deepEqual(r.history_totals, {
+    leads: 200, appointments_set: 150, appointments_held: 116, presentations: 92, quotes: 70, closes: 22,
+    revenue: 220000, units: 660, cost: 138000,
+  });
+  const partial = forecastFunnel({ weeks: [{ leads: 2, closes: 1 }, { leads: 0, closes: 3, revenue: 5 }] });
+  assert.deepEqual(partial.history_totals, { leads: 2, closes: 4 }); // revenue missing in a week: left out
+});
