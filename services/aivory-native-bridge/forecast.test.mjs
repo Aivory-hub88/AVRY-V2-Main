@@ -141,3 +141,49 @@ test('history totals are plain sums of the input weeks', () => {
   const partial = forecastFunnel({ weeks: [{ leads: 2, closes: 1 }, { leads: 0, closes: 3, revenue: 5 }] });
   assert.deepEqual(partial.history_totals, { leads: 2, closes: 4 }); // revenue missing in a week: left out
 });
+
+// The live Odoo case: 12-week window, records in the first 10 weeks only.
+const ODOO_WEEKS = [[2, 3, 3, 99768], [3, 0, 0, 0], [2, 4, 4, 71182], [0, 3, 3, 64615], [3, 2, 2, 35396],
+  [2, 0, 0, 0], [5, 1, 1, 18587], [3, 3, 2, 55910], [3, 6, 4, 65190], [11, 11, 5, 35694]]
+  .map(([leads, quotes, closes, revenue], i) => ({
+    week_start: new Date(Date.UTC(2026, 6, 13 + 7 * i)).toISOString().slice(0, 10), leads, quotes, closes, revenue,
+  }));
+const SAT_OCT_10 = Date.UTC(2026, 9, 10, 12);
+
+test('window fills weeks with no records as zeros instead of dropping them', () => {
+  const r = forecastFunnel({ weeks: ODOO_WEEKS, window_start: '2026-07-13', window_weeks: 12 }, SAT_OCT_10);
+  assert.equal(r.weeks_used, 12);
+  assert.deepEqual(r.history.slice(-2).map((h) => [h.week_start, h.leads, h.filled_with_zero]),
+    [['2026-09-21', 0, true], ['2026-09-28', 0, true]]);
+  assert.equal(r.history_totals.leads, 34);
+  assert.equal(r.totals.closes, 7.2); // same as passing the zero weeks by hand
+  assert.equal(r.totals.revenue, 111935);
+  assert.ok(r.warnings.some((w) => w.includes('2026-09-21, 2026-09-28')));
+  assert.ok(!r.warnings.some((w) => w.includes('current week')));
+});
+
+test('window: Sunday-start buckets land in the overlapping Monday week; out-of-window rows are dropped', () => {
+  const weeks = [{ week_start: '2026-07-12', leads: 4, closes: 1 }, { week_start: '2026-06-01', leads: 9, closes: 9 }];
+  const r = forecastFunnel({ weeks, window_start: '2026-07-15', window_weeks: 3 }, SAT_OCT_10);
+  assert.equal(r.history[0].week_start, '2026-07-13');
+  assert.equal(r.history[0].leads, 4);
+  assert.equal(r.history_totals.leads, 4);
+  assert.ok(r.warnings.some((w) => w.includes('not a Monday')));
+  assert.ok(r.warnings.some((w) => w.includes('2026-06-01 is outside')));
+});
+
+test('window: reaching into the current week warns; missing week_start and collisions are errors', () => {
+  const late = forecastFunnel({ weeks: ODOO_WEEKS, window_start: '2026-07-20', window_weeks: 12 }, SAT_OCT_10);
+  assert.ok(late.warnings.some((w) => w.includes('current week')));
+  assert.equal(forecastFunnel({ weeks: [{ leads: 1, closes: 1 }], window_start: '2026-07-13', window_weeks: 2 }).success, false);
+  const dup = forecastFunnel({ weeks: [{ week_start: '2026-07-13', leads: 1, closes: 1 }, { week_start: '2026-07-14', leads: 1, closes: 1 }],
+    window_start: '2026-07-13', window_weeks: 2 });
+  assert.equal(dup.success, false);
+});
+
+test('history echoes exactly the rows used', () => {
+  const r = forecastFunnel({ weeks: ROOFING });
+  assert.equal(r.history.length, 2);
+  assert.deepEqual(Object.keys(r.history[0]), ['label', 'leads', 'appointments_set', 'appointments_held', 'presentations',
+    'quotes', 'closes', 'revenue', 'units', 'cost']);
+});

@@ -101,9 +101,62 @@ function stdDev(xs) {
   return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1));
 }
 
-export function forecastFunnel(input) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+const parseDay = (str) => {
+  const t = Date.parse(`${str}T00:00:00Z`);
+  return Number.isFinite(t) ? t : null;
+};
+const fmtDay = (t) => new Date(t).toISOString().slice(0, 10);
+
+// Lay the given weeks onto a fixed window of `count` weeks from `start`.
+// Week-bucketed sources (Odoo read_group) return no row for an empty week;
+// left to the agent, those weeks were dropped and the window silently shrank
+// (live test, 2026-10-10: "12 weeks" became 10 and the forecast tripled).
+// Here an absent week is a zero row, by construction.
+function fillWindow(rawWeeks, start, count, warnings, now) {
+  let startT = parseDay(start);
+  if (startT === null) return { error: `window_start "${start}" is not a YYYY-MM-DD date.` };
+  const dow = new Date(startT).getUTCDay(); // 0 = Sunday
+  if (dow !== 1) {
+    startT -= ((dow + 6) % 7) * DAY_MS;
+    warnings.push(`window_start ${start} is not a Monday; the window starts on Monday ${fmtDay(startT)}.`);
+  }
+  const fields = [...STAGES, ...MONEY_FIELDS].filter((f) => rawWeeks.some((wk) => isNum(wk[f])));
+  const slots = Array(count).fill(null);
+  for (const wk of rawWeeks) {
+    const t = wk.week_start ? parseDay(wk.week_start) : null;
+    if (t === null) return { error: 'With window_start, every week needs week_start (YYYY-MM-DD).' };
+    // Rounded, so a locale whose weeks start on Sunday still lands in the
+    // Monday week it overlaps most.
+    const i = Math.round((t - startT) / (7 * DAY_MS));
+    if (i < 0 || i >= count) {
+      warnings.push(`Week starting ${wk.week_start} is outside the window and was left out.`);
+      continue;
+    }
+    if (slots[i]) return { error: `Two weeks map to the week of ${fmtDay(startT + i * 7 * DAY_MS)}.` };
+    slots[i] = wk;
+  }
+  const filled = [];
+  const out = slots.map((wk, i) => {
+    const weekStart = fmtDay(startT + i * 7 * DAY_MS);
+    if (wk) return { ...wk, week_start: weekStart, label: wk.label || weekStart };
+    filled.push(weekStart);
+    return { label: weekStart, week_start: weekStart, ...Object.fromEntries(fields.map((f) => [f, 0])), filled_with_zero: true };
+  });
+  if (filled.length) {
+    warnings.push(`No records for ${filled.length} week(s) (${filled.join(', ')}); counted as zero, not dropped.`);
+  }
+  if (startT + count * 7 * DAY_MS > now) {
+    warnings.push('The window reaches into the current week, which is not complete yet; end it on the last full week.');
+  }
+  return { weeks: out };
+}
+
+export function forecastFunnel(input, now = Date.now()) {
   const {
-    weeks,
+    weeks: rawWeeks,
+    window_start: windowStart,
+    window_weeks: windowWeeks,
     horizon_weeks: horizon = 4,
     weighting = 'recent',
     target_closes_per_week: target,
@@ -114,6 +167,14 @@ export function forecastFunnel(input) {
     rate_overrides: overrides,
   } = input;
   const warnings = [];
+
+  let weeks = rawWeeks;
+  if (windowStart) {
+    const filled = fillWindow(rawWeeks, windowStart, windowWeeks || rawWeeks.length, warnings, now);
+    if (filled.error) return { success: false, error: filled.error };
+    weeks = filled.weeks;
+  }
+  if (weeks.length < 2) return { success: false, error: 'At least 2 weeks of history are needed.' };
 
   const stages = presentFields(weeks, STAGES, warnings);
   if (!stages.includes('leads') || !stages.includes('closes')) {
@@ -219,6 +280,15 @@ export function forecastFunnel(input) {
   const result = {
     success: true,
     weeks_used: weeks.length,
+    // The exact rows the forecast was computed from, zero-filled weeks
+    // included. Show this table to the user, not one rebuilt from notes.
+    history: weeks.map((wk) => {
+      const row = { label: wk.label || null };
+      if (wk.week_start) row.week_start = wk.week_start;
+      for (const f of [...stages, ...money]) row[f] = wk[f];
+      if (wk.filled_with_zero) row.filled_with_zero = true;
+      return row;
+    }),
     // Plain (unweighted) sums of the input, so the agent can quote a total
     // for the history table instead of adding a column up itself.
     history_totals: Object.fromEntries(

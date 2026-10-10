@@ -349,7 +349,10 @@ export const tools = [
       "what-if scenarios via rate_overrides. " +
       "ALWAYS use this tool for these numbers instead of calculating them yourself. " +
       "Pass one object per week, oldest first, with the same funnel stages filled in every week; omit a stage " +
-      "the business does not track rather than guessing it. Gather the counts from the tenant's connected CRM/ERP " +
+      "the business does not track rather than guessing it. For counts from a week-grouped query, pass " +
+      "window_start + window_weeks and give each week its week_start, so empty weeks become zeros. " +
+      "Show the user the returned `history` table and `history_totals`, never a table rebuilt by hand. " +
+      "Gather the counts from the tenant's connected CRM/ERP " +
       "or ask the user for them; never invent a count. Read-only: it stores nothing. Quote the returned " +
       "warnings and assumptions alongside the forecast.",
     inputSchema: {
@@ -357,6 +360,7 @@ export const tools = [
         .array(
           z.object({
             label: z.string().max(40).optional(),
+            week_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'week_start must be YYYY-MM-DD').optional(),
             leads: z.number().int().nonnegative(),
             appointments_set: z.number().int().nonnegative().optional(),
             appointments_held: z.number().int().nonnegative().optional(),
@@ -368,8 +372,18 @@ export const tools = [
             cost: z.number().nonnegative().optional(),
           }),
         )
-        .min(2)
+        .min(1)
         .max(52),
+      window_start: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'window_start must be YYYY-MM-DD')
+        .optional()
+        .describe(
+          'Monday the history window starts. With window_start and window_weeks, pass only the weeks that ' +
+          'have records, each with week_start; every other week in the window is counted as zero. Use this ' +
+          'whenever the counts come from a week-grouped query, which returns no row for an empty week.',
+        ),
+      window_weeks: z.number().int().min(2).max(52).optional(),
       horizon_weeks: z.number().int().min(1).max(12).default(4),
       weighting: z.enum(['recent', 'equal']).default('recent'),
       target_closes_per_week: z.number().positive().optional(),
