@@ -333,6 +333,11 @@ export function forecastFunnel(input, now = Date.now()) {
     rates,
     funnel_stages: stages,
     available_overrides: availableOverrides,
+    // Ready-made sentence for offering what-ifs, so the offer matches what
+    // the tool can actually run.
+    what_if_note: availableOverrides.length
+      ? `What-if scenarios can change: ${availableOverrides.join(', ')}.`
+      : 'No what-if scenarios are possible on this funnel.',
     unit_economics: Object.fromEntries(Object.entries(econ).map(([k, v]) => [k, round(v, k === 'profit_margin' ? 4 : 2)])),
     lead_trend: {
       method: leadsProj.method,
@@ -383,6 +388,21 @@ export function forecastFunnel(input, now = Date.now()) {
   // unchanged: raising appointments_held alone would also lower the
   // presentation rate and leave closes where they were.
   if (overrides && Object.keys(overrides).length) {
+    // A what-if on a stage this funnel does not have has no meaning, and a
+    // warning was easy to talk past (live test: "hold rate" offered for a
+    // funnel without appointments). Refuse the whole call instead.
+    const unknown = Object.keys(overrides).filter((n) => !availableOverrides.includes(n));
+    if (unknown.length) {
+      return {
+        success: false,
+        error:
+          `No ${unknown.join(', ')} in this funnel (stages: ${stages.join(' -> ')}). ` +
+          `Rates that can be changed here: ${availableOverrides.join(', ') || 'none'}. ` +
+          'Tell the user this scenario cannot be run on their data, and why.',
+        funnel_stages: stages,
+        available_overrides: availableOverrides,
+      };
+    }
     const applied = {};
     const scenarioSteps = steps.map((st) => ({ ...st }));
     for (const [name, value] of Object.entries(overrides)) {
