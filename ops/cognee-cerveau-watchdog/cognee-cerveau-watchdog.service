@@ -1,0 +1,13 @@
+[Unit]
+Description=Aivory Cerveau — cognee-cerveau (:3200) liveness probe, auto-restart + Telegram alert
+Documentation=file:///usr/local/bin/cognee-cerveau-watchdog.sh
+After=network-online.target cognee-cerveau.service
+
+[Service]
+Type=oneshot
+# root: needs `systemctl restart`, /proc/<pid>/task/*/stack for the hang
+# snapshot, and the root-only tencent-watch-notify.sh (it reads the bot token).
+ExecStart=/usr/local/bin/cognee-cerveau-watchdog.sh
+# Worst case: 5 s probe + 15 s stop (TimeoutStopSec drop-in) + 45 s recovery wait + alert.
+TimeoutStartSec=120
+Nice=5

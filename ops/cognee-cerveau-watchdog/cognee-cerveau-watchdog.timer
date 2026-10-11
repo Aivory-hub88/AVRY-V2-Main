@@ -1,0 +1,10 @@
+[Unit]
+Description=Probe cognee-cerveau /health every minute (3 consecutive failures => restart + alert)
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+AccuracySec=5s
+# No Persistent=: a missed probe while the host was down is meaningless.
+
+[Install]
+WantedBy=timers.target
