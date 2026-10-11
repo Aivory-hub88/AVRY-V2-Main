@@ -122,14 +122,18 @@ test('rate override re-runs the funnel with only that step changed', () => {
   assert.equal(r.scenario.target_required_per_week.quotes, 30);
 });
 
-test('bleed_rate override sets the set rate; unknown names are ignored with a warning', () => {
-  const r = forecastFunnel({
-    weeks: ROOFING, weighting: 'equal', horizon_weeks: 1,
-    rate_overrides: { bleed_rate: 0.1, nonsense_rate: 0.9 },
-  });
+test('bleed_rate override sets the set rate; a rate the funnel lacks is refused', () => {
+  const r = forecastFunnel({ weeks: ROOFING, weighting: 'equal', horizon_weeks: 1, rate_overrides: { bleed_rate: 0.1 } });
   assert.deepEqual(r.scenario.rate_overrides, { bleed_rate: 0.1 });
   assert.equal(r.scenario.projection[0].appointments_set, 90);
-  assert.ok(r.warnings.some((w) => w.includes('"nonsense_rate"')));
+
+  // Live Odoo shape: leads -> quotes -> closes, so no hold rate to change.
+  const short = [{ leads: 10, quotes: 6, closes: 3 }, { leads: 12, quotes: 7, closes: 4 }];
+  const bad = forecastFunnel({ weeks: short, rate_overrides: { hold_rate: 0.85, close_rate: 0.7 } });
+  assert.equal(bad.success, false);
+  assert.match(bad.error, /^No hold_rate in this funnel \(stages: leads -> quotes -> closes\)\. Rates that can be changed here: close_rate\./);
+  assert.deepEqual(bad.available_overrides, ['close_rate']);
+  assert.equal(forecastFunnel({ weeks: short }).what_if_note, 'What-if scenarios can change: close_rate.');
 });
 
 test('history totals are plain sums of the input weeks', () => {
