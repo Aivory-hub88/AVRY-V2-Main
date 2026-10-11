@@ -187,3 +187,22 @@ test('history echoes exactly the rows used', () => {
   assert.deepEqual(Object.keys(r.history[0]), ['label', 'leads', 'appointments_set', 'appointments_held', 'presentations',
     'quotes', 'closes', 'revenue', 'units', 'cost']);
 });
+
+test('a stage recorded in almost no weeks is left out with the reason, and only real steps are overridable', () => {
+  // Live Odoo: 4 opportunity-linked appointments, all in the week of 21 Sep.
+  const weeks = [...ODOO_WEEKS, { week_start: '2026-09-21', leads: 0, appointments_set: 4, quotes: 0, closes: 0, revenue: 0 }];
+  const r = forecastFunnel({ weeks, window_start: '2026-07-13', window_weeks: 12 }, SAT_OCT_10);
+  assert.deepEqual(r.funnel_stages, ['leads', 'quotes', 'closes']);
+  assert.ok(r.warnings.some((w) => w.startsWith(
+    '"appointments_set" has records in 1 of 12 weeks and is zero in 8 of 8 weeks where "quotes" has volume',
+  )));
+  assert.equal(r.totals.closes, 7.2); // same forecast as without the stray stage
+  assert.deepEqual(r.available_overrides, ['close_rate']);
+});
+
+test('a fully tracked funnel keeps every stage and offers every rate', () => {
+  const r = forecastFunnel({ weeks: ROOFING });
+  assert.equal(r.funnel_stages.length, 6);
+  assert.deepEqual(r.available_overrides,
+    ['set_rate', 'hold_rate', 'presentation_rate', 'quotation_rate', 'close_rate', 'bleed_rate']);
+});

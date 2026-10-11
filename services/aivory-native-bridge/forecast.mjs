@@ -139,7 +139,12 @@ function fillWindow(rawWeeks, start, count, warnings, now) {
   const filled = [];
   const out = slots.map((wk, i) => {
     const weekStart = fmtDay(startT + i * 7 * DAY_MS);
-    if (wk) return { ...wk, week_start: weekStart, label: wk.label || weekStart };
+    // Each stage comes from its own week-grouped query, so a stage missing
+    // from a week that other stages returned is a zero for that week too.
+    if (wk) {
+      const zeros = Object.fromEntries(fields.filter((f) => !isNum(wk[f])).map((f) => [f, 0]));
+      return { ...wk, ...zeros, week_start: weekStart, label: wk.label || weekStart };
+    }
     filled.push(weekStart);
     return { label: weekStart, week_start: weekStart, ...Object.fromEntries(fields.map((f) => [f, 0])), filled_with_zero: true };
   });
@@ -150,6 +155,29 @@ function fillWindow(rawWeeks, start, count, warnings, now) {
     warnings.push('The window reaches into the current week, which is not complete yet; end it on the last full week.');
   }
   return { weeks: out };
+}
+
+// A middle stage that is zero in most weeks where the next stage has volume
+// is not being recorded (e.g. appointments kept outside the CRM), not
+// converting at 0%. Keeping it would put a near-zero rate in the chain and
+// sink every projection, so it is left out, with the reason in numbers.
+function dropUntrackedStages(weeks, stages, warnings) {
+  const kept = [...stages];
+  for (let i = kept.length - 2; i >= 1; i--) {
+    const stage = kept[i];
+    const next = kept[i + 1];
+    const active = weeks.filter((wk) => wk[next] > 0);
+    const zeros = active.filter((wk) => !(wk[stage] > 0)).length;
+    if (active.length && zeros / active.length > 0.5) {
+      const withData = weeks.filter((wk) => wk[stage] > 0).length;
+      warnings.push(
+        `"${stage}" has records in ${withData} of ${weeks.length} weeks and is zero in ${zeros} of ` +
+        `${active.length} weeks where "${next}" has volume, so it looks untracked and was left out of the funnel.`,
+      );
+      kept.splice(i, 1);
+    }
+  }
+  return kept;
 }
 
 export function forecastFunnel(input, now = Date.now()) {
@@ -176,10 +204,11 @@ export function forecastFunnel(input, now = Date.now()) {
   }
   if (weeks.length < 2) return { success: false, error: 'At least 2 weeks of history are needed.' };
 
-  const stages = presentFields(weeks, STAGES, warnings);
+  let stages = presentFields(weeks, STAGES, warnings);
   if (!stages.includes('leads') || !stages.includes('closes')) {
     return { success: false, error: 'Every week needs both "leads" and "closes".' };
   }
+  stages = dropUntrackedStages(weeks, stages, warnings);
   const money = presentFields(weeks, MONEY_FIELDS, warnings);
   const w = weightsFor(weeks.length, weighting);
 
@@ -216,6 +245,10 @@ export function forecastFunnel(input, now = Date.now()) {
     ? steps.reduce((acc, st) => acc * st.rate, 1)
     : null;
   rates.lead_to_close_rate = round(chain, 4);
+  // The only names rate_overrides accepts for this funnel: offer what-ifs on
+  // these and nothing else (no "hold rate" when appointments are untracked).
+  const availableOverrides = steps.filter((st) => STEP_NAMES[st.key]).map((st) => st.name);
+  if (availableOverrides.includes('set_rate')) availableOverrides.push('bleed_rate');
 
   // Unit economics, as weighted sums so big weeks count for more.
   const sum = (f) => weeks.reduce((acc, wk, i) => acc + w[i] * wk[f], 0);
@@ -298,6 +331,8 @@ export function forecastFunnel(input, now = Date.now()) {
     currency: currency || null,
     units_label: unitsLabel || null,
     rates,
+    funnel_stages: stages,
+    available_overrides: availableOverrides,
     unit_economics: Object.fromEntries(Object.entries(econ).map(([k, v]) => [k, round(v, k === 'profit_margin' ? 4 : 2)])),
     lead_trend: {
       method: leadsProj.method,
