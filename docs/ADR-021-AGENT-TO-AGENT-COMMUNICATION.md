@@ -48,7 +48,9 @@ dashboard room ──turn──▶ backend /discussion-turn ──▶ vps-bridge
 - **vps-bridge, backend.** Pass `team_actions` through unchanged (one field each, like `pending_approval`).
 - **Dashboard (room).** `lib/teamComms.ts` (pure: validate + plan, client-safe like `agentHandoff.ts`) and
   `spaceAgentRun.ts` execute the actions: post messages, enqueue tasks, schedule reminders, route answers back.
-  Migration `workspace-agent-comms.sql` adds the columns/tables below.
+  `lib/teamReminders.ts` fires due reminders. Migration `workspace-agent-comms.sql` adds the columns/tables below.
+- **Config.** The tools are `Safe` tier in code, but the product risk profiles use `allowed_tools`, so the five
+  names are added to `allowed_tools` and `auto_approve` of the six `agent_*` profiles on the Cerveau host.
 
 ### 2.2 Data
 
@@ -78,5 +80,7 @@ workspace_agent_reminders(id, space_id, thread_root, target_agent, from_agent, t
 - Direct agent-to-agent DMs outside a room. Every exchange is visible in a thread on purpose.
 - Engine-side delivery (`send_message_to_peer` from upstream v0.8.6). It runs a hidden peer turn; the room path is
   what the user can see and stop. Revisit for Telegram/Slack-only tenants.
-- A dedicated reminder scheduler service: reminders fire from the room poll (`GET messages`) and from a
-  token-protected sweep route a VPS timer calls every minute.
+- A reminder scheduler that fires with nobody in the room. Every agent turn runs under a member's own JWT
+  (tenant, credits, approvals), and a timer has none, so v1 fires due reminders from the room poll
+  (`GET .../timeline`) of a member who can write, claiming each atomically. Firing with the room closed needs a
+  backend service-token path for discussion turns first.
