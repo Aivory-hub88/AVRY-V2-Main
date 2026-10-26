@@ -100,13 +100,15 @@ credential** that the backend mints for the member whose turn created the remind
   `missed_policy` (`run_once` default | `skip`), `fire_outcome` (`on_time` | `late` | `skipped`) and `wait_id` (§4.2).
 - **Sweeper (avry-backend).** `app/services/room_reminder_sweeper.py` runs every 60 s from the lifespan, under a
   Postgres advisory lock so only one worker sweeps. It selects `(space_id, credential_owner)` pairs with a due,
-  unfired reminder, loads the owner (skipped when the account is gone or has no paid tier), mints a **15-minute
-  access token** for them (`type: access`, `via: room-reminder`), and calls the dashboard's
+  unfired reminder, loads the owner, mints a **15-minute access token** for them (`type: access`, `via: room-reminder`), and calls the dashboard's
   `POST /api/workspace/{space}/reminders/fire` with it.
 - **Dashboard.** That route verifies the token like any request (JWT + write role on the room, so a member who lost
   access cannot be impersonated into it) and runs the same `fireDueReminders` the room poll runs, restricted to that
   owner's reminders. The turn then calls the existing `/api/v1/telegram/discussion-turn` with the minted token, so
-  tenant (acting-as-leader), credits and approvals are exactly those of the member who set the reminder up.
+  tenant (acting-as-leader), tier, credits and approvals are exactly those of the member who set the reminder up.
+  When the owner is gone or inactive, or the dashboard answers 401/403/404 (no longer allowed in the room), the
+  sweeper sets `credential_owner = NULL` on those due rows, which hands them back to the room poll instead of
+  retrying every minute.
 - Why the dashboard and not the backend runs the turn: posting the reply, planning team actions, routing answers and
   draining queues all live in `lib/spaceAgentRun.ts`. A second implementation in Python would drift. The backend
   only owns the signing key, which is the one thing the dashboard cannot do on its own.
@@ -141,7 +143,9 @@ A wait **wakes** when (a) its `until` reminder fires, (b) a delegate or ask the 
 member with write access or with the service token (webhooks). (c) schedules a due wake reminder, so the sweeper or
 the room poll starts the turn with a real member credential. The woken turn's instruction repeats the original
 request and the note, gives the `wait_id`, and tells the agent to call `team_wait_close` when it is done. Waking does
-not close; an open wait expires after 14 days. At most 3 open waits per agent per thread.
+not close; an open wait expires after 14 days. An agent keeps at most 3 open waits per thread: a fourth closes the
+oldest (`superseded by a newer wait`), so the newest is never the one lost. Closing a wait cancels its pending wake.
+The wait and its close are posted in the thread (`⏳ Waiting: …`, `✅ No longer waiting`), like every team action.
 
 ### 4.3 Quiet and failed unattended runs
 
@@ -160,8 +164,9 @@ new", and a run that could not do its job still counts as a success.
 - **Webhook path.** The response gains `run_outcome: null | "quiet" | "failed"` and `run_failure_reason` next to
   `team_actions`; vps-bridge and the backend relay them, and forward `turn_origin` the other way. The dashboard
   sends `turn_origin` for reminder and wake tasks. On `quiet` it posts no reply and marks the task `done`
-  (`reason: quiet run`); team actions still run. On `failed` it posts the reason as the agent's message, marks the
-  task `failed` with it, and the waiting agent is told (#72's failure notice).
+  (`reason: quiet run: nothing to report`); team actions still run. On `failed` it posts
+  `⚠️ Could not complete this run: <reason>` followed by the reply, and marks the task `failed` with the reason.
+  A conversation turn (no `turn_origin`) ignores `run_outcome` and always posts its reply.
 
 ### 4.4 Config and rollout
 
@@ -170,6 +175,7 @@ new", and a run that could not do its job still counts as a success.
 - Backend env: `DASHBOARD_INTERNAL_URL` (e.g. `http://avry-user-dashboard:9001/dashboard`) and
   `ROOM_REMINDER_SWEEPER_ENABLED=true`. Unset means no sweeper: the room poll fires as before.
 - Cerveau prod config: add `team_wait`, `team_wait_close`, `run_no_update`, `run_report_failure` to
-  `allowed_tools` and `auto_approve` of the six `agent_*` risk profiles (they are `Safe` in code).
+  `allowed_tools` and `auto_approve` of the six `agent_*` risk profiles (they are `Safe` in code). A cron job
+  with its own `allowed_tools` list needs the two `run_*` names there too.
 - Deploy order: dashboard migration → Cerveau → vps-bridge → backend → dashboard. Each piece ignores fields it does
   not know, so a partial deploy degrades to today's behaviour.
