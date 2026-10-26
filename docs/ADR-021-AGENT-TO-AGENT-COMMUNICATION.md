@@ -84,3 +84,92 @@ workspace_agent_reminders(id, space_id, thread_root, target_agent, from_agent, t
   (tenant, credits, approvals), and a timer has none, so v1 fires due reminders from the room poll
   (`GET .../timeline`) of a member who can write, claiming each atomically. Firing with the room closed needs a
   backend service-token path for discussion turns first.
+
+## 4. Addendum 2026-10-26 — follow-up #5: reminders with the room closed, waits, quiet and failed runs
+
+**Status:** Accepted 2026-10-26, building. Follows the openbot study of 2026-10-26 (ideas only; openbot is PolyForm
+Noncommercial, so no code was copied). Follow-ups #1–#2 of that study shipped as avry-user-dashboard#72 (queued
+team turns, gathered answers, failure notices) and AVRY-Cerveau#39 (bounded tool-schema activation).
+
+### 4.1 Reminders fire with nobody in the room
+
+§3 named the blocker: every agent turn runs under a member's JWT, and a timer has none. The fix is a **delegated
+credential** that the backend mints for the member whose turn created the reminder.
+
+- `workspace_agent_reminders` gains `credential_owner` (the `user_id` of the credential the creating turn ran under),
+  `missed_policy` (`run_once` default | `skip`), `fire_outcome` (`on_time` | `late` | `skipped`) and `wait_id` (§4.2).
+- **Sweeper (avry-backend).** `app/services/room_reminder_sweeper.py` runs every 60 s from the lifespan, under a
+  Postgres advisory lock so only one worker sweeps. It selects `(space_id, credential_owner)` pairs with a due,
+  unfired reminder, loads the owner (skipped when the account is gone or has no paid tier), mints a **15-minute
+  access token** for them (`type: access`, `via: room-reminder`), and calls the dashboard's
+  `POST /api/workspace/{space}/reminders/fire` with it.
+- **Dashboard.** That route verifies the token like any request (JWT + write role on the room, so a member who lost
+  access cannot be impersonated into it) and runs the same `fireDueReminders` the room poll runs, restricted to that
+  owner's reminders. The turn then calls the existing `/api/v1/telegram/discussion-turn` with the minted token, so
+  tenant (acting-as-leader), credits and approvals are exactly those of the member who set the reminder up.
+- Why the dashboard and not the backend runs the turn: posting the reply, planning team actions, routing answers and
+  draining queues all live in `lib/spaceAgentRun.ts`. A second implementation in Python would drift. The backend
+  only owns the signing key, which is the one thing the dashboard cannot do on its own.
+- **Room poll stays** as the fallback (sweeper down, `DASHBOARD_INTERNAL_URL` unset, rows from before the
+  migration with no `credential_owner`). Claims are atomic (`FOR UPDATE SKIP LOCKED`), so the two paths fire a
+  reminder once.
+- **Missed policy.** A reminder is *late* when it is claimed more than 10 minutes after `fire_at` (the sweeper was
+  down, or nobody had the room open). `run_once` fires it once and says so in the turn ("this reminder was due at …");
+  `skip` marks it `skipped` and posts nothing. `team_remind` takes an optional `if_missed: run_once | skip`.
+- **Token lifetime.** 15 minutes covers the fired turn and the chain it starts (ask → answer, delegate → report) in
+  the common case. A chain still running after that fails its next turn with 401 like an expired browser session,
+  and that failure is reported to the waiting agent (#72). The minted token is never stored or logged.
+
+### 4.2 `team_wait` / `team_wait_close`
+
+An agent that is blocked ("waiting for the build", "until Lex finishes the quote") needs the request to survive the
+end of its turn and any compaction.
+
+| Tool | Records | What the room does |
+|---|---|---|
+| `team_wait(note, until?)` | `TeamAction{kind: wait, text: note, when: until}` | Stores a row in `workspace_agent_waits` with the **request text of the turn** (copied by the room, not written by the model) and the note. With `until`, also schedules a wake reminder (`wait_id` set). |
+| `team_wait_close(wait_id?, note?)` | `TeamAction{kind: wait_close}` | Closes that wait, or all of the agent's open waits in the thread. |
+
+```sql
+workspace_agent_waits(id, space_id, thread_root, agent_type, task_id, request_text, note,
+                      credential_owner, status open|closed|expired, wake_count, last_woken_at,
+                      created_at, closed_at, expires_at DEFAULT now() + 14 days)
+```
+
+A wait **wakes** when (a) its `until` reminder fires, (b) a delegate or ask the agent made in that thread finishes
+(the answer/report turn carries the open waits), or (c) `POST /api/workspace/{space}/waits/{id}/wake` is called by a
+member with write access or with the service token (webhooks). (c) schedules a due wake reminder, so the sweeper or
+the room poll starts the turn with a real member credential. The woken turn's instruction repeats the original
+request and the note, gives the `wait_id`, and tells the agent to call `team_wait_close` when it is done. Waking does
+not close; an open wait expires after 14 days. At most 3 open waits per agent per thread.
+
+### 4.3 Quiet and failed unattended runs
+
+Unattended turns (Geno's cron runs, fired reminders, woken waits) currently always produce a message, even "nothing
+new", and a run that could not do its job still counts as a success.
+
+- **Cerveau.** Two tools, `run_no_update()` and `run_report_failure(reason)`, record a `RunOutcome` into a new
+  task-local `RUN_OUTCOME` (same pattern as `TEAM_ACTIONS`). They are offered only when the cell is scoped:
+  - in `cron::scheduler::run_agent_job` (every cron agent run), and
+  - in the gateway webhook when the caller marks the turn unattended with `X-Turn-Origin: cron | reminder | wake`.
+  A human chat turn never sees them. Delegated sub-turns get no cell.
+- **Cron path.** `quiet` turns the output into the existing `NO_REPLY:` sentinel, so delivery is `skipped` and the
+  run is `ok` on `cron_runs`. `failed` makes the run's execution `error` with `run reported failure: <reason>`, so
+  `cron_runs.status = error` (the ledger) and the reason is still delivered: a failure is something the operator
+  must see.
+- **Webhook path.** The response gains `run_outcome: null | "quiet" | "failed"` and `run_failure_reason` next to
+  `team_actions`; vps-bridge and the backend relay them, and forward `turn_origin` the other way. The dashboard
+  sends `turn_origin` for reminder and wake tasks. On `quiet` it posts no reply and marks the task `done`
+  (`reason: quiet run`); team actions still run. On `failed` it posts the reason as the agent's message, marks the
+  task `failed` with it, and the waiting agent is told (#72's failure notice).
+
+### 4.4 Config and rollout
+
+- Migration `migrations/workspace-agent-followup5.sql` (dashboard) before the dashboard deploy; the code tolerates
+  the old schema (room poll keeps working, waits are dropped with a note).
+- Backend env: `DASHBOARD_INTERNAL_URL` (e.g. `http://avry-user-dashboard:9001/dashboard`) and
+  `ROOM_REMINDER_SWEEPER_ENABLED=true`. Unset means no sweeper: the room poll fires as before.
+- Cerveau prod config: add `team_wait`, `team_wait_close`, `run_no_update`, `run_report_failure` to
+  `allowed_tools` and `auto_approve` of the six `agent_*` risk profiles (they are `Safe` in code).
+- Deploy order: dashboard migration → Cerveau → vps-bridge → backend → dashboard. Each piece ignores fields it does
+  not know, so a partial deploy degrades to today's behaviour.
