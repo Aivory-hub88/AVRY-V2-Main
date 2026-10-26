@@ -911,6 +911,9 @@ async function callCerveau(ctx, userText) {
         ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
         // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
         ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
+        // ADR-021 §4.3: an unattended turn (fired reminder, woken wait), so Cerveau
+        // offers run_no_update / run_report_failure.
+        ...(ctx.turn_origin ? { 'X-Turn-Origin': ctx.turn_origin } : {}),
       },
       body: JSON.stringify({ message: userText }),
       signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
@@ -943,7 +946,27 @@ async function callCerveau(ctx, userText) {
     pendingApproval: (data && data.pending_approval) || null,
     // ADR-021: speech acts from the agent's team tools; relayed unchanged.
     teamActions: Array.isArray(data && data.team_actions) ? data.team_actions : [],
+    // ADR-021 §4.3: 'quiet' | 'failed' | null, for unattended turns only.
+    ...runOutcomeFields(data),
   };
+}
+
+/** ADR-021 §4.3: the turn origins Cerveau treats as unattended; anything else is dropped. */
+const UNATTENDED_TURN_ORIGINS = ['cron', 'reminder', 'wake'];
+
+function sanitizeTurnOrigin(raw) {
+  const origin = String(raw || '').trim().toLowerCase();
+  return UNATTENDED_TURN_ORIGINS.includes(origin) ? origin : null;
+}
+
+/** Cerveau's run outcome, relayed only when it is one of the two known values. */
+function runOutcomeFields(data) {
+  const outcome = data && data.run_outcome;
+  if (outcome !== 'quiet' && outcome !== 'failed') return { runOutcome: null, runFailureReason: null };
+  const reason = outcome === 'failed' && typeof data.run_failure_reason === 'string'
+    ? data.run_failure_reason.slice(0, 500)
+    : null;
+  return { runOutcome: outcome, runFailureReason: reason };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -990,6 +1013,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       channel,
       // ADR-021: Team Space room turn (the whitelist above folds 'discussion' into 'telegram').
       room_turn: requestedChannel === 'discussion',
+      // ADR-021 §4.3: only meaningful on a room turn (the dashboard's reminder / wake turns).
+      turn_origin: requestedChannel === 'discussion' ? sanitizeTurnOrigin(req.body.turn_origin) : null,
       internalKey,
       orKey,
       active_agents: sanitizeTeamAgents(req.body.active_agents),
@@ -1018,6 +1043,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       let reply;
       let pendingApproval = null;
       let teamActions = [];
+      let runOutcome = null;
+      let runFailureReason = null;
       if (engine === 'cerveau') {
         console.log('[telegram-agent] routing to cerveau', {
           user_id: ctx.user_id, agent_type: agentType, session_id: historyKey,
@@ -1027,7 +1054,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // legacy `histories` Map. See stripMarkdownForChat() below: Cerveau's
         // /webhook has no format hint in its contract, so replies need the
         // same chat-channel cleanup the legacy path gets from a prompt rule.
-        ({ reply, pendingApproval, teamActions } = await callCerveau(ctx, userText));
+        ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
       } else {
         if (!orKey) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
@@ -1054,6 +1081,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         reply: reply.slice(0, REPLY_MAX),
         pending_approval: pendingApproval,
         team_actions: teamActions,
+        run_outcome: runOutcome,
+        run_failure_reason: runFailureReason,
       });
     } catch (err) {
       console.error('[telegram-agent] error:', err.message);
@@ -1184,6 +1213,8 @@ module.exports._internals = {
   stripMarkdownForChat,
   callCerveau,
   resolveCerveauApproval,
+  sanitizeTurnOrigin,
+  runOutcomeFields,
 };
 module.exports.calculate = calculate;
 module.exports.activeAgentsHeader = activeAgentsHeader;
