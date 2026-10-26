@@ -909,6 +909,8 @@ async function callCerveau(ctx, userText) {
         'X-Agent-Type': ctx.agent_type,
         'X-Session-Id': ctx.session_id,
         ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
+        // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
+        ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
       },
       body: JSON.stringify({ message: userText }),
       signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
@@ -936,7 +938,12 @@ async function callCerveau(ctx, userText) {
   // Cerveau patch 0035: additive field, null on every normal turn. Relayed
   // as-is (already {id, tool_name, risk_tier} | null) — this bridge never
   // needs to inspect its shape, only pass it through to avry-backend.
-  return { reply, pendingApproval: (data && data.pending_approval) || null };
+  return {
+    reply,
+    pendingApproval: (data && data.pending_approval) || null,
+    // ADR-021: speech acts from the agent's team tools; relayed unchanged.
+    teamActions: Array.isArray(data && data.team_actions) ? data.team_actions : [],
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -981,6 +988,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       agent_type: agentType,
       session_id: historyKey,
       channel,
+      // ADR-021: Team Space room turn (the whitelist above folds 'discussion' into 'telegram').
+      room_turn: requestedChannel === 'discussion',
       internalKey,
       orKey,
       active_agents: sanitizeTeamAgents(req.body.active_agents),
@@ -1008,6 +1017,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
 
       let reply;
       let pendingApproval = null;
+      let teamActions = [];
       if (engine === 'cerveau') {
         console.log('[telegram-agent] routing to cerveau', {
           user_id: ctx.user_id, agent_type: agentType, session_id: historyKey,
@@ -1017,7 +1027,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // legacy `histories` Map. See stripMarkdownForChat() below: Cerveau's
         // /webhook has no format hint in its contract, so replies need the
         // same chat-channel cleanup the legacy path gets from a prompt rule.
-        ({ reply, pendingApproval } = await callCerveau(ctx, userText));
+        ({ reply, pendingApproval, teamActions } = await callCerveau(ctx, userText));
       } else {
         if (!orKey) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
@@ -1040,7 +1050,11 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       // Additive field, mirrors Cerveau's own /webhook contract (patch
       // 0035) — null on every turn that didn't hit a Pending approval, so
       // any existing caller of this route is unaffected.
-      return res.json({ reply: reply.slice(0, REPLY_MAX), pending_approval: pendingApproval });
+      return res.json({
+        reply: reply.slice(0, REPLY_MAX),
+        pending_approval: pendingApproval,
+        team_actions: teamActions,
+      });
     } catch (err) {
       console.error('[telegram-agent] error:', err.message);
       return res.status(502).json({ error: true, message: 'Agent gateway error' });
