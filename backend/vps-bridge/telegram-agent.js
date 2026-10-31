@@ -522,44 +522,107 @@ Adopt this identity naturally: introduce yourself with the configured agent/busi
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Credit metering — every agent message costs credits so LLM spend is capped
-// per user tier. The backend ledger is the source of truth; this call is
-// atomic there (row-locked), so concurrent messages can't double-spend.
+// Credit metering — a credit is a slice of LLM spend, not a message, so a
+// one-line answer costs a credit or two and a 20-tool-call Odoo report costs
+// what it actually cost. The backend ledger is the source of truth and is
+// atomic there (row-locked).
+//
+// Flow per turn: checkCredits() refuses up front when the balance is empty
+// (no LLM call is ever made on an empty balance); the turn then runs while
+// callLLM()/webSearch() add OpenRouter's billed cost into ctx.usage; and
+// settleCredits() charges it afterwards with allow_partial, so a turn that
+// ran past the last credit is charged what is left instead of failing.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MESSAGE_COST = () => Math.max(1, parseInt(process.env.AGENT_MESSAGE_COST, 10) || 1);
+// USD of OpenRouter spend one credit covers. Must equal CREDIT_COST_USD in
+// avry-backend's app/services/tiers.py, which the plan and pack prices are
+// sized against.
+const CREDIT_COST_USD = () => parseFloat(process.env.CREDIT_COST_USD) || 0.004365;
+// OpenRouter charges 5.5% on the balance its usage cost is drawn from.
+const OPENROUTER_FEE = 1.055;
+// Blended DeepSeek V4.1 Flash peak rate per token, used only when a response
+// carries token counts but no cost.
+const FALLBACK_USD_PER_TOKEN = 0.31e-6;
+// Cerveau runs its own LLM calls and reports no cost, so its turns are
+// charged a flat rate: a typical tool-using turn (~75k tokens) at peak.
+const CERVEAU_TURN_CREDITS = () => Math.max(1, parseInt(process.env.CERVEAU_TURN_CREDITS, 10) || 6);
 
 const OUT_OF_CREDITS_REPLY =
   'Maaf, kuota pesan AI agent ini sudah habis untuk periode ini — silakan hubungi operator bisnis ini. ' +
   '(This agent has used up its AI message quota for the current period — the business operator can top up or upgrade from the Aivory dashboard.)';
 
+function newUsage() {
+  return { cost: 0, tokens: 0 };
+}
+
+/** Add one OpenRouter response's billed usage into ctx.usage. */
+function recordUsage(ctx, data) {
+  const u = data && data.usage;
+  if (!ctx || !ctx.usage || !u) return;
+  const tokens = Number(u.total_tokens) || (Number(u.prompt_tokens) || 0) + (Number(u.completion_tokens) || 0);
+  const cost = Number(u.cost);
+  ctx.usage.tokens += tokens;
+  ctx.usage.cost += Number.isFinite(cost) && cost > 0 ? cost : tokens * FALLBACK_USD_PER_TOKEN;
+}
+
+/** Credits for a turn's spend; any turn that reached the LLM costs at least one. */
+function creditsForUsage(usage) {
+  const usd = (usage.cost || 0) * OPENROUTER_FEE;
+  return Math.max(1, Math.ceil(usd / CREDIT_COST_USD() - 1e-9));
+}
+
 /**
- * Deduct one message's credits. Returns { allowed, reply? }.
- * Fails OPEN on transient errors (a metering hiccup must not take every
- * customer conversation down) and CLOSED on an explicit 402.
+ * Refuse the turn when the operator has no credits left. Returns
+ * { allowed, reply? }. Fails OPEN on transient errors (a metering hiccup
+ * must not take every customer conversation down).
  */
-async function consumeMessageCredit(ctx, reason = 'agent_message') {
+async function checkCredits(ctx) {
+  try {
+    const res = await fetch(`${BACKEND_URL()}/api/v1/credits/internal/status/${encodeURIComponent(ctx.user_id)}`, {
+      headers: { 'X-Internal-Token': ctx.internalKey },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      console.error(`[telegram-agent] credit status returned ${res.status} (failing open)`);
+      return { allowed: true };
+    }
+    const st = await res.json();
+    if (!st.unlimited && (st.balance || 0) <= 0) return { allowed: false, reply: OUT_OF_CREDITS_REPLY };
+    return { allowed: true };
+  } catch (err) {
+    console.error('[telegram-agent] credit status failed (failing open):', err.message);
+    return { allowed: true };
+  }
+}
+
+/** Charge a finished turn. Never throws: the reply has already been produced. */
+async function settleCredits(ctx, amount, reason = 'agent_message', extraMeta = {}) {
   try {
     const res = await fetch(`${BACKEND_URL()}/api/v1/credits/internal/consume`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Internal-Token': ctx.internalKey },
       body: JSON.stringify({
         user_id: ctx.user_id,
-        amount: MESSAGE_COST(),
+        amount,
         reason,
-        meta: { agent_type: ctx.agent_type, channel: ctx.channel, session_id: ctx.session_id },
+        allow_partial: true,
+        meta: { agent_type: ctx.agent_type, channel: ctx.channel, session_id: ctx.session_id, ...extraMeta },
       }),
       signal: AbortSignal.timeout(8000),
     });
-    if (res.status === 402) return { allowed: false, reply: OUT_OF_CREDITS_REPLY };
-    if (!res.ok) {
-      console.error(`[telegram-agent] credit consume returned ${res.status} (failing open)`);
-    }
-    return { allowed: true };
+    if (!res.ok) console.error(`[telegram-agent] credit settle returned ${res.status} for ${amount} credits`);
   } catch (err) {
-    console.error('[telegram-agent] credit consume failed (failing open):', err.message);
-    return { allowed: true };
+    console.error(`[telegram-agent] credit settle failed for ${amount} credits:`, err.message);
   }
+}
+
+/** Charge a legacy-loop turn by what OpenRouter billed for it. */
+function settleUsage(ctx, reason) {
+  const usage = ctx.usage || newUsage();
+  return settleCredits(ctx, creditsForUsage(usage), reason, {
+    tokens: usage.tokens,
+    cost_usd: Math.round(usage.cost * 1e6) / 1e6,
+  });
 }
 
 const _tierCache = new Map(); // user_id -> { at, tier }
@@ -690,7 +753,7 @@ async function recordAction(ctx, actionType, payload) {
   return data.action_id;
 }
 
-async function webSearch(query, orKey) {
+async function webSearch(query, orKey, ctx) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -703,11 +766,13 @@ async function webSearch(query, orKey) {
       model: SEARCH_MODEL(),
       messages: [{ role: 'user', content: String(query).slice(0, 500) }],
       stream: false,
+      usage: { include: true },
     }),
     signal: AbortSignal.timeout(30000),
   });
   if (!res.ok) throw new Error(`search upstream ${res.status}`);
   const data = await res.json();
+  recordUsage(ctx, data);
   const answer = data && data.choices && data.choices[0] && data.choices[0].message
     ? data.choices[0].message.content
     : '';
@@ -752,7 +817,7 @@ async function executeTool(name, args, ctx) {
     case 'calculate': // models occasionally guess this name; same safe evaluator
       return { expression: args.expression, result: calculate(args.expression) };
     case 'web_search':
-      return { answer: await webSearch(args.query, ctx.orKey) };
+      return { answer: await webSearch(args.query, ctx.orKey, ctx) };
     case 'save_lead':
       return { saved: true, reference: await recordAction(ctx, 'lead', args) };
     case 'create_ticket':
@@ -789,11 +854,13 @@ async function executeTool(name, args, ctx) {
 // Agent loop
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function callLLM(messages, tools, orKey, toolChoice) {
+async function callLLM(messages, tools, orKey, toolChoice, ctx) {
   const body = {
     model: AGENT_MODEL(),
     messages,
     stream: false,
+    // Billed cost in the response, so the turn is charged what it cost.
+    usage: { include: true },
   };
   if (tools && tools.length) {
     body.tools = tools;
@@ -815,6 +882,7 @@ async function callLLM(messages, tools, orKey, toolChoice) {
     throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 200)}`);
   }
   const data = await res.json();
+  recordUsage(ctx, data);
   const msg = data && data.choices && data.choices[0] && data.choices[0].message;
   if (!msg) throw new Error('Empty LLM response');
   return msg;
@@ -830,7 +898,7 @@ async function runAgentLoop({ systemPrompt, history, userText, tools, ctx }) {
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const forceFinal = round === MAX_TOOL_ROUNDS - 1 || Date.now() > deadline - 15000;
-    const msg = await callLLM(messages, tools, ctx.orKey, forceFinal ? 'none' : undefined);
+    const msg = await callLLM(messages, tools, ctx.orKey, forceFinal ? 'none' : undefined, ctx);
 
     if (msg.tool_calls && msg.tool_calls.length && !forceFinal) {
       messages.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls });
@@ -874,9 +942,9 @@ async function runAgentLoop({ systemPrompt, history, userText, tools, ctx }) {
  * does for OpenRouter failures — so it falls into the handler's existing
  * try/catch and produces the same 502 {error:true} response runAgentLoop()
  * failures already produce today. No silent fallback to the legacy loop:
- * consumeMessageCredit() already ran for this message (credit gating must
- * stay before any LLM call), so re-running runAgentLoop() after a Cerveau
- * failure would either double-charge or need new bypass logic — not worth it
+ * checkCredits() already admitted this message (credit gating must stay
+ * before any LLM call), so re-running runAgentLoop() after a Cerveau
+ * failure would need its own metering and bypass logic — not worth it
  * for a staged rollout whose whole point is to surface real failure rates,
  * not mask them.
  */
@@ -1018,13 +1086,14 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       internalKey,
       orKey,
       active_agents: sanitizeTeamAgents(req.body.active_agents),
+      usage: newUsage(),
     };
 
     try {
       // Credit gate first: when the operator's quota is spent, reply without
       // ever reaching the LLM so usage cost stays hard-capped per tier. This
       // must stay ahead of the engine branch below — both paths spend credit.
-      const credit = await consumeMessageCredit(ctx);
+      const credit = await checkCredits(ctx);
       if (!credit.allowed) {
         return res.json({ reply: credit.reply });
       }
@@ -1055,6 +1124,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // /webhook has no format hint in its contract, so replies need the
         // same chat-channel cleanup the legacy path gets from a prompt rule.
         ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
+        await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
       } else {
         if (!orKey) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
@@ -1067,6 +1137,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         const systemPrompt =
           AGENT_PROMPTS[agentType] + SECURITY_RULES + operatorConfigBlock(profile) + commonRules(channel) + tierHint;
         reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
+        await settleUsage(ctx, 'agent_message');
         histories.set(
           historyKey,
           [...history, { role: 'user', content: userText }, { role: 'assistant', content: reply }].slice(-HISTORY_MAX)
@@ -1176,13 +1247,13 @@ module.exports.createApprovalDecisionHandler = function createApprovalDecisionHa
     try {
       // The continuation turn is a real LLM call, distinct from the message
       // that originally triggered the approval (already charged its own
-      // credit) — charged here, before resolving, with a distinct reason so
-      // it's traceable in the ledger. On exhaustion: never resolve the row
+      // credits) — gated here before resolving and charged after, with a
+      // distinct reason so it's traceable in the ledger. On exhaustion: never resolve the row
       // (approve/deny-by-starvation would be wrong), still return 200 so
       // the caller can ack the button tap and show the normal out-of-credit
       // reply instead of leaving it spinning — outcome is explicitly null so
       // the caller can tell this apart from a real approve/deny.
-      const credit = await consumeMessageCredit(ctx, 'approval_resume');
+      const credit = await checkCredits(ctx);
       if (!credit.allowed) {
         return res.json({ outcome: null, reply_text: credit.reply });
       }
@@ -1190,6 +1261,7 @@ module.exports.createApprovalDecisionHandler = function createApprovalDecisionHa
       const { outcome, replyText } = await resolveCerveauApproval({
         userId: user_id, agentType: agent_type, pendingId: pending_id, decision,
       });
+      await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'approval_resume', { engine: 'cerveau', flat_rate: true });
       const reply = replyText ? stripMarkdownForChat(replyText).slice(0, REPLY_MAX) : null;
       return res.json({ outcome, reply_text: reply });
     } catch (err) {
@@ -1206,7 +1278,11 @@ module.exports.WORKFLOWS = WORKFLOWS;
 module.exports._internals = {
   operatorConfigBlock,
   sanitizeProfileValue,
-  consumeMessageCredit,
+  checkCredits,
+  settleCredits,
+  recordUsage,
+  creditsForUsage,
+  callLLM,
   SECURITY_RULES,
   AGENT_PROMPTS,
   commonRules,
