@@ -935,6 +935,109 @@ async function runAgentLoop({ systemPrompt, history, userText, tools, ctx }) {
 // conversation continuity itself; this is just the caller.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Request headers for Cerveau's /webhook and /webhook/stream (identical contract). */
+async function cerveauHeaders(ctx, secret) {
+  // A Team-scoped list from the backend (ADR-020 P3) wins over the tenant-wide
+  // deployment lookup; absent or empty means "not team-scoped".
+  const teamAgents = Array.isArray(ctx.active_agents) && ctx.active_agents.length ? ctx.active_agents : null;
+  const activeAgents = activeAgentsHeader(
+    teamAgents || (await getActiveAgents(ctx.user_id, ctx.internalKey)),
+    ctx.agent_type
+  );
+  return {
+    'Content-Type': 'application/json',
+    'X-Webhook-Secret': secret,
+    'X-Tenant-Id': ctx.user_id,
+    'X-Agent-Type': ctx.agent_type,
+    'X-Session-Id': ctx.session_id,
+    ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
+    // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
+    ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
+    // ADR-021 §4.3: an unattended turn (fired reminder, woken wait), so Cerveau
+    // offers run_no_update / run_report_failure.
+    ...(ctx.turn_origin ? { 'X-Turn-Origin': ctx.turn_origin } : {}),
+  };
+}
+
+/**
+ * Stream one console turn from Cerveau's /webhook/stream to the caller as SSE.
+ *
+ * Only for plain console turns: the stream's `done` frame carries pending_approval
+ * but not team_actions / run_outcome, so room and unattended turns stay on the
+ * blocking path. Frames are relayed as they arrive (`chunk` deltas, then one
+ * `done` or `error`). Resolves to true when Cerveau finished with a `done` frame,
+ * so the caller settles credits exactly as the blocking path does.
+ *
+ * Throws before any byte is written when Cerveau rejects the request, so the
+ * handler's catch can still answer with the usual JSON 502.
+ */
+async function streamCerveau(ctx, userText, res) {
+  const secret = CERVEAU_WEBHOOK_SECRET();
+  if (!secret) throw new Error('Cerveau not configured (missing webhook secret)');
+  const headers = await cerveauHeaders(ctx, secret);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CERVEAU_FETCH_TIMEOUT_MS());
+  res.on('close', () => controller.abort());
+  try {
+    let up;
+    try {
+      up = await fetch(`${CERVEAU_WEBHOOK_URL()}/stream`, {
+        method: 'POST',
+        headers: { ...headers, Accept: 'text/event-stream' },
+        body: JSON.stringify({ message: userText }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      console.error(`[telegram-agent] cerveau stream network/abort error for ${ctx.agent_type}:`, err.message);
+      throw new Error(`Cerveau request failed: ${err.message}`);
+    }
+    if (!up.ok) {
+      const bodyText = await up.text().catch(() => '');
+      console.error(`[telegram-agent] cerveau stream ${up.status} for ${ctx.agent_type}: ${bodyText.slice(0, 200)}`);
+      throw new Error(`Cerveau ${up.status}: ${bodyText.slice(0, 200)}`);
+    }
+
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const decoder = new TextDecoder();
+    let pending = '';
+    let finished = false;
+    const sawFrame = (line) => {
+      if (!line.startsWith('data:')) return;
+      try {
+        const frame = JSON.parse(line.slice(5).trim());
+        if (frame.type === 'done') finished = true;
+      } catch { /* keep-alive or partial line: not a frame */ }
+    };
+    try {
+      for await (const part of up.body) {
+        res.write(part);
+        pending += decoder.decode(part, { stream: true });
+        let nl;
+        while ((nl = pending.indexOf('\n')) >= 0) {
+          sawFrame(pending.slice(0, nl).replace(/\r$/, ''));
+          pending = pending.slice(nl + 1);
+        }
+      }
+      sawFrame(pending);
+    } catch (err) {
+      console.error(`[telegram-agent] cerveau stream broke for ${ctx.agent_type}:`, err.message);
+      if (!res.writableEnded && !res.destroyed) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Agent gateway error' })}\n\n`);
+      }
+    }
+    if (!res.writableEnded) res.end();
+    return finished;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Forward one message to Aivory Cerveau's /webhook and return its reply.
  *
@@ -958,31 +1061,13 @@ async function callCerveau(ctx, userText) {
     throw new Error('Cerveau not configured (missing webhook secret)');
   }
 
-  // A Team-scoped list from the backend (ADR-020 P3) wins over the tenant-wide
-  // deployment lookup; absent or empty means "not team-scoped".
-  const teamAgents = Array.isArray(ctx.active_agents) && ctx.active_agents.length ? ctx.active_agents : null;
-  const activeAgents = activeAgentsHeader(
-    teamAgents || (await getActiveAgents(ctx.user_id, ctx.internalKey)),
-    ctx.agent_type
-  );
+  const headers = await cerveauHeaders(ctx, secret);
 
   let res;
   try {
     res = await fetch(CERVEAU_WEBHOOK_URL(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Webhook-Secret': secret,
-        'X-Tenant-Id': ctx.user_id,
-        'X-Agent-Type': ctx.agent_type,
-        'X-Session-Id': ctx.session_id,
-        ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
-        // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
-        ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
-        // ADR-021 §4.3: an unattended turn (fired reminder, woken wait), so Cerveau
-        // offers run_no_update / run_report_failure.
-        ...(ctx.turn_origin ? { 'X-Turn-Origin': ctx.turn_origin } : {}),
-      },
+      headers,
       body: JSON.stringify({ message: userText }),
       signal: AbortSignal.timeout(CERVEAU_FETCH_TIMEOUT_MS()),
     });
@@ -1074,6 +1159,10 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       ? requestedChannel
       : String(historyKey).startsWith('slack_') ? 'slack' : 'telegram';
 
+    // Opt-in: the caller asks for an SSE relay of Cerveau's /webhook/stream. Anything
+    // that can't stream (credit refusal, legacy engine, room turns) still answers JSON.
+    const wantsStream = req.body.stream === true;
+
     const ctx = {
       user_id: user_id || 'unknown',
       agent_type: agentType,
@@ -1123,6 +1212,12 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // legacy `histories` Map. See stripMarkdownForChat() below: Cerveau's
         // /webhook has no format hint in its contract, so replies need the
         // same chat-channel cleanup the legacy path gets from a prompt rule.
+        if (wantsStream && channel === 'console' && !ctx.room_turn && !ctx.turn_origin) {
+          if (await streamCerveau(ctx, userText, res)) {
+            await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
+          }
+          return;
+        }
         ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
         await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
       } else {
@@ -1288,6 +1383,7 @@ module.exports._internals = {
   commonRules,
   stripMarkdownForChat,
   callCerveau,
+  streamCerveau,
   resolveCerveauApproval,
   sanitizeTurnOrigin,
   runOutcomeFields,
