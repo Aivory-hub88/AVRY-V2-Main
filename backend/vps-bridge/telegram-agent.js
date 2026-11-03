@@ -953,6 +953,9 @@ async function cerveauHeaders(ctx, secret) {
     ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
     // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
     ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
+    // The team room this turn belongs to, so Cerveau keys the room's shared
+    // python_execute workspace by room. Absent on the single-user Console.
+    ...(ctx.space_id ? { 'X-Space-Id': ctx.space_id } : {}),
     // ADR-021 §4.3: an unattended turn (fired reminder, woken wait), so Cerveau
     // offers run_no_update / run_report_failure.
     ...(ctx.turn_origin ? { 'X-Turn-Origin': ctx.turn_origin } : {}),
@@ -1112,6 +1115,12 @@ function sanitizeTurnOrigin(raw) {
   return UNATTENDED_TURN_ORIGINS.includes(origin) ? origin : null;
 }
 
+/** `[A-Za-z0-9._-]{1,128}`, not starting with '.': the shape Cerveau accepts in X-Space-Id. */
+function sanitizeSpaceId(raw) {
+  const id = String(raw || '').trim();
+  return /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$/.test(id) ? id : null;
+}
+
 /** Cerveau's run outcome, relayed only when it is one of the two known values. */
 function runOutcomeFields(data) {
   const outcome = data && data.run_outcome;
@@ -1170,6 +1179,8 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       channel,
       // ADR-021: Team Space room turn (the whitelist above folds 'discussion' into 'telegram').
       room_turn: requestedChannel === 'discussion',
+      // Only meaningful on a room turn; must match Cerveau's X-Space-Id rule.
+      space_id: requestedChannel === 'discussion' ? sanitizeSpaceId(req.body.space_id) : null,
       // ADR-021 §4.3: only meaningful on a room turn (the dashboard's reminder / wake turns).
       turn_origin: requestedChannel === 'discussion' ? sanitizeTurnOrigin(req.body.turn_origin) : null,
       internalKey,
@@ -1386,6 +1397,7 @@ module.exports._internals = {
   streamCerveau,
   resolveCerveauApproval,
   sanitizeTurnOrigin,
+  sanitizeSpaceId,
   runOutcomeFields,
 };
 module.exports.calculate = calculate;
