@@ -7,7 +7,7 @@
 // CONFIGURATION
 // ============================================================================
 
-const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://43.156.108.96:3001';
+const BRIDGE_URL = import.meta.env.VITE_BRIDGE_URL || 'http://localhost:3001';
 const API_KEY = import.meta.env.VITE_BRIDGE_API_KEY;
 
 if (!API_KEY) {

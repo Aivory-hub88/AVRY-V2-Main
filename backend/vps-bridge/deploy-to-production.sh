@@ -6,7 +6,7 @@
 set -e  # Exit on error
 
 # Configuration
-PROD_SERVER="43.156.108.96"
+PROD_SERVER="${PROD_SERVER:?set PROD_SERVER to the target host}"
 PROD_USER="root"  # Change this to your SSH user
 DEPLOY_PATH="/opt/aivory/vps-bridge"
 LOCAL_PATH="$(cd "$(dirname "$0")" && pwd)"
@@ -172,7 +172,7 @@ echo ""
 echo "Next Steps:"
 echo "  1. Test all endpoints using TESTING_GUIDE.md"
 echo "  2. Update Next.js frontend .env.local:"
-echo "     VPS_BRIDGE_URL=http://43.156.108.96:3003"
+echo "     VPS_BRIDGE_URL=http://$PROD_SERVER:3003"
 echo "  3. Monitor logs: ssh $PROD_USER@$PROD_SERVER 'pm2 logs vps-bridge'"
 echo "  4. Check status: ssh $PROD_USER@$PROD_SERVER 'pm2 status'"
 echo ""

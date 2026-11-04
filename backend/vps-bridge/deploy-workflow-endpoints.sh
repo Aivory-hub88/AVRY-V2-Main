@@ -4,7 +4,7 @@
 
 set -e  # Exit on error
 
-VPS_HOST="43.156.108.96"
+VPS_HOST="${VPS_HOST:?set VPS_HOST to the target host}"
 VPS_USER="ubuntu"
 VPS_PATH="/opt/aivory/vps-bridge"
 LOCAL_FILE="vps-bridge/server.js"
