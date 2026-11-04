@@ -2037,7 +2037,7 @@ app.post('/diagnostics/run', async (req, res) => {
         'X-Title': 'Aivory'
       },
       body: JSON.stringify({
-        model: process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b',
+        model: process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4.1-flash',
         messages: [
           { role: 'system', content: DIAGNOSTIC_SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify(payload, null, 2) }
@@ -2252,7 +2252,7 @@ warmPingConsoleModel();
 // (360/day ≈ under $0.0001/day); qwen failovers 32 pings/day/model. Well
 // under $0.01/month combined. Model defaults mirror lib/blueprintQueue.js.
 const BLUEPRINT_MODEL_DEFAULT = process.env.BLUEPRINT_MODEL || 'deepseek/deepseek-v4-flash-0731';
-const BLUEPRINT_FAILOVER_DEFAULTS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3-235b-a22b,qwen/qwen3.6-plus')
+const BLUEPRINT_FAILOVER_DEFAULTS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3.7-flash,qwen/qwen3-coder-flash')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const BLUEPRINT_WARM_INTERVAL_MS = 4 * 60 * 1000;
 const FAILOVER_WARM_INTERVAL_MS = 45 * 60 * 1000;
