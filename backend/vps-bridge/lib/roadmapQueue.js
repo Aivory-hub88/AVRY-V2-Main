@@ -34,7 +34,7 @@ const ROADMAP_TIMEOUT_MS = parseInt(process.env.ROADMAP_TIMEOUT_MS || '60000', 1
 // Different-model last resort, tried reasoning-off after the primary tier
 // fails — sidesteps whatever is specifically wrong with ROADMAP_MODEL's
 // provider right now. Comma-separated.
-const ROADMAP_FAILOVER_MODELS = (process.env.ROADMAP_FAILOVER_MODELS || 'qwen/qwen3-235b-a22b')
+const ROADMAP_FAILOVER_MODELS = (process.env.ROADMAP_FAILOVER_MODELS || 'qwen/qwen3.7-flash')
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);

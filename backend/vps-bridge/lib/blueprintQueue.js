@@ -86,7 +86,7 @@ const BLUEPRINT_FALLBACK_TIMEOUT_MS = parseInt(process.env.BLUEPRINT_FALLBACK_TI
 // differently-hosted model (e.g. Google/OpenAI), but two separately-served
 // Qwen models still gives protection against a model-specific queue/issue,
 // which is what was chosen here.
-const BLUEPRINT_FAILOVER_MODELS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3-235b-a22b,qwen/qwen3.6-plus')
+const BLUEPRINT_FAILOVER_MODELS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3.7-flash,qwen/qwen3-coder-flash')
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);
