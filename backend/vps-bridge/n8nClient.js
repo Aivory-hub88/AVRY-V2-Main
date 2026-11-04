@@ -11,7 +11,7 @@ const { post } = require('./lib/http');
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const N8N_BASE_URL = (
-  process.env.N8N_BASE_URL || 'http://avry-n8n:5678'
+  process.env.N8N_BASE_URL || 'http://n8n:5678'
 ).replace(/\/$/, '');
 
 // REST API base — used for workflow CRUD and activation
