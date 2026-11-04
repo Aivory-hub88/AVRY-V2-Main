@@ -62,7 +62,7 @@ rsync -av \
 Then, **before staging**, always:
 
 1. `git status --short backend/vps-bridge/` — confirm no `.env*` appeared.
-2. Scan for credentials that live outside `.env` (this has bitten before — `.env.example` shipped a concrete secret-shaped `N8N_MCP_AUTH_TOKEN` and a `N8N_BASE_URL` pointing at the retired, miner-compromised `43.156.108.96`):
+2. Scan for credentials that live outside `.env` (this has bitten before — `.env.example` shipped a concrete secret-shaped `N8N_MCP_AUTH_TOKEN` and a `N8N_BASE_URL` pointing at a retired host):
 
    ```bash
    grep -rnEi "(sk-[a-zA-Z0-9]{16,}|sk-or-v1-|eyJhbGciOi|xoxb-|ghp_|[0-9]{9,10}:AA[a-zA-Z0-9_-]{30,}|postgres(ql)?://[^'\"[:space:]]+:[^'\"[:space:]]+@)" \

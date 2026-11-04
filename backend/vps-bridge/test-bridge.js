@@ -3,7 +3,7 @@
  * Run from MacBook: node test-bridge.js
  */
 
-const BRIDGE_URL = process.env.BRIDGE_URL || 'http://43.156.108.96:3001';
+const BRIDGE_URL = process.env.BRIDGE_URL || 'http://localhost:3001';
 const API_KEY = process.env.API_KEY || 'your-api-key-here';
 
 async function fetchJSON(url, options = {}) {
