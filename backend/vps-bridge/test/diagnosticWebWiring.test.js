@@ -67,7 +67,7 @@ function sse(text) {
   return new Response(body, { status: 200 });
 }
 
-function mockFetch() {
+function mockFetch(assessment = ASSESSMENT) {
   const calls = { diagnostic: [], extractor: [] };
   const orig = global.fetch;
   global.fetch = async (_url, init) => {
@@ -78,7 +78,7 @@ function mockFetch() {
       return Response.json({ choices: [{ message: { content: JSON.stringify(PROFILE) } }] });
     }
     calls.diagnostic.push(body);
-    return sse(JSON.stringify(ASSESSMENT));
+    return sse(JSON.stringify(assessment));
   };
   return { calls, restore: () => { global.fetch = orig; } };
 }
@@ -158,4 +158,35 @@ test('no URL: behaves exactly like before even with the flag on', async () => {
     assert.equal('web_context' in r, false);
     assert.ok(!m.calls.diagnostic[0].messages[1].content.includes('website_context'));
   } finally { m.restore(); delete process.env.WEB_CONTEXT_ENABLED; }
+});
+
+const WITH_INSIGHTS = {
+  ...ASSESSMENT,
+  website_insights: ['Your website offers online ordering, consistent with your digital sales answer.', '  Insight two  ', '', 'x'.repeat(300), 'Insight four (over the cap)'],
+  translations: { id: { strengths: ['a'], primary_constraints: ['b'], automation_opportunities: ['c'], narrative_summary: 'ringkasan', recommended_next_step: 'langkah', website_insights: ['Website Anda menawarkan pemesanan online.', 'Dua', 'Tiga', 'Empat'] } },
+};
+
+test('flag ON: website_insights are cleaned and capped, in both languages', async () => {
+  process.env.WEB_CONTEXT_ENABLED = 'true';
+  store.clear();
+  const m = mockFetch(WITH_INSIGHTS);
+  try {
+    const r = await dq.runDeepDiagnostic({ ...PHASES, _report_context: REPORT, _website_url: 'http://93.184.216.34/' });
+    assert.equal(r.web_context, 'ok');
+    assert.deepEqual(r.website_insights, ['Your website offers online ordering, consistent with your digital sales answer.', 'Insight two', 'Insight four (over the cap)'].slice(0, 3));
+    assert.equal(r.translations.id.website_insights.length, 3);
+    assert.ok(/website_insights/.test(m.calls.diagnostic[0].messages[0].content), 'prompt must request the field');
+  } finally { m.restore(); delete process.env.WEB_CONTEXT_ENABLED; }
+});
+
+test('no profile: invented website_insights are dropped (flag off, no URL, or scrape failure)', async () => {
+  delete process.env.WEB_CONTEXT_ENABLED;
+  const m = mockFetch(WITH_INSIGHTS);
+  try {
+    const off = await dq.runDeepDiagnostic({ ...PHASES, _report_context: REPORT, _website_url: 'http://93.184.216.34/' });
+    assert.equal('website_insights' in off, false);
+    assert.equal('website_insights' in off.translations.id, false);
+    const noUrl = await dq.runDeepDiagnostic({ ...PHASES, _report_context: REPORT });
+    assert.equal('website_insights' in noUrl, false);
+  } finally { m.restore(); }
 });
