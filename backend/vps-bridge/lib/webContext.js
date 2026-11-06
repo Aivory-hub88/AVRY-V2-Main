@@ -16,7 +16,7 @@ const net = require('node:net');
 const { execFile } = require('node:child_process');
 
 const DEFAULTS = {
-  obscuraBin: process.env.OBSCURA_BIN || '/home/ubuntu/obscura/obscura',
+  obscuraBin: process.env.OBSCURA_BIN || '/home/ubuntu/.zeroclaw-cerveau/mcp-tools/obscura/obscura',
   totalTimeoutMs: parseInt(process.env.WEB_CONTEXT_TIMEOUT_MS || '25000', 10),
   pageTimeoutSec: 12,
   maxPages: 6,
@@ -317,7 +317,7 @@ async function defaultCallExtractor(system, user, timeoutMs) {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://aivory.app', 'X-Title': 'Aivory' },
     body: JSON.stringify({
-      model: process.env.WEB_CONTEXT_MODEL || process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b',
+      model: process.env.WEB_CONTEXT_MODEL || process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4.1-flash',
       messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
       stream: false,
       max_tokens: 600,
