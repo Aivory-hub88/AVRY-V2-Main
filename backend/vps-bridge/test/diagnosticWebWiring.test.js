@@ -179,6 +179,12 @@ test('flag ON: website_insights are cleaned and capped, in both languages', asyn
   } finally { m.restore(); delete process.env.WEB_CONTEXT_ENABLED; }
 });
 
+test('prompt asks for **bold** key phrases and cleanInsights keeps the markers', () => {
+  const sys = dq.DIAGNOSTIC_SYSTEM_PROMPT;
+  assert.ok(/\*\*double asterisks\*\*/.test(sys));
+  assert.deepEqual(dq.cleanInsights(['Your site has **online booking**, matching your **manual scheduling** answer.']), ['Your site has **online booking**, matching your **manual scheduling** answer.']);
+});
+
 test('no profile: invented website_insights are dropped (flag off, no URL, or scrape failure)', async () => {
   delete process.env.WEB_CONTEXT_ENABLED;
   const m = mockFetch(WITH_INSIGHTS);
