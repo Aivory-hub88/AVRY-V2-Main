@@ -213,7 +213,7 @@ fn room_doc_ids(room: &str) -> (String, String) {
 /// (the roster) minus `chief_of_staff` (Aira keeps legacy service access until her ACL rows
 /// are verified). A new agent type is added WITHOUT a rebuild by setting
 /// `COLLAB_KNOWN_AGENTS` (comma-separated, replaces the default list), e.g.
-/// `autonomous,customer_service,leads_qualifier,finance_invoice_ops,office_assistant,data_analyst,<new_type>`.
+/// `autonomous,customer_service,leads_qualifier,finance_invoice_ops,office_assistant,data_analyst,operations_inventory,<new_type>`.
 /// `scripts/check-agent-type.sh` fails when a worker type is in the roster but
 /// missing from this default list.
 const DEFAULT_KNOWN_AGENTS: &[&str] = &[
@@ -223,6 +223,7 @@ const DEFAULT_KNOWN_AGENTS: &[&str] = &[
     "finance_invoice_ops",
     "office_assistant",
     "data_analyst",
+    "operations_inventory",
 ];
 
 /// Parse `COLLAB_KNOWN_AGENTS`. Unset/blank/only-separators -> default list.
@@ -881,16 +882,17 @@ mod known_agent_tests {
     #[test]
     fn default_list_has_the_worker_agents_and_not_aira() {
         let v = parse_known_agents(None);
-        assert_eq!(v.len(), 6);
+        assert_eq!(v.len(), 7);
         assert!(v.iter().any(|a| a == "leads_qualifier"));
         assert!(v.iter().any(|a| a == "data_analyst"));
+        assert!(v.iter().any(|a| a == "operations_inventory"));
         assert!(!v.iter().any(|a| a == "chief_of_staff"));
     }
 
     #[test]
     fn blank_or_separator_only_env_falls_back_to_default() {
-        assert_eq!(parse_known_agents(Some("")).len(), 6);
-        assert_eq!(parse_known_agents(Some(" , ,")).len(), 6);
+        assert_eq!(parse_known_agents(Some("")).len(), 7);
+        assert_eq!(parse_known_agents(Some(" , ,")).len(), 7);
     }
 
     #[test]

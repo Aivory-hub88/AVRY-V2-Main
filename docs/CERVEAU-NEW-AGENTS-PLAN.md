@@ -273,8 +273,49 @@ Acceptance (Odoo demo, Brazos Ridge Roofing)
   17 leads per week needed (currently 3)).
 - Room: Aira `team_delegate`s the weekly report to Ivo and gets it back.
 
-### Phase 3 — Juno (≈ 5–6 days)
-Same steps as Phase 2, plus:
+### Phase 3 — Juno (≈ 5–6 days) — BUILT 2026-11-09, not deployed
+Branches: AVRY-V2-Main `feat/agent-juno-operations` (worktree `~/Documents/Aivory-wt/juno`, backend and
+user-dashboard submodule worktrees on the same branch name, based on the Aivory-hub88 remotes, not the
+old ClementHansel forks) and AVRY-Cerveau `feat/skills-operations-inventory` (`~/Documents/Aivory-wt/cerveau-juno`).
+
+Done
+1. Backend: roster entry, `TOGGLEABLE_TOOLKITS` (erpnext, gmail, outlook, googledrive, googlesheets),
+   `_OPS_ODOO_METHODS` (purchase.order.button_confirm / button_cancel, stock.picking.button_validate;
+   Od-MCP enforces the list per instance from what the backend sends at connect, so there is no separate
+   Od-MCP-side allowlist), catalog seed + one-off migration, `tests/test_agent_juno.py` (9 tests).
+2. Native bridge: `reorder.mjs` (pure maths, 10 tests) + `agents/operations-inventory.mjs`
+   (`reorder_suggestion`, up to 50 items, every input echoed, assumptions listed, demand under 14 days
+   flagged directional, missing inputs refused with the reason). Smoke-tested through the real MCP route.
+3. Skill bundle `operations-inventory` (`ops-rules` always inline, `stock-check`, `purchase-order`).
+4. Cerveau config (mirror): server, bundles (6), `agents.operations_inventory`, risk profile, `compact`
+   runtime with Odoo read preload, Aira delegate, `room_team`, reversible tier entry.
+   ERP writes (CREATE_DOCUMENT, MAKE_PURCHASE_ORDER, MAKE_STOCK_ENTRY, SUBMIT/CANCEL_DOCUMENT) and every
+   mail send are allowed but NOT in `auto_approve`, so they park. ERPNEXT DELETE / SET_VALUE /
+   UPDATE_DOCUMENT are deliberately absent (price changes). `ops/deploy/apply_juno_config.py` is idempotent
+   and its output is byte-identical to the mirror.
+5. Dashboard: roster, glow colour, avatar map, card (purple header), i18n en/id, PLACEHOLDER portrait.
+   Collab default list. Telegram persona. `tsc` clean, 1154 tests pass.
+6. `ops/deploy/deploy-juno.sh` (user-run; backups, health checks, rollback) and the services script
+   `ops/deploy/deploy-ivo-services.sh` (generalised to every new agent in the checkout).
+
+Fix found on the way: Aira's `IDENTITY.md` roster never listed Ivo, so she had no delegate alias for him.
+Both Ivo and Juno are now in her roster, aliases and routing line (deploy-juno.sh patches the live file).
+
+Deviations from the original plan
+- No `record_ops_alert` native tool: it would need a new aivory_ops table on production for little gain.
+  Alerts travel as `alert` packets via `team_handoff` (docs/CERVEAU-HANDOFF-PACKET.md).
+- No scheduled daily stock check yet (`tenant_scheduled_runs.py`) and no Odoo demo stock seed: both need a
+  look at the scheduler and the demo tenant first. Until then the stock check runs when someone asks.
+- `reorder_suggestion` takes its inputs from Juno (read from the ERP) instead of reading Odoo itself, for the
+  same reason as `kpi_snapshot`: no Od-MCP access from a native tool yet.
+
+Not done / open
+- Portrait `public/agents/operations_inventory.svg` is a placeholder.
+- Odoo writes go through the dynamic `tenant_odoo__` path like Lex and Finn; their approval behaviour is
+  whatever the live path does today. Verify on the canary before calling the acceptance test passed.
+- Acceptance tests below not run on prod.
+
+Original scope, same steps as Phase 2, plus:
 - `_OPS_ODOO_METHODS` in Od-MCP connect + Od-MCP side allowlist.
 - Native `reorder_suggestion` (pure math, unit-tested) and `record_ops_alert`.
 - Daily stock check as a tenant scheduled run (`tenant_scheduled_runs.py`).
