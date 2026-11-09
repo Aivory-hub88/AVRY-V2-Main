@@ -6,6 +6,7 @@ import * as customerService from './agents/customer-service.mjs';
 import * as leadsQualifier from './agents/leads-qualifier.mjs';
 import * as financeInvoiceOps from './agents/finance-invoice-ops.mjs';
 import * as officeAssistant from './agents/office-assistant.mjs';
+import * as dataAnalyst from './agents/data-analyst.mjs';
 
 const PORT = Number(process.env.PORT || 4100);
 const BRIDGE_KEY = process.env.BRIDGE_KEY;
@@ -24,7 +25,7 @@ function log(level, msg, attrs = {}) {
   console.log(JSON.stringify({ level, msg, ts: new Date().toISOString(), ...attrs }));
 }
 
-const AGENT_MODULES = [customerService, leadsQualifier, financeInvoiceOps, officeAssistant];
+const AGENT_MODULES = [customerService, leadsQualifier, financeInvoiceOps, officeAssistant, dataAnalyst];
 
 // Basic sanity: tenant_id must be a non-empty, reasonably-shaped identifier.
 // Rejecting weird input here (not just downstream in n8n/Postgres) keeps the
@@ -69,7 +70,11 @@ async function callN8nWebhook(webhookUrl, payload, tenantId, toolName) {
 function buildMcpServerForSession(agentModule, tenantId) {
   const server = new McpServer({ name: `aivory-native-${agentModule.agentType}`, version: '1.0.0' });
   const webhookUrl = process.env[agentModule.webhookEnvVar];
-  if (!webhookUrl) {
+  // Only agents with at least one n8n-backed tool need a webhook URL. A module
+  // whose tools all have local handlers (data_analyst) must not be blocked by
+  // an env var it will never use.
+  const needsWebhook = agentModule.tools.some((t) => typeof t.handler !== 'function');
+  if (needsWebhook && !webhookUrl) {
     throw new Error(`${agentModule.webhookEnvVar} env var is not set`);
   }
 
