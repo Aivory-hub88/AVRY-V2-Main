@@ -8,6 +8,7 @@ import * as financeInvoiceOps from './agents/finance-invoice-ops.mjs';
 import * as officeAssistant from './agents/office-assistant.mjs';
 import * as dataAnalyst from './agents/data-analyst.mjs';
 import * as operationsInventory from './agents/operations-inventory.mjs';
+import * as marketingContent from './agents/marketing-content.mjs';
 
 const PORT = Number(process.env.PORT || 4100);
 const BRIDGE_KEY = process.env.BRIDGE_KEY;
@@ -26,7 +27,7 @@ function log(level, msg, attrs = {}) {
   console.log(JSON.stringify({ level, msg, ts: new Date().toISOString(), ...attrs }));
 }
 
-const AGENT_MODULES = [customerService, leadsQualifier, financeInvoiceOps, officeAssistant, dataAnalyst, operationsInventory];
+const AGENT_MODULES = [customerService, leadsQualifier, financeInvoiceOps, officeAssistant, dataAnalyst, operationsInventory, marketingContent];
 
 // Basic sanity: tenant_id must be a non-empty, reasonably-shaped identifier.
 // Rejecting weird input here (not just downstream in n8n/Postgres) keeps the

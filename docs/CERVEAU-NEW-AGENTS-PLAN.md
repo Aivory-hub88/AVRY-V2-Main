@@ -326,8 +326,43 @@ Acceptance
 - Draft PO created in Odoo only after approval; confirm parks as F-1.
 - Room: Juno hands a confirmed PO to Finn; Finn acknowledges.
 
-### Phase 4 — Mira (≈ 5–6 days)
-Same steps, plus:
+### Phase 4 — Mira (≈ 5–6 days) — BUILT 2026-11-09, not deployed
+Branches: AVRY-V2-Main `feat/agent-mira-marketing` (worktree `~/Documents/Aivory-wt/mira`, submodules on the
+Aivory-hub88 remotes) and AVRY-Cerveau `feat/skills-marketing-content` (`~/Documents/Aivory-wt/cerveau-mira`).
+
+Done
+1. Backend: roster entry, `TOGGLEABLE_TOOLKITS` (gmail, googledrive, googlesheets, googledocs), catalog seed +
+   one-off migration, no Odoo execute methods, no tier gate, `tests/test_agent_mira.py` (8 tests).
+2. Native bridge: `utm.mjs` (pure, 9 tests) + `agents/marketing-content.mjs` (`campaign_links`, up to 30 links):
+   cleans every tag, keeps other URL parameters, refuses non-http(s) URLs and URLs that already carry `utm_`
+   (never overwrites), refuses an unknown channel unless source and medium are both given, flags identical
+   destination plus tags, and returns the `source / medium / campaign` line for the packet to Lex. Smoke-tested
+   through the real MCP route.
+3. Skill bundle `marketing-content`: `content-rules` (always inline), `slop-catalogue` (EN + ID),
+   `content-calendar`, `channel-drafts`, `campaign-brief`.
+4. Cerveau config (mirror): server, 6 bundles (native, browsing, Docs, Sheets, Drive, Gmail), risk profile
+   (creating NEW Docs/Sheets/Drive files and Gmail drafts auto-approved; editing existing Docs/Sheets and every
+   send parked; no Gmail read, no cookie/env browser tools, no social toolkits), `compact` runtime with Odoo read
+   preload, Aira delegate, `room_team`. `ops/deploy/apply_mira_config.py` is idempotent and byte-identical to the
+   mirror. Uses the same model provider as the other agents (`agent_analyst_brain`); a cheaper writing model is an
+   option once there is cost data.
+5. Dashboard: roster, glow colour (#de1f5b, the pink header), card, i18n en/id, PLACEHOLDER portrait. Collab
+   default list (8). Telegram persona. Aira's roster and routing line list Mira. `ops/deploy/deploy-mira.sh`.
+
+Deviations from the original plan
+- No `content_calendar_*` and no `record_campaign`: they would need new aivory_ops tables on production, and the
+  calendar is a Google Sheet by the acceptance test anyway. The campaign hand-off to Lex is a `campaign` packet
+  carrying the tool's UTM line. Revisit when Ivo needs per-campaign attribution that Sheets cannot give.
+- The business-context fields "proof" and "never contact" are asked for in conversation and kept in the knowledge
+  graph; extending the tenant persona config itself is still open.
+- Outlook email drafts and social publishing are out of v1 (6-server cap; publishing is Mira phase 2).
+
+Not done / open
+- Portrait `public/agents/marketing_content.svg` is a placeholder.
+- Acceptance tests below not run on prod. Lex does not yet have skill modules for reading the campaign packet
+  (the Lex scoring/reply-label work in section 8 is still pending).
+
+Original scope, same steps, plus:
 - Native `content_calendar_create/list/update` and `record_campaign` (stored in
   the bridge DB like Lex's records; campaign rows carry UTM tags).
 - Skill bundle with channel formats and brand-voice rules.
