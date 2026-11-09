@@ -209,12 +209,44 @@ fn room_doc_ids(room: &str) -> (String, String) {
 }
 
 /// Agent types the dashboard may invite to a doc (Fase 1 Opsi C).
-/// Must match `KNOWN_AGENT_TYPES` in dashboard lib/workspaceAccess.ts.
+/// Default list mirrors `KNOWN_AGENT_TYPES` in dashboard lib/workspaceAccess.ts
+/// (the roster) minus `chief_of_staff` (Aira keeps legacy service access until her ACL rows
+/// are verified). A new agent type is added WITHOUT a rebuild by setting
+/// `COLLAB_KNOWN_AGENTS` (comma-separated, replaces the default list), e.g.
+/// `autonomous,customer_service,leads_qualifier,finance_invoice_ops,office_assistant,data_analyst,<new_type>`.
+/// `scripts/check-agent-type.sh` fails when a worker type is in the roster but
+/// missing from this default list.
+const DEFAULT_KNOWN_AGENTS: &[&str] = &[
+    "autonomous",
+    "customer_service",
+    "leads_qualifier",
+    "finance_invoice_ops",
+    "office_assistant",
+    "data_analyst",
+];
+
+/// Parse `COLLAB_KNOWN_AGENTS`. Unset/blank/only-separators -> default list.
+fn parse_known_agents(raw: Option<&str>) -> Vec<String> {
+    let parsed: Vec<String> = raw
+        .unwrap_or("")
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if parsed.is_empty() {
+        DEFAULT_KNOWN_AGENTS.iter().map(|s| s.to_string()).collect()
+    } else {
+        parsed
+    }
+}
+
+fn known_agents() -> &'static [String] {
+    static KNOWN: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    KNOWN.get_or_init(|| parse_known_agents(std::env::var("COLLAB_KNOWN_AGENTS").ok().as_deref()))
+}
+
 fn is_known_agent(s: &str) -> bool {
-    matches!(
-        s,
-        "autonomous" | "customer_service" | "leads_qualifier" | "finance_invoice_ops" | "office_assistant"
-    )
+    known_agents().iter().any(|k| k == s)
 }
 
 /// Access for a service caller asserting a known agent type: scoped to the
@@ -839,5 +871,31 @@ mod token_kind_tests {
     fn other_token_kinds_are_rejected() {
         let t = token(serde_json::json!({ "user_id": "u1", "type": "impersonation" }));
         assert!(verify_credential(&auth(), Some(&t)).is_none());
+    }
+}
+
+#[cfg(test)]
+mod known_agent_tests {
+    use super::*;
+
+    #[test]
+    fn default_list_has_the_worker_agents_and_not_aira() {
+        let v = parse_known_agents(None);
+        assert_eq!(v.len(), 6);
+        assert!(v.iter().any(|a| a == "leads_qualifier"));
+        assert!(v.iter().any(|a| a == "data_analyst"));
+        assert!(!v.iter().any(|a| a == "chief_of_staff"));
+    }
+
+    #[test]
+    fn blank_or_separator_only_env_falls_back_to_default() {
+        assert_eq!(parse_known_agents(Some("")).len(), 6);
+        assert_eq!(parse_known_agents(Some(" , ,")).len(), 6);
+    }
+
+    #[test]
+    fn env_replaces_default_and_trims() {
+        let v = parse_known_agents(Some(" autonomous , leads_qualifier ,"));
+        assert_eq!(v, vec!["autonomous".to_string(), "leads_qualifier".to_string()]);
     }
 }
