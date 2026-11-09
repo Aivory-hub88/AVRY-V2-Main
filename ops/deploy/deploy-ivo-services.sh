@@ -44,8 +44,17 @@ say "Preflight (local)"
 COLLAB_MAIN="$REPO/services/collab/src/main.rs"
 [ -f "$COLLAB_MAIN" ] || die "missing $COLLAB_MAIN"
 grep -q 'COLLAB_KNOWN_AGENTS' "$COLLAB_MAIN" || die "collab main.rs has no COLLAB_KNOWN_AGENTS (wrong checkout?)"
-grep -q '"data_analyst"' "$COLLAB_MAIN" || die "collab main.rs does not know data_analyst"
-grep -q 'data_analyst' "$REPO/backend/avry-backend/app/routes/agent_roster.py" || die "backend roster has no data_analyst in this checkout"
+# Agents this checkout adds, in rollout order. A type is checked only if the local backend
+# roster has it, so the same script serves the Ivo checkout and later ones (Juno, Mira).
+AGENTS=""
+for t in data_analyst operations_inventory marketing_content; do
+  grep -q "\"$t\"" "$REPO/backend/avry-backend/app/routes/agent_roster.py" && AGENTS="$AGENTS $t"
+done
+[ -n "$AGENTS" ] || die "backend roster has none of the new agents in this checkout"
+for t in $AGENTS; do
+  grep -q "\"$t\"" "$COLLAB_MAIN" || die "collab main.rs does not know $t"
+done
+echo "new agents in this checkout:$AGENTS"
 echo "stages:$ORDERED"
 if [ "$DRY" = 1 ]; then
   say "Dry run: nothing sent."
@@ -61,7 +70,7 @@ case " $ORDERED " in
 esac
 
 say "Apply on $HOST"
-ssh "$HOST" "STAGES='$ORDERED' TS='$TS' bash -s" <<'REMOTE'
+ssh "$HOST" "STAGES='$ORDERED' TS='$TS' AGENTS='$AGENTS' bash -s" <<'REMOTE'
 set -euo pipefail
 ROOT=/home/ubuntu/AVRY-V2-Main
 COMPOSE="sudo docker compose -f $ROOT/docker-compose.prod.yml"
@@ -120,11 +129,13 @@ for S in $STAGES; do
     echo; echo "-- backend"
     RB="$(rollback_tag avry-backend)"; echo "rollback tag $RB"
     ff_merge backend/avry-backend
-    grep -q data_analyst backend/avry-backend/app/routes/agent_roster.py || { echo "merged backend has no data_analyst"; exit 1; }
+    for t in $AGENTS; do grep -q "\"$t\"" backend/avry-backend/app/routes/agent_roster.py || { echo "merged backend has no $t"; exit 1; }; done
     if build_up avry-backend avry-backend && wait_up avry-backend 120; then
-      sudo docker exec avry-backend sh -c 'grep -rq data_analyst app/routes/agent_roster.py' \
-        && echo "roster in running container: has data_analyst" \
-        || { echo "container roster lacks data_analyst"; restore avry-backend avry-backend "$RB"; exit 1; }
+      for t in $AGENTS; do
+        sudo docker exec avry-backend grep -q "\"$t\"" app/routes/agent_roster.py \
+          && echo "roster in running container: has $t" \
+          || { echo "container roster lacks $t"; restore avry-backend avry-backend "$RB"; exit 1; }
+      done
     else
       restore avry-backend avry-backend "$RB"; exit 1
     fi
@@ -150,8 +161,10 @@ for S in $STAGES; do
   dashboard)
     echo; echo "-- dashboard"
     # The card posts to the backend, so refuse to ship it before the backend has Ivo.
-    sudo docker exec avry-backend sh -c 'grep -rq data_analyst app/routes/agent_roster.py' \
-      || { echo "backend roster lacks data_analyst: deploy backend first"; exit 1; }
+    for t in $AGENTS; do
+      sudo docker exec avry-backend grep -q "\"$t\"" app/routes/agent_roster.py \
+        || { echo "backend roster lacks $t: deploy backend first"; exit 1; }
+    done
     RB="$(rollback_tag avry-user-dashboard)"; echo "rollback tag $RB"
     ff_merge frontend/avry-user-dashboard
     if build_up avry-user-dashboard avry-user-dashboard && wait_up avry-user-dashboard 90; then
