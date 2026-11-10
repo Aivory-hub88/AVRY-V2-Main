@@ -49,7 +49,8 @@ test('discriminator picks are validated against the real options', () => {
   const opts = _discriminatorOptions(_parseSearchCandidates(SEARCH, 8)[0].discriminators);
   assert.deepEqual(_validatePick({ resource: 'file', operation: 'upload' }, opts), { resource: 'file', operation: 'upload' });
   assert.equal(_validatePick({ resource: 'file', operation: 'explode' }, opts), null);
-  assert.equal(_validatePick({ resource: 'nope', operation: 'copy' }, opts), null);
+  assert.deepEqual(_validatePick({ resource: 'nope', operation: 'copy' }, opts), { resource: 'file', operation: 'copy' }, 'a unique operation fixes a wrong resource');
+  assert.equal(_validatePick({ resource: 'nope', operation: 'explode' }, opts), null);
   assert.equal(_validatePick(null, opts), null);
 });
 
@@ -57,6 +58,12 @@ test('a pick with only an operation infers its resource when unambiguous', () =>
   const opts = _discriminatorOptions({ resources: { message: ['send', 'get'], label: ['create', 'get'] }, operations: [], modes: [] });
   assert.deepEqual(_validatePick({ operation: 'send' }, opts), { resource: 'message', operation: 'send' });
   assert.equal(_validatePick({ operation: 'get' }, opts), null, 'ambiguous operation is rejected');
+});
+
+test('a mismatched resource is corrected from the operation (channel + post => message/post)', () => {
+  const opts = _discriminatorOptions({ resources: { channel: ['create', 'get'], message: ['post', 'update'] }, operations: [], modes: [] });
+  assert.deepEqual(_validatePick({ resource: 'channel', operation: 'post' }, opts), { resource: 'message', operation: 'post' });
+  assert.equal(_validatePick({ resource: 'channel', operation: 'explode' }, opts), null);
 });
 
 test('expressions get the leading = n8n needs, nested values included', () => {

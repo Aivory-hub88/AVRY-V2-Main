@@ -21,6 +21,10 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash-0731';
 const PROVIDER_OPTS = { provider: { sort: 'throughput' }, reasoning: { enabled: false } };
 const MAX_DEFS_CHARS = 14000;
 
+function skip(id, reason) {
+  console.warn(`[nodeConfigurator] ${id} not configured: ${reason}`);
+}
+
 function enabled() {
   return String(process.env.AETHER_NODE_CONFIG || 'on').toLowerCase() !== 'off' && !!process.env.OPENROUTER_API_KEY;
 }
@@ -73,12 +77,12 @@ Reply with ONLY a JSON object: {"parameters": { ... }, "needsInput": [ {"path": 
 Rules:
 - Use ONLY parameter names and enum values defined in the TypeScript definitions. Include every required (non-optional) field.
 - If the user's request or the step gives a concrete value (email address, URL, channel, subject, interval), use it exactly.
-- To use data produced by an earlier step, use an n8n expression string that starts with "=", e.g. "={{ $json.email }}". Only reference fields that plausibly exist.
+- To use data produced by an earlier step, use an n8n expression string that starts with "=". $json is ONLY the output of the node immediately before this one. To read data from any other earlier step, reference that step by its exact title: ={{ $('Exact Step Title').item.json.field }}. Only reference fields that plausibly exist.
 - Never invent secrets, credentials, IDs or addresses. If a REQUIRED value cannot be known (a spreadsheet ID, a channel ID, a folder), set it to a short placeholder like "<SPREADSHEET_ID>" and list it in needsInput with a human-readable label.
 - Leave optional fields out unless the step clearly implies them.
 - Write message bodies, subjects and prompts concisely and professionally, in the same language as the user's request.
 - Be SPECIFIC to this workflow's goal. Never write generic filler such as "automated notification" or "this is a message from the workflow": a subject or message must say what happened and include the relevant data from earlier steps via expressions (names, emails, amounts, links the flow produces).
-- Data from a Webhook trigger arrives under $json.body (POST/PUT body) or $json.query (query string), e.g. "={{ $json.body.email }}". Data from other nodes is at $json.<field>.
+- Data from a Webhook trigger arrives under .json.body (POST/PUT body) or .json.query (query string): directly after the webhook use "={{ $json.body.email }}", from later steps use "={{ $('Webhook Step Title').item.json.body.email }}".
 - A Webhook trigger that receives data from another system uses httpMethod "POST" (GET only for simple pings or links).
 - A Schedule trigger must express the exact times the user asked for (days, hours, minutes).
 - Do not output credentials, authentication objects or the "credentials" key.`;
@@ -113,6 +117,13 @@ function validatePick(pick, options) {
     // Models often return just the operation. If it exists under exactly one
     // resource, that resource is unambiguous.
     if (!resource && pick.operation) {
+      const owners = Object.keys(options.resources).filter((r) => options.resources[r].includes(pick.operation));
+      if (owners.length === 1) resource = owners[0];
+    }
+    // The operation is more specific than the resource: a model that returns
+    // resource "channel" + operation "post" (post only exists under "message",
+    // and the step text said "channel") means message/post.
+    if (pick.operation && !(options.resources[resource] || []).includes(pick.operation)) {
       const owners = Object.keys(options.resources).filter((r) => options.resources[r].includes(pick.operation));
       if (owners.length === 1) resource = owners[0];
     }
@@ -179,20 +190,20 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
         timeoutMs: 15000,
       });
       const valid = validatePick(pick, options);
-      if (!valid) return null;
+      if (!valid) { skip(id, `invalid operation pick ${JSON.stringify(pick)}`); return null; }
       disc = valid;
     }
 
     // 2) exact definitions
     const defs = await mcp.getNodeDefinitions(id, disc);
-    if (defs.error || !defs.definitions) return null;
+    if (defs.error || !defs.definitions) { skip(id, `no definitions (${defs.error || 'empty'})`); return null; }
     const typeVersion = Number(node.version) || defs.version || 1;
     const definitions = defs.definitions.length > MAX_DEFS_CHARS ? defs.definitions.slice(0, MAX_DEFS_CHARS) + '\n/* …truncated */' : defs.definitions;
 
     // 3) fill parameters
     const baseUser = `${stepText}\n\nNode: ${id} (typeVersion ${typeVersion})${Object.keys(disc).length ? `\nDiscriminators: ${JSON.stringify(disc)}` : ''}\n\nTypeScript definitions:\n${definitions}`;
     let out = await llm({ system: FILL_SYSTEM, user: baseUser, maxTokens: 1800 });
-    if (!out || typeof out.parameters !== 'object' || out.parameters === null) return null;
+    if (!out || typeof out.parameters !== 'object' || out.parameters === null) { skip(id, 'LLM returned no parameters'); return null; }
 
     const finalize = (o) => normalizeExpressions({ ...(o.parameters || {}), ...disc });
     let parameters = finalize(out);
