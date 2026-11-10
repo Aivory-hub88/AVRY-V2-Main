@@ -140,6 +140,19 @@ test('wrong token: isAvailable false and everything degrades to neutral values',
   }
 });
 
+test('the legacy AUTH_TOKEN is never sent', async () => {
+  const good = process.env.N8N_MCP_AUTH_TOKEN;
+  delete process.env.N8N_MCP_AUTH_TOKEN;
+  process.env.AUTH_TOKEN = TOKEN; // would authenticate if it were (wrongly) used
+  client._clearSession();
+  try {
+    assert.equal(await client.isAvailable(), false);
+  } finally {
+    process.env.N8N_MCP_AUTH_TOKEN = good;
+    delete process.env.AUTH_TOKEN;
+  }
+});
+
 test('nothing configured: unavailable, no throw', async () => {
   const url = process.env.N8N_MCP_URL;
   process.env.N8N_MCP_URL = '';

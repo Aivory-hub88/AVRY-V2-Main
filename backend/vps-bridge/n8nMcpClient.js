@@ -15,7 +15,7 @@
  *
  * Config (read at call time):
  *   N8N_MCP_URL         e.g. http://127.0.0.1:5678/mcp-server/http
- *   N8N_MCP_AUTH_TOKEN  n8n MCP access token, sent as Bearer (AUTH_TOKEN also read)
+ *   N8N_MCP_AUTH_TOKEN  n8n MCP access token, sent as Bearer
  *   N8N_MCP_CACHE_TTL_MS (default 10 min), N8N_MCP_TIMEOUT_MS (default 15 s)
  *
  * Everything degrades gracefully: when the MCP is unreachable/unauthorised the
@@ -27,7 +27,9 @@ function cfg() {
   const url = (process.env.N8N_MCP_URL || '').replace(/\/+$/, '');
   return {
     url,
-    auth: process.env.N8N_MCP_AUTH_TOKEN || process.env.AUTH_TOKEN || '',
+    // Only N8N_MCP_AUTH_TOKEN: the bridge's generic AUTH_TOKEN belonged to the
+    // retired czlonkowski container and must never be sent to n8n.
+    auth: process.env.N8N_MCP_AUTH_TOKEN || '',
     cacheTtl: Number(process.env.N8N_MCP_CACHE_TTL_MS || 10 * 60 * 1000),
     timeout: Number(process.env.N8N_MCP_TIMEOUT_MS || 15000),
   };
