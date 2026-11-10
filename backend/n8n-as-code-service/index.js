@@ -636,6 +636,10 @@ function requirementFromConfiguredNode(step) {
 }
 
 function inferNodeRequirement(step) {
+  // condition / switch / loop steps are logic, not integrations: their text often
+  // mentions the apps used inside the branches ("...tell Slack"), which made the
+  // keyword templates demand a Slack bot token for the condition itself.
+  if (['condition', 'switch', 'loop'].includes(step.type)) return null;
   const fromConfigured = requirementFromConfiguredNode(step);
   if (fromConfigured !== undefined) return fromConfigured;
   const title = step.title || step.action || step.nodeName || step.id || 'Workflow Step';
