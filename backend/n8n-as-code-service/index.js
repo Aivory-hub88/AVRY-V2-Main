@@ -715,8 +715,18 @@ function inferNodeRequirement(step) {
   };
 }
 
+// Every step including those inside condition/switch/loop branches: a Slack
+// alert inside an "if overdue" branch needs its credential like any other step.
+function flattenSteps(steps, out = []) {
+  for (const step of Array.isArray(steps) ? steps : []) {
+    out.push(step);
+    for (const branch of step.branches || []) flattenSteps(branch.steps, out);
+  }
+  return out;
+}
+
 function buildSetupReport(meta) {
-  const nodeRequirements = meta.steps.map(inferNodeRequirement).filter(Boolean);
+  const nodeRequirements = flattenSteps(meta.steps).map(inferNodeRequirement).filter(Boolean);
   return {
     workflowId: meta.draftId,
     workflowName: meta.intent || 'Aivory Workflow Draft',

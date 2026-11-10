@@ -231,6 +231,85 @@ async function mapWithConcurrency(items, limit, fn) {
   return out;
 }
 
+// condition / switch / loop steps are built by n8n-as-code from their branches;
+// searching nodes for them only produces noise (it once matched "flow").
+const CONTROL_FLOW_TYPES = new Set(['condition', 'switch', 'loop']);
+
+function isControlFlowStep(step) {
+  return CONTROL_FLOW_TYPES.has(step?.type) || (Array.isArray(step?.branches) && step.branches.length > 0);
+}
+
+function stepLabel(st) {
+  const d = (st.description || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  return `"${st.title}" (${st.type || 'step'}${d ? `: ${d}` : ''})`;
+}
+
+/**
+ * Inspect + configure one level of steps, then recurse into branch bodies, so a
+ * Slack alert inside an "if overdue" branch gets a real node like any other step.
+ * `ancestors` are the labels of everything that runs before this level.
+ */
+async function enrichLevel(steps, ctx, ancestors) {
+  const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step, i) => {
+    if (isControlFlowStep(step)) return { skipped: true };
+    try {
+      const previousTitles = [...ancestors, ...steps.slice(0, i).filter((st) => st.title).map(stepLabel)];
+      return { ok: true, inspection: await inspectStepWithMcp(step, { intent: ctx.intent, previousTitles }) };
+    } catch (error) {
+      return { ok: false, error };
+    }
+  });
+
+  const inspected = [];
+  const enrichedSteps = [];
+
+  for (let idx = 0; idx < steps.length; idx++) {
+    const step = steps[idx];
+    const result = results[idx];
+    let enriched = step;
+
+    if (result.skipped) {
+      inspected.push({ stepId: step.id, title: step.title, mcpAvailable: true, skipped: 'control-flow step, built from its branches' });
+    } else if (!result.ok) {
+      inspected.push({ stepId: step.id, title: step.title, mcpAvailable: true, error: result.error.message });
+    } else {
+      const inspection = result.inspection;
+      inspected.push({ stepId: step.id, title: step.title, ...inspection });
+      // The exact n8n node type goes on the step; n8n-as-code builds that node.
+      const selectedNodeType = inspection.selectedWorkflowNodeType || inspection.selectedNodeType || null;
+      // n8n-as-code reads parameters from step.parameters when a direct nodeType
+      // is provided; copilot steps carry their settings under step.config.
+      const mappedParameters = step.parameters || step.config || {};
+      const cfg = inspection.configured;
+      enriched = {
+        ...step,
+        nodeType: selectedNodeType,
+        // A configured node carries n8n's current typeVersion and real parameters.
+        ...(cfg ? { typeVersion: cfg.typeVersion } : {}),
+        parameters: cfg ? cfg.parameters : mappedParameters,
+        n8nInspection: inspection,
+      };
+    }
+
+    if (Array.isArray(enriched.branches) && enriched.branches.length) {
+      const here = [...ancestors, ...steps.slice(0, idx).filter((st) => st.title).map(stepLabel), `"${step.title}" (${step.type || 'step'})`];
+      const branches = [];
+      for (const branch of enriched.branches) {
+        const sub = await enrichLevel(branch.steps || [], ctx, here);
+        branches.push({ ...branch, steps: sub.steps });
+        inspected.push(...sub.inspected);
+      }
+      enriched = { ...enriched, branches };
+    }
+    enrichedSteps.push(enriched);
+  }
+  return { steps: enrichedSteps, inspected };
+}
+
+function countSteps(steps) {
+  return (steps || []).reduce((n, st) => n + 1 + (st.branches || []).reduce((m, b) => m + countSteps(b.steps), 0), 0);
+}
+
 async function enrichStepsWithMcp(steps, ctx = {}) {
   const available = await isN8nMcpAvailable();
   if (!available) {
@@ -246,59 +325,8 @@ async function enrichStepsWithMcp(steps, ctx = {}) {
   }
 
   const t0 = Date.now();
-  const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step, i) => {
-    try {
-      const previousTitles = steps.slice(0, i).filter((st) => st.title).map((st) => {
-        const d = (st.description || '').replace(/\s+/g, ' ').trim().slice(0, 90);
-        return `"${st.title}" (${st.type || 'step'}${d ? `: ${d}` : ''})`;
-      });
-      return { ok: true, inspection: await inspectStepWithMcp(step, { intent: ctx.intent, previousTitles }) };
-    } catch (error) {
-      return { ok: false, error };
-    }
-  });
-  console.log(`[workflow-draft] inspected ${steps.length} step(s) concurrently=${INSPECT_CONCURRENCY} elapsedMs=${Date.now() - t0}`);
-
-  const inspected = [];
-  const enrichedSteps = [];
-
-  for (let idx = 0; idx < steps.length; idx++) {
-    const step = steps[idx];
-    const result = results[idx];
-    if (!result.ok) {
-      inspected.push({
-        stepId: step.id,
-        title: step.title,
-        mcpAvailable: true,
-        error: result.error.message,
-      });
-      enrichedSteps.push(step);
-      continue;
-    }
-    const inspection = result.inspection;
-    inspected.push({
-      stepId: step.id,
-      title: step.title,
-      ...inspection,
-    });
-    // Extract selectedNodeType from inspection as top-level nodeType
-    // This allows n8n-as-code-service to use the exact n8n node type
-    const selectedNodeType = inspection.selectedWorkflowNodeType || inspection.selectedNodeType || null;
-    // n8n-as-code reads node parameters from step.parameters when a direct
-    // nodeType is provided. UI/copilot steps carry their config under
-    // step.config, so map it through to avoid building parameter-less nodes
-    // that fail n8n pre-execution validation.
-    const mappedParameters = step.parameters || step.config || {};
-    const cfg = inspection.configured;
-    enrichedSteps.push({
-      ...step,
-      nodeType: selectedNodeType,
-      // A configured node carries n8n's current typeVersion and real parameters.
-      ...(cfg ? { typeVersion: cfg.typeVersion } : {}),
-      parameters: cfg ? cfg.parameters : mappedParameters,
-      n8nInspection: inspection,
-    });
-  }
+  const { steps: enrichedSteps, inspected } = await enrichLevel(steps, ctx, []);
+  console.log(`[workflow-draft] inspected ${countSteps(steps)} step(s) concurrently=${INSPECT_CONCURRENCY} elapsedMs=${Date.now() - t0}`);
 
   return {
     steps: enrichedSteps,
