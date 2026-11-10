@@ -253,6 +253,11 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
       }
     }
 
+    // Model-authored code is never trusted blindly: always ask the user to review it.
+    if (id === 'n8n-nodes-base.code') {
+      needsInput = [...needsInput, { path: 'jsCode', label: `Review the generated code in "${step.title || 'Code'}"` }];
+    }
+
     return {
       nodeType: id,
       displayName: node.displayName || null,
