@@ -21,6 +21,24 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash-0731';
 const PROVIDER_OPTS = { provider: { sort: 'throughput' }, reasoning: { enabled: false } };
 const MAX_DEFS_CHARS = 14000;
 
+/** Old n8n nodes the search/skills layer still surfaces, mapped to what n8n expects today. */
+const DEPRECATED_NODE_REMAP = {
+  'n8n-nodes-base.cron': 'n8n-nodes-base.scheduleTrigger',
+  'n8n-nodes-base.interval': 'n8n-nodes-base.scheduleTrigger',
+  'n8n-nodes-base.start': 'n8n-nodes-base.manualTrigger',
+  'n8n-nodes-base.function': 'n8n-nodes-base.code',
+  'n8n-nodes-base.functionItem': 'n8n-nodes-base.code',
+};
+
+function remapDeprecatedNode(nodeType) {
+  return DEPRECATED_NODE_REMAP[nodeType] || nodeType;
+}
+
+/** condition / switch / loop steps are built by the adapter from their branches, not from a configured node. */
+function isBranchingStep(step) {
+  return ['condition', 'switch', 'loop'].includes(step?.type) || (Array.isArray(step?.branches) && step.branches.length > 0);
+}
+
 function skip(id, reason) {
   console.warn(`[nodeConfigurator] ${id} not configured: ${reason}`);
 }
@@ -79,6 +97,7 @@ Rules:
 - If the user's request or the step gives a concrete value (email address, URL, channel, subject, interval), use it exactly.
 - ALWAYS read data from earlier steps with an explicit reference to that step by its exact title: ={{ $('Exact Step Title').item.json.field }}. This is correct whether or not the step is adjacent, so never use a bare $json (except in the very first node). Only reference fields that plausibly exist.
 - Never invent secrets, credentials, IDs, addresses, company names or brand names (write "our team" instead of guessing a company). If a REQUIRED value cannot be known (a spreadsheet ID, a channel ID, a folder), set it to a short placeholder like "<SPREADSHEET_ID>" and list it in needsInput with a human-readable label.
+- Do NOT invent fields that other nodes output. Use fields the user named, or generic ones that always exist ($now, $('Step').all().length, $('Step').all() to loop over every item, e.g. ={{ $('Step').all().map(i => i.json.amount).join(', ') }}). If you must reference a field or column the user did NOT name, still use your best guess but ALSO add a needsInput item labelled exactly: Confirm the field "<field>" exists in "<step title>".
 - Leave optional fields out unless the step clearly implies them.
 - Write message bodies, subjects and prompts concisely and professionally, in the same language as the user's request.
 - Be SPECIFIC to this workflow's goal. Never write generic filler such as "automated notification" or "this is a message from the workflow": a subject or message must say what happened and include the relevant data from earlier steps via expressions (names, emails, amounts, links the flow produces).
@@ -174,6 +193,7 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
   const llm = deps.llm || llmJson;
   const mcp = deps.mcp || require('./n8nMcpClient');
   if (!node?.nodeType) return null;
+  if (isBranchingStep(step)) return null; // built by the adapter from its branches
   const id = node.nodeType;
 
   try {
@@ -252,4 +272,4 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
   }
 }
 
-module.exports = { configureStep, buildConfigIntent, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };
+module.exports = { configureStep, buildConfigIntent, remapDeprecatedNode, isBranchingStep, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };
