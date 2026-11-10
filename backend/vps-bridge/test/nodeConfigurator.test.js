@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { configureStep, buildConfigIntent, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
+const { configureStep, buildConfigIntent, remapDeprecatedNode, isBranchingStep, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
 const { _parseSearchCandidates } = require('../n8nMcpClient');
 
 // Captured from n8n 2.26.4 (search_nodes ["google drive", "schedule trigger"], trimmed).
@@ -71,6 +71,22 @@ test('expressions get the leading = n8n needs, nested values included', () => {
     _normalizeExpressions({ text: 'New lead: {{ $json.name }}', n: 3, list: ['{{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: 'hi {{ $json.c }}' } }),
     { text: '=New lead: {{ $json.name }}', n: 3, list: ['={{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: '=hi {{ $json.c }}' } },
   );
+});
+
+test('deprecated nodes are remapped to their modern replacement', () => {
+  assert.equal(remapDeprecatedNode('n8n-nodes-base.cron'), 'n8n-nodes-base.scheduleTrigger');
+  assert.equal(remapDeprecatedNode('n8n-nodes-base.function'), 'n8n-nodes-base.code');
+  assert.equal(remapDeprecatedNode('n8n-nodes-base.gmail'), 'n8n-nodes-base.gmail');
+});
+
+test('branching steps are not configured (the adapter builds them from branches)', async () => {
+  assert.equal(isBranchingStep({ type: 'condition' }), true);
+  assert.equal(isBranchingStep({ type: 'action', branches: [{ key: 'a', steps: [] }] }), true);
+  assert.equal(isBranchingStep({ type: 'action' }), false);
+  let called = false;
+  const out = await configureStep({ step: { title: 'If overdue', type: 'condition' }, node: { nodeType: 'n8n-nodes-base.if', displayName: 'If', version: 2.2, discriminators: null } }, { llm: async () => { called = true; return {}; }, mcp: fakeMcp() });
+  assert.equal(out, null);
+  assert.equal(called, false);
 });
 
 test('buildConfigIntent combines workflow name, user request and the whole flow', () => {

@@ -7,7 +7,7 @@ const {
   lookupNode,
   isAvailable: isN8nMcpAvailable,
 } = require('./n8nMcpClient');
-const { configureStep, buildConfigIntent, enabled: nodeConfiguratorEnabled } = require('./nodeConfigurator');
+const { configureStep, buildConfigIntent, remapDeprecatedNode, enabled: nodeConfiguratorEnabled } = require('./nodeConfigurator');
 
 // --- n8n-as-code grounded node resolver (@n8n-as-code/skills) ---------------
 // Replaces the weak MCP-only candidate scoring (which mapped hubspot->Monica CRM,
@@ -156,7 +156,13 @@ async function inspectStepWithMcp(step, ctx = {}) {
   // n8n expects the full package form (n8n-nodes-base.*); MCP returns a short
   // form (nodes-base.*) in nodeType. Prefer workflowNodeType for the draft so
   // n8n-as-code does not reject it as an unrecognized node type.
-  const selectedWorkflowNodeType = selectedNode?.workflowNodeType || selectedNode?.nodeType || null;
+  // A deprecated node (cron, interval, function...) is swapped for its modern
+  // replacement before anything is looked up or built.
+  const rawWorkflowNodeType = selectedNode?.workflowNodeType || selectedNode?.nodeType || null;
+  const selectedWorkflowNodeType = rawWorkflowNodeType ? remapDeprecatedNode(rawWorkflowNodeType) : null;
+  if (selectedNode && selectedWorkflowNodeType !== rawWorkflowNodeType) {
+    selectedNode = { ...selectedNode, nodeType: selectedWorkflowNodeType, workflowNodeType: selectedWorkflowNodeType, displayName: undefined };
+  }
   const schema = selectedNodeType ? await getNodeSchema(selectedNodeType) : null;
 
   // Real configuration: resource/operation, current typeVersion and concrete
