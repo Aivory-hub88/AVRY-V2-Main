@@ -267,6 +267,8 @@ function detectIntent(stepTitle, stepType, stepDescription) {
   return 'default';
 }
 
+const AETHER_CONFIGURED_NOTE = 'Configured by Aivory Aether from n8n node definitions.';
+
 function buildRealN8nWorkflow({ draftId, intent, steps }) {
   const nodes      = [];
   const connections = {};
@@ -498,6 +500,9 @@ function buildRealN8nWorkflow({ draftId, intent, steps }) {
             typeVersion: nodeConfig.typeVersion,
             position,
             parameters:  { ...nodeConfig.parameters },
+            // Marker for nodes configured by the Aether node configurator (LLM +
+            // n8n type definitions); the sandbox never executes generated code.
+            ...(step.n8nInspection?.configured ? { notes: AETHER_CONFIGURED_NOTE } : {}),
           });
 
           if (connectFrom) addConnection(connectFrom, nodeName, 'main', connectBranch);
@@ -1138,9 +1143,15 @@ function stripCredentialsForSandbox(workflowDef) {
       };
     }
 
+    // A Code node whose JavaScript/Python was written by the configurator is NOT
+    // executed on the production n8n: model-authored code must never run
+    // unreviewed (it also assumes data shapes the stubbed upstream nodes lack and
+    // could hang the run). It is stubbed like any integration node.
+    const isGeneratedCode = stripped.type === 'n8n-nodes-base.code' && stripped.notes === AETHER_CONFIGURED_NOTE;
+
     // Any non-core node is swapped to a harmless Set node that proves the
     // logic flow works without credential/parameter errors
-    if (!CORE_SANDBOX_TYPES.has(stripped.type)) {
+    if (isGeneratedCode || !CORE_SANDBOX_TYPES.has(stripped.type)) {
       return {
         id:          stripped.id,
         name:        stripped.name,

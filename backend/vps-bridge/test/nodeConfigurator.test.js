@@ -173,6 +173,12 @@ test('configureStep: an invalid operation pick, junk output or missing definitio
   assert.equal(await configureStep({ step: STEP, node: GMAIL }, { llm: boom, mcp }), null);
 });
 
+test('configureStep: a Code node always asks the user to review the generated code', async () => {
+  const llm = async () => ({ parameters: { language: 'javaScript', jsCode: 'return items;' }, needsInput: [] });
+  const out = await configureStep({ step: { title: 'Group invoices', type: 'action' }, node: { nodeType: 'n8n-nodes-base.code', displayName: 'Code', version: 2, discriminators: null } }, { llm, mcp: fakeMcp() });
+  assert.deepEqual(out.needsInput, [{ path: 'jsCode', label: 'Review the generated code in "Group invoices"' }]);
+});
+
 test('configureStep: a node without discriminators skips the pick call', async () => {
   const mcp = fakeMcp();
   let calls = 0;
