@@ -77,6 +77,10 @@ Rules:
 - Never invent secrets, credentials, IDs or addresses. If a REQUIRED value cannot be known (a spreadsheet ID, a channel ID, a folder), set it to a short placeholder like "<SPREADSHEET_ID>" and list it in needsInput with a human-readable label.
 - Leave optional fields out unless the step clearly implies them.
 - Write message bodies, subjects and prompts concisely and professionally, in the same language as the user's request.
+- Be SPECIFIC to this workflow's goal. Never write generic filler such as "automated notification" or "this is a message from the workflow": a subject or message must say what happened and include the relevant data from earlier steps via expressions (names, emails, amounts, links the flow produces).
+- Data from a Webhook trigger arrives under $json.body (POST/PUT body) or $json.query (query string), e.g. "={{ $json.body.email }}". Data from other nodes is at $json.<field>.
+- A Webhook trigger that receives data from another system uses httpMethod "POST" (GET only for simple pings or links).
+- A Schedule trigger must express the exact times the user asked for (days, hours, minutes).
 - Do not output credentials, authentication objects or the "credentials" key.`;
 
 function describeStep(step, intent, previousSteps) {
@@ -129,6 +133,22 @@ function normalizeExpressions(value) {
   if (Array.isArray(value)) return value.map(normalizeExpressions);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, normalizeExpressions(v)]));
   return value;
+}
+
+/**
+ * What the node configurator sees as "the goal": the workflow name, what the
+ * user actually asked for (recent chat turns), and the whole flow outline, so a
+ * step such as "email sales" is written for THIS workflow, not generically.
+ */
+function buildConfigIntent({ description, userContext, steps }) {
+  const outline = (steps || [])
+    .map((st, i) => `${i + 1}. ${st.title || 'Step'}${st.description ? ` — ${st.description}` : ''}`)
+    .join('\n');
+  return [
+    description ? `Workflow: ${description}` : '',
+    userContext ? `What the user asked for:\n${String(userContext).slice(0, 1500)}` : '',
+    outline ? `Whole flow:\n${outline}` : '',
+  ].filter(Boolean).join('\n\n');
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -220,4 +240,4 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
   }
 }
 
-module.exports = { configureStep, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };
+module.exports = { configureStep, buildConfigIntent, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };

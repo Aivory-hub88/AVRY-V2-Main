@@ -1910,13 +1910,14 @@ app.post('/workflows/edit',     (req, res) => handleWorkflowRequest(req, res, 'E
 const { prepareWorkflowDraft } = require('./workflowDraftService');
 app.post('/workflows/draft-test', async (req, res) => {
   try {
-    const { workflowId, workflowId: wfId, description, steps } = req.body || {};
+    const { workflowId, workflowId: wfId, description, steps, user_context: userContext } = req.body || {};
     if (!Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json({ message: 'steps must be a non-empty array' });
     }
     const result = await prepareWorkflowDraft({
       workflowId: workflowId || wfId,
       description: description || 'Aivory Workflow',
+      userContext: typeof userContext === 'string' ? userContext : '',
       steps,
     });
     res.status(200).json(result);

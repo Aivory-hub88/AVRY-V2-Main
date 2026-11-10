@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { configureStep, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
+const { configureStep, buildConfigIntent, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
 const { _parseSearchCandidates } = require('../n8nMcpClient');
 
 // Captured from n8n 2.26.4 (search_nodes ["google drive", "schedule trigger"], trimmed).
@@ -64,6 +64,17 @@ test('expressions get the leading = n8n needs, nested values included', () => {
     _normalizeExpressions({ text: 'New lead: {{ $json.name }}', n: 3, list: ['{{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: 'hi {{ $json.c }}' } }),
     { text: '=New lead: {{ $json.name }}', n: 3, list: ['={{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: '=hi {{ $json.c }}' } },
   );
+});
+
+test('buildConfigIntent combines workflow name, user request and the whole flow', () => {
+  const out = buildConfigIntent({
+    description: 'Lead alerts',
+    userContext: 'When a lead arrives, email sales',
+    steps: [{ title: 'Webhook Trigger', description: 'Receives a lead' }, { title: 'Send Email' }],
+  });
+  assert.match(out, /Workflow: Lead alerts/);
+  assert.match(out, /What the user asked for:\nWhen a lead arrives, email sales/);
+  assert.match(out, /1\. Webhook Trigger — Receives a lead\n2\. Send Email/);
 });
 
 test('extractJson copes with fences and chatter', () => {
