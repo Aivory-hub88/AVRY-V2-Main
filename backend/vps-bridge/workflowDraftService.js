@@ -118,6 +118,7 @@ function summarizeSchema(schema) {
     displayName: schema.displayName || schema.name || null,
     description: schema.description || null,
     propertiesCount: Array.isArray(schema.properties) ? schema.properties.length : undefined,
+    typeDefinitionsChars: typeof schema.typeDefinitions === 'string' ? schema.typeDefinitions.length : undefined,
     credentials: schema.credentials || schema.credentialTypes || undefined,
   };
 }
@@ -147,7 +148,7 @@ async function inspectStepWithMcp(step) {
   const selectedWorkflowNodeType = selectedNode?.workflowNodeType || selectedNode?.nodeType || null;
   const schema = selectedNodeType ? await getNodeSchema(selectedNodeType) : null;
   const validation = selectedNodeType
-    ? await validateNodeConfig(selectedNodeType, step.config || {}, 'minimal')
+    ? await validateNodeConfig(selectedWorkflowNodeType || selectedNodeType, step.config || {}, 'minimal')
     : null;
 
   return {
