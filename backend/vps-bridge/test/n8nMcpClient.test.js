@@ -5,6 +5,44 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
+
+// Captured from n8n 2.26.4 (search_nodes ["gmail"], trimmed).
+const GMAIL_SEARCH = [
+  '## "gmail"',
+  'Found 4 nodes:',
+  '',
+  '- n8n-nodes-base.gmail',
+  '  Display Name: Gmail',
+  '  Version: 2.2',
+  '  Description: Consume the Gmail API',
+  '  @relatedNodes',
+  '    - n8n-nodes-base.gmailTrigger: "Use Gmail Trigger for scheduled email fetching"',
+  '  Discriminators:',
+  '    resource:',
+  '      - message:',
+  '          operations:',
+  '            - send',
+  '',
+  '- n8n-nodes-base.gmailHitlTool',
+  '  Display Name: Gmail',
+  '  Version: 2.2',
+  '  Description: Request human approval for tools',
+  '  Discriminators: none (use node directly without resource/operation/mode)',
+  '',
+  '- n8n-nodes-base.gmailTool',
+  '  Display Name: Gmail Tool',
+  '  Version: 2.2',
+  '  Description: Consume the Gmail API',
+  '',
+  '- n8n-nodes-base.gmailTrigger [TRIGGER]',
+  '  Display Name: Gmail Trigger',
+  '  Version: 1.3',
+  '  Description: Fetches emails from Gmail and starts the workflow on specified polling intervals.',
+  '  Discriminators: none (use node directly without resource/operation/mode)',
+].join('\n');
+const NO_NODES = '## "send email gmail"\nNo nodes found. Try a different search term.';
+const GMAIL_NEEDS_DISC = "\n\n# Errors\n\nError: Node 'n8n-nodes-base.gmail' requires resource and operation discriminators. Available resources: draft, label, message, thread. Use search_nodes to see all options.";
+
 const TOKEN = 'test-token';
 const calls = [];
 let sseMode = false;
@@ -38,16 +76,12 @@ const server = http.createServer((req, res) => {
     if (msg.method === 'tools/call') {
       const { name, arguments: args } = msg.params;
       if (name === 'search_nodes') {
-        const results = [
-          'Query "gmail":',
-          '- n8n-nodes-base.gmail: "Gmail"  @builderHint send and read email',
-          '- n8n-nodes-base.gmailTrigger: "Gmail Trigger"',
-          '  related: n8n-nodes-base.googleSheets',
-        ].join('\n');
+        const results = args.queries.length === 1 && /\s/.test(args.queries[0]) ? NO_NODES : GMAIL_SEARCH;
         return reply(res, { jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: results }], structuredContent: { results } } });
       }
       if (name === 'get_node_types') {
-        const definitions = `// ${args.nodeIds[0]}\ninterface GmailParams { resource: 'message' }`;
+        const id = typeof args.nodeIds[0] === 'string' ? args.nodeIds[0] : args.nodeIds[0].nodeId;
+        const definitions = id === 'n8n-nodes-base.gmail' ? GMAIL_NEEDS_DISC : id === 'n8n-nodes-base.nope' ? "\n\n# Errors\n\nError: Node 'n8n-nodes-base.nope' not found." : `// ${id}\ninterface SetParams { mode: 'manual' }`;
         return reply(res, { jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: definitions }], structuredContent: { definitions } } });
       }
       if (name === 'validate_node_config') {
@@ -72,21 +106,34 @@ test.before(async () => {
 test.after(() => server.close());
 test.beforeEach(() => { calls.length = 0; client._clearCache(); client._clearSession(); sseMode = false; statelessSession = true; });
 
-test('search_nodes: sends {queries:[q]} and extracts candidates in rank order', async () => {
-  const out = await client.searchNodes('send gmail email', { limit: 8 });
+test('search_nodes: sends short terms, parses real hits in rank order, skips related/Tool nodes', async () => {
+  const out = await client.searchNodes('', { terms: ['gmail'], limit: 8 });
   const call = calls.find((c) => c.method === 'tools/call');
   assert.equal(call.params.name, 'search_nodes');
-  assert.deepEqual(call.params.arguments, { queries: ['send gmail email'] });
-  assert.deepEqual(out.map((c) => c.workflowNodeType), ['n8n-nodes-base.gmail', 'n8n-nodes-base.gmailTrigger', 'n8n-nodes-base.googleSheets']);
+  assert.deepEqual(call.params.arguments, { queries: ['gmail'] });
+  assert.deepEqual(out.map((c) => c.workflowNodeType), ['n8n-nodes-base.gmail', 'n8n-nodes-base.gmailTrigger']);
   assert.equal(out[0].displayName, 'Gmail');
+  assert.equal(out[0].description, 'Consume the Gmail API');
   assert.equal(out[0].relevance, 'high');
   assert.equal(out[1].category, 'trigger');
   assert.equal(out[0].package, 'n8n-nodes-base');
 });
 
+test('search_nodes: a sentence is reduced to service-name terms', async () => {
+  assert.deepEqual(client._deriveSearchTerms('Send email via Gmail every morning'), ['email', 'via', 'gmail', 'morning']);
+  await client.searchNodes('Send an email with Gmail');
+  const sent = calls.find((c) => c.method === 'tools/call').params.arguments;
+  assert.deepEqual(sent, { queries: ['email', 'gmail'] });
+});
+
+test('search_nodes: "No nodes found" yields no candidates', async () => {
+  const out = await client.searchNodes('', { terms: ['send email gmail'] });
+  assert.deepEqual(out, []);
+});
+
 test('handshake happens once across calls, with the initialized notification', async () => {
-  await client.searchNodes('a');
-  await client.searchNodes('b');
+  await client.searchNodes('gmail');
+  await client.searchNodes('slack');
   assert.equal(calls.filter((c) => c.method === 'initialize').length, 1);
   assert.equal(calls.filter((c) => c.method === 'notifications/initialized').length, 1);
 });
@@ -99,15 +146,26 @@ test('works with SSE responses and a stateful session id', async () => {
 });
 
 test('getNodeSchema: short ids are expanded, result is cached', async () => {
-  const a = await client.getNodeSchema('nodes-base.gmail');
-  assert.equal(a.nodeType, 'n8n-nodes-base.gmail');
-  assert.equal(a.displayName, 'Gmail');
-  assert.match(a.typeDefinitions, /GmailParams/);
+  const a = await client.getNodeSchema('nodes-base.set');
+  assert.equal(a.nodeType, 'n8n-nodes-base.set');
+  assert.equal(a.displayName, 'Set');
+  assert.match(a.typeDefinitions, /SetParams/);
   const toolCalls = () => calls.filter((c) => c.method === 'tools/call').length;
   const before = toolCalls();
-  await client.getNodeSchema('n8n-nodes-base.gmail');
+  await client.getNodeSchema('n8n-nodes-base.set');
   assert.equal(toolCalls(), before, 'second lookup served from cache');
-  assert.deepEqual(calls.find((c) => c.method === 'tools/call').params.arguments, { nodeIds: ['n8n-nodes-base.gmail'] });
+  assert.deepEqual(calls.find((c) => c.method === 'tools/call').params.arguments, { nodeIds: ['n8n-nodes-base.set'] });
+});
+
+test('getNodeSchema: a node that needs discriminators is reported, not treated as definitions', async () => {
+  const s = await client.getNodeSchema('n8n-nodes-base.gmail');
+  assert.equal(s.needsDiscriminators, true);
+  assert.deepEqual(s.resources, ['draft', 'label', 'message', 'thread']);
+  assert.equal(s.typeDefinitions, '');
+});
+
+test('getNodeSchema: unknown node (error text) returns null', async () => {
+  assert.equal(await client.getNodeSchema('n8n-nodes-base.nope'), null);
 });
 
 test('validateNodeConfig: maps the native result to {valid, errors, warnings}', async () => {

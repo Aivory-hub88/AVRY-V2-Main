@@ -223,9 +223,26 @@ async function getNodeSchema(nodeType) {
 
   try {
     const { structured, text } = await callTool('get_node_types', { nodeIds: [id] });
-    const definitions = (structured && typeof structured.definitions === 'string' ? structured.definitions : text || '').trim();
-    if (!definitions) return null;
-    const data = { nodeType: id, displayName: humanizeNodeName(id), typeDefinitions: definitions.slice(0, 6000) };
+    const body = (structured && typeof structured.definitions === 'string' ? structured.definitions : text || '').trim();
+    if (!body) return null;
+
+    let data;
+    if (/^#\s*Errors/m.test(body) || /^Error:/m.test(body)) {
+      // n8n reports problems as plain text, not isError. A node with
+      // resource/operation variants needs discriminators to get its types:
+      // the node exists, we just have no per-operation definitions.
+      const need = /requires resource and operation discriminators\. Available resources: ([^.\n]+)/.exec(body);
+      if (!need) return null; // unknown node or another failure
+      data = {
+        nodeType: id,
+        displayName: humanizeNodeName(id),
+        typeDefinitions: '',
+        needsDiscriminators: true,
+        resources: need[1].split(',').map((r) => r.trim()).filter(Boolean),
+      };
+    } else {
+      data = { nodeType: id, displayName: humanizeNodeName(id), typeDefinitions: body.slice(0, 6000) };
+    }
     setCache(id, data);
     return data;
   } catch (err) {
@@ -269,46 +286,79 @@ async function validateWorkflow(_workflow) {
   return { valid: true, errors: [], warnings: ['Workflow-level MCP validation is not available (native MCP validates SDK code)'] };
 }
 
-const NODE_ID_RE = /(?:@n8n\/n8n-nodes-[a-z0-9-]+|n8n-nodes-[a-z0-9-]+)\.[A-Za-z][A-Za-z0-9]*/g;
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'from', 'by', 'at', 'as', 'into',
+  'step', 'new', 'all', 'data', 'send', 'get', 'set', 'list', 'create', 'update', 'delete', 'read', 'write',
+  'trigger', 'action', 'node', 'file', 'files', 'item', 'items', 'every', 'each', 'when', 'then',
+]);
 
-/** Extract candidate nodes from the free-text search_nodes result. */
+/** Short search terms ("gmail", "google drive") from free text; n8n's search wants service names, not sentences. */
+function deriveSearchTerms(query) {
+  const words = String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w));
+  return [...new Set(words)].slice(0, 4);
+}
+
+/**
+ * Parse search_nodes text. Each hit is an unindented "- <nodeId>[ [TRIGGER]]"
+ * line followed by indented "Display Name:/Version:/Description:" lines;
+ * "@relatedNodes" entries are indented, so they are not hits. Hits are in the
+ * engine's rank order; AI "Tool" variants are skipped (not workflow steps).
+ */
 function parseSearchCandidates(text, limit) {
   const seen = new Set();
   const out = [];
+  let cur = null;
   for (const line of String(text).split('\n')) {
-    const ids = line.match(NODE_ID_RE);
-    if (!ids) continue;
-    for (const id of ids) {
-      if (seen.has(id)) continue;
+    const head = /^- ((?:@n8n\/n8n-nodes-[a-z0-9-]+|n8n-nodes-[a-z0-9-]+)\.[A-Za-z][A-Za-z0-9]*)(\s+\[TRIGGER\])?\s*$/.exec(line);
+    if (head) {
+      const id = head[1];
+      cur = null;
+      if (seen.has(id) || /Tool$/.test(id)) continue;
       seen.add(id);
-      const named = new RegExp(`${id.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\\W{1,4}"([^"]{2,60})"`).exec(line);
-      out.push({
+      cur = {
         nodeType: id,
         workflowNodeType: id,
-        displayName: named ? named[1] : humanizeNodeName(id),
+        displayName: humanizeNodeName(id),
+        description: null,
         package: id.slice(0, id.lastIndexOf('.')),
-        category: /trigger$/i.test(id) ? 'trigger' : null,
-        // The engine's ranking is the only relevance signal in the text output.
+        category: head[2] ? 'trigger' : null,
         relevance: out.length === 0 ? 'high' : null,
-      });
-      if (out.length >= limit) return out;
+      };
+      out.push(cur);
+      if (out.length >= limit) break;
+      continue;
     }
+    if (!cur) continue;
+    const dn = /^\s+Display Name:\s*(.+)$/.exec(line);
+    if (dn) { cur.displayName = dn[1].trim(); continue; }
+    const ds = /^\s+Description:\s*(.+)$/.exec(line);
+    if (ds) { cur.description = ds[1].trim(); continue; }
   }
   return out;
 }
 
 /**
- * Search nodes by keyword. NOT cached. Returns a candidate array
- * ({ nodeType, workflowNodeType, displayName, package, category, relevance }),
- * [] on error.
+ * Search nodes. `options.terms` (service names such as "gmail") is preferred;
+ * otherwise terms are derived from `query`. NOT cached. Returns candidates
+ * ({ nodeType, workflowNodeType, displayName, description, package, category,
+ * relevance }), [] on error or no hits.
  */
 async function searchNodes(query, options = {}) {
+  const terms = (Array.isArray(options.terms) && options.terms.length ? options.terms : deriveSearchTerms(query))
+    .map((t) => String(t).trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  if (terms.length === 0) return [];
   try {
-    const { structured, text } = await callTool('search_nodes', { queries: [String(query)] });
+    const { structured, text } = await callTool('search_nodes', { queries: terms });
     const body = structured && typeof structured.results === 'string' ? structured.results : text;
     return parseSearchCandidates(body, options.limit || 8);
   } catch (err) {
-    console.warn(`[n8nMcpClient] searchNodes(${query}) failed:`, err.message);
+    console.warn(`[n8nMcpClient] searchNodes(${terms.join(', ')}) failed:`, err.message);
     return [];
   }
 }
@@ -334,6 +384,7 @@ module.exports = {
   // Exposed for testing
   _toFullNodeType: toFullNodeType,
   _parseSearchCandidates: parseSearchCandidates,
+  _deriveSearchTerms: deriveSearchTerms,
   _clearCache: () => schemaCache.clear(),
   _clearSession: resetSession,
 };

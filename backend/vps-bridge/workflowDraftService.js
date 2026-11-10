@@ -70,6 +70,15 @@ function buildStepSearchQuery(step) {
     .slice(0, 160);
 }
 
+// n8n's native search wants short service names ("gmail", "google drive"), not
+// a sentence: prefer the step's declared integration, then its title words.
+function buildStepSearchTerms(step) {
+  const hints = [step.config?.integration, step.config?.service, step.config?.app, step.app, step.integration]
+    .filter((h) => typeof h === 'string' && h.trim())
+    .map((h) => h.trim());
+  return [...new Set(hints)].slice(0, 3);
+}
+
 function normalizeSearchResults(raw) {
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw?.results)) return raw.results;
@@ -129,7 +138,7 @@ async function inspectStepWithMcp(step) {
     return { mcpAvailable: true, query: '', candidates: [], selectedNode: null };
   }
 
-  const rawSearch = await searchNodes(query, { limit: 8, source: 'core' });
+  const rawSearch = await searchNodes(query, { limit: 8, terms: buildStepSearchTerms(step) });
   const candidates = normalizeSearchResults(rawSearch).map(sanitizeCandidate);
   const skillsNodeId = await resolveNodeIdFromSkills(step);
   let selectedNode = null;
