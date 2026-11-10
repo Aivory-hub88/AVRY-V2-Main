@@ -180,6 +180,10 @@ async function inspectStepWithMcp(step, ctx = {}) {
     }
   }
 
+  // The skills fallback names a node by its bare id ("googleSheets"); the
+  // search hit has the real display name ("Google Sheets") for the setup report.
+  if (selectedNode && configured?.displayName) selectedNode = { ...selectedNode, displayName: configured.displayName };
+
   // When configured, the validation result is for the REAL parameters; otherwise
   // fall back to validating the step's own config like before.
   const validation = configured
@@ -238,7 +242,10 @@ async function enrichStepsWithMcp(steps, ctx = {}) {
   const t0 = Date.now();
   const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step, i) => {
     try {
-      const previousTitles = steps.slice(0, i).map((st) => st.title).filter(Boolean);
+      const previousTitles = steps.slice(0, i).filter((st) => st.title).map((st) => {
+        const d = (st.description || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+        return `"${st.title}" (${st.type || 'step'}${d ? `: ${d}` : ''})`;
+      });
       return { ok: true, inspection: await inspectStepWithMcp(step, { intent: ctx.intent, previousTitles }) };
     } catch (error) {
       return { ok: false, error };
