@@ -156,6 +156,29 @@ function validatePick(pick, options) {
   return options.modes.includes(pick.mode) ? { mode: pick.mode } : null;
 }
 
+// ── Placeholders ──────────────────────────────────────────────────────────────
+
+const PLACEHOLDER_RE = /^<[^<>]+>$|^(your|my)[_\s-]|[_\s-]here$|^(xxx+|todo|changeme|example)$/i;
+
+/** Paths (dot notation) of string values that look like a placeholder the user must replace. */
+function findPlaceholderPaths(value, base = '') {
+  if (typeof value === 'string') return PLACEHOLDER_RE.test(value.trim()) ? [base] : [];
+  if (Array.isArray(value)) return value.flatMap((v, i) => findPlaceholderPaths(v, `${base}[${i}]`));
+  if (value && typeof value === 'object') {
+    return Object.entries(value).flatMap(([k, v]) => findPlaceholderPaths(v, base ? `${base}.${k}` : k));
+  }
+  return [];
+}
+
+/** Every placeholder left in the parameters must appear in needsInput, even if the model forgot to list it. */
+function withPlaceholderInputs(parameters, needsInput) {
+  const listed = new Set((needsInput || []).map((n) => String(n.path || '').replace(/^parameters\./, '')));
+  const extra = findPlaceholderPaths(parameters)
+    .filter((path) => path && !listed.has(path))
+    .map((path) => ({ path, label: `Fill in "${path.replace(/\.value$/, '')}"` }));
+  return [...(needsInput || []), ...extra];
+}
+
 // ── Expressions ───────────────────────────────────────────────────────────────
 
 /** n8n only evaluates a string as an expression when it starts with "=". */
@@ -253,6 +276,8 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
       }
     }
 
+    needsInput = withPlaceholderInputs(parameters, needsInput);
+
     // Model-authored code is never trusted blindly: always ask the user to review it.
     if (id === 'n8n-nodes-base.code') {
       needsInput = [...needsInput, { path: 'jsCode', label: `Review the generated code in "${step.title || 'Code'}"` }];
@@ -278,4 +303,4 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
   }
 }
 
-module.exports = { configureStep, buildConfigIntent, remapDeprecatedNode, isBranchingStep, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };
+module.exports = { configureStep, buildConfigIntent, _findPlaceholderPaths: findPlaceholderPaths, _withPlaceholderInputs: withPlaceholderInputs, remapDeprecatedNode, isBranchingStep, enabled, _normalizeExpressions: normalizeExpressions, _extractJson: extractJson, _discriminatorOptions: discriminatorOptions, _validatePick: validatePick };

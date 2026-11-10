@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { configureStep, buildConfigIntent, remapDeprecatedNode, isBranchingStep, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
+const { configureStep, buildConfigIntent, _findPlaceholderPaths, _withPlaceholderInputs, remapDeprecatedNode, isBranchingStep, _validatePick, _discriminatorOptions, _extractJson, _normalizeExpressions } = require('../nodeConfigurator');
 const { _parseSearchCandidates } = require('../n8nMcpClient');
 
 // Captured from n8n 2.26.4 (search_nodes ["google drive", "schedule trigger"], trimmed).
@@ -71,6 +71,13 @@ test('expressions get the leading = n8n needs, nested values included', () => {
     _normalizeExpressions({ text: 'New lead: {{ $json.name }}', n: 3, list: ['{{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: 'hi {{ $json.c }}' } }),
     { text: '=New lead: {{ $json.name }}', n: 3, list: ['={{ $json.a }}', '=already {{ $json.b }}', 'plain'], o: { x: '=hi {{ $json.c }}' } },
   );
+});
+
+test('placeholders left in parameters are always listed as inputs', () => {
+  const params = { documentId: { __rl: true, mode: 'id', value: 'your_sheet_id_here' }, sheetName: { value: '<SHEET_NAME>' }, sendTo: 'a@b.co', text: 'hello' };
+  assert.deepEqual(_findPlaceholderPaths(params).sort(), ['documentId.value', 'sheetName.value']);
+  const out = _withPlaceholderInputs(params, [{ path: 'parameters.sheetName.value', label: 'Sheet name' }]);
+  assert.deepEqual(out.map((n) => n.path), ['parameters.sheetName.value', 'documentId.value'], 'already-listed paths are not duplicated');
 });
 
 test('deprecated nodes are remapped to their modern replacement', () => {
