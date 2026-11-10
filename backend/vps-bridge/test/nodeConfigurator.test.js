@@ -113,12 +113,14 @@ test('configureStep: picks operation, fills params, uses the node version, merge
   };
   const out = await configureStep({ step: STEP, node: GMAIL, intent: 'email leads', previousSteps: ['Webhook'] }, { llm, mcp });
   assert.equal(out.nodeType, 'n8n-nodes-base.gmail');
+  assert.equal(out.displayName, 'Gmail');
   assert.equal(out.typeVersion, 2.2);
   assert.deepEqual(out.parameters, { sendTo: 'sales@example.com', subject: 'Leads', message: '={{ $json.summary }}', resource: 'message', operation: 'send' });
   assert.deepEqual(out.credentialTypes, ['gmailOAuth2']);
   assert.deepEqual(mcp.calls.defs[0], ['n8n-nodes-base.gmail', { resource: 'message', operation: 'send' }]);
   assert.equal(out.validation.valid, true);
   assert.match(prompts[1], /Earlier steps.*Webhook/);
+  assert.match(prompts[1], /exact title/);
 });
 
 test('configureStep: repairs once when n8n validation fails, keeps the better result', async () => {

@@ -77,12 +77,12 @@ Reply with ONLY a JSON object: {"parameters": { ... }, "needsInput": [ {"path": 
 Rules:
 - Use ONLY parameter names and enum values defined in the TypeScript definitions. Include every required (non-optional) field.
 - If the user's request or the step gives a concrete value (email address, URL, channel, subject, interval), use it exactly.
-- To use data produced by an earlier step, use an n8n expression string that starts with "=". $json is ONLY the output of the node immediately before this one. To read data from any other earlier step, reference that step by its exact title: ={{ $('Exact Step Title').item.json.field }}. Only reference fields that plausibly exist.
-- Never invent secrets, credentials, IDs or addresses. If a REQUIRED value cannot be known (a spreadsheet ID, a channel ID, a folder), set it to a short placeholder like "<SPREADSHEET_ID>" and list it in needsInput with a human-readable label.
+- ALWAYS read data from earlier steps with an explicit reference to that step by its exact title: ={{ $('Exact Step Title').item.json.field }}. This is correct whether or not the step is adjacent, so never use a bare $json (except in the very first node). Only reference fields that plausibly exist.
+- Never invent secrets, credentials, IDs, addresses, company names or brand names (write "our team" instead of guessing a company). If a REQUIRED value cannot be known (a spreadsheet ID, a channel ID, a folder), set it to a short placeholder like "<SPREADSHEET_ID>" and list it in needsInput with a human-readable label.
 - Leave optional fields out unless the step clearly implies them.
 - Write message bodies, subjects and prompts concisely and professionally, in the same language as the user's request.
 - Be SPECIFIC to this workflow's goal. Never write generic filler such as "automated notification" or "this is a message from the workflow": a subject or message must say what happened and include the relevant data from earlier steps via expressions (names, emails, amounts, links the flow produces).
-- Data from a Webhook trigger arrives under .json.body (POST/PUT body) or .json.query (query string): directly after the webhook use "={{ $json.body.email }}", from later steps use "={{ $('Webhook Step Title').item.json.body.email }}".
+- A Webhook trigger's payload is under .json.body (POST/PUT body) or .json.query (query string): e.g. ={{ $('Webhook Step Title').item.json.body.email }}. Fields of other earlier steps are directly under .json.<field>.
 - A Webhook trigger that receives data from another system uses httpMethod "POST" (GET only for simple pings or links).
 - A Schedule trigger must express the exact times the user asked for (days, hours, minutes).
 - Do not output credentials, authentication objects or the "credentials" key.`;
@@ -95,7 +95,7 @@ function describeStep(step, intent, previousSteps) {
     `Step description: ${step.description || ''}`,
     `Step type: ${step.type || ''}`,
     `Step settings already known (may be empty): ${JSON.stringify(cfg).slice(0, 1200)}`,
-    `Earlier steps (data flows from these): ${previousSteps.length ? previousSteps.join(' -> ') : '(this is the first step)'}`,
+    `Earlier steps, in order (node name = exact title; data flows from these): ${previousSteps.length ? previousSteps.join(' -> ') : '(this is the first step)'}`,
   ].join('\n');
 }
 
@@ -234,6 +234,7 @@ async function configureStep({ step, node, intent, previousSteps = [] }, deps = 
 
     return {
       nodeType: id,
+      displayName: node.displayName || null,
       typeVersion,
       parameters,
       credentialTypes: defs.credentials || [],
