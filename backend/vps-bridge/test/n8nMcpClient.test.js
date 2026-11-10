@@ -132,8 +132,8 @@ test('search_nodes: "No nodes found" yields no candidates', async () => {
 });
 
 test('handshake happens once across calls, with the initialized notification', async () => {
-  await client.searchNodes('a');
-  await client.searchNodes('b');
+  await client.searchNodes('gmail');
+  await client.searchNodes('slack');
   assert.equal(calls.filter((c) => c.method === 'initialize').length, 1);
   assert.equal(calls.filter((c) => c.method === 'notifications/initialized').length, 1);
 });
