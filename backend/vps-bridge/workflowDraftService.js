@@ -7,7 +7,7 @@ const {
   lookupNode,
   isAvailable: isN8nMcpAvailable,
 } = require('./n8nMcpClient');
-const { configureStep, enabled: nodeConfiguratorEnabled } = require('./nodeConfigurator');
+const { configureStep, buildConfigIntent, enabled: nodeConfiguratorEnabled } = require('./nodeConfigurator');
 
 // --- n8n-as-code grounded node resolver (@n8n-as-code/skills) ---------------
 // Replaces the weak MCP-only candidate scoring (which mapped hubspot->Monica CRM,
@@ -300,9 +300,11 @@ async function enrichStepsWithMcp(steps, ctx = {}) {
   };
 }
 
-async function prepareWorkflowDraft({ workflowId, description, steps }) {
+async function prepareWorkflowDraft({ workflowId, description, userContext, steps }) {
   const resolvedWorkflowId = workflowId || buildWorkflowId();
-  const { steps: enrichedSteps, inspectionReport } = await enrichStepsWithMcp(steps || [], { intent: description });
+  const { steps: enrichedSteps, inspectionReport } = await enrichStepsWithMcp(steps || [], {
+    intent: buildConfigIntent({ description, userContext, steps }),
+  });
 
   const buildResult = await callN8nAsCodeService('/drafts/build', {
     session_id: resolvedWorkflowId,
