@@ -4,8 +4,10 @@ const {
   getNodeSchema,
   validateNodeConfig,
   searchNodes,
+  lookupNode,
   isAvailable: isN8nMcpAvailable,
 } = require('./n8nMcpClient');
+const { configureStep, enabled: nodeConfiguratorEnabled } = require('./nodeConfigurator');
 
 // --- n8n-as-code grounded node resolver (@n8n-as-code/skills) ---------------
 // Replaces the weak MCP-only candidate scoring (which mapped hubspot->Monica CRM,
@@ -132,7 +134,7 @@ function summarizeSchema(schema) {
   };
 }
 
-async function inspectStepWithMcp(step) {
+async function inspectStepWithMcp(step, ctx = {}) {
   const query = buildStepSearchQuery(step);
   if (!query) {
     return { mcpAvailable: true, query: '', candidates: [], selectedNode: null };
@@ -156,9 +158,35 @@ async function inspectStepWithMcp(step) {
   // n8n-as-code does not reject it as an unrecognized node type.
   const selectedWorkflowNodeType = selectedNode?.workflowNodeType || selectedNode?.nodeType || null;
   const schema = selectedNodeType ? await getNodeSchema(selectedNodeType) : null;
-  const validation = selectedNodeType
-    ? await validateNodeConfig(selectedWorkflowNodeType || selectedNodeType, step.config || {}, 'minimal')
-    : null;
+
+  // Real configuration: resource/operation, current typeVersion and concrete
+  // parameters, grounded in n8n's own type definitions and validated by n8n.
+  let configured = null;
+  if (selectedWorkflowNodeType && nodeConfiguratorEnabled()) {
+    const rawHit = normalizeSearchResults(rawSearch).find((c) => (c.workflowNodeType || c.nodeType) === selectedWorkflowNodeType)
+      || await lookupNode(selectedWorkflowNodeType);
+    if (rawHit) {
+      configured = await configureStep({
+        step,
+        node: {
+          nodeType: selectedWorkflowNodeType,
+          displayName: rawHit.displayName,
+          version: rawHit.version,
+          discriminators: rawHit.discriminators,
+        },
+        intent: ctx.intent,
+        previousSteps: ctx.previousTitles || [],
+      });
+    }
+  }
+
+  // When configured, the validation result is for the REAL parameters; otherwise
+  // fall back to validating the step's own config like before.
+  const validation = configured
+    ? configured.validation
+    : selectedNodeType
+      ? await validateNodeConfig(selectedWorkflowNodeType || selectedNodeType, step.config || {}, 'minimal')
+      : null;
 
   return {
     mcpAvailable: true,
@@ -169,6 +197,7 @@ async function inspectStepWithMcp(step) {
     selectedWorkflowNodeType,
     schema: summarizeSchema(schema),
     validation,
+    configured,
   };
 }
 
@@ -192,7 +221,7 @@ async function mapWithConcurrency(items, limit, fn) {
   return out;
 }
 
-async function enrichStepsWithMcp(steps) {
+async function enrichStepsWithMcp(steps, ctx = {}) {
   const available = await isN8nMcpAvailable();
   if (!available) {
     return {
@@ -207,9 +236,10 @@ async function enrichStepsWithMcp(steps) {
   }
 
   const t0 = Date.now();
-  const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step) => {
+  const results = await mapWithConcurrency(steps, INSPECT_CONCURRENCY, async (step, i) => {
     try {
-      return { ok: true, inspection: await inspectStepWithMcp(step) };
+      const previousTitles = steps.slice(0, i).map((st) => st.title).filter(Boolean);
+      return { ok: true, inspection: await inspectStepWithMcp(step, { intent: ctx.intent, previousTitles }) };
     } catch (error) {
       return { ok: false, error };
     }
@@ -246,10 +276,13 @@ async function enrichStepsWithMcp(steps) {
     // step.config, so map it through to avoid building parameter-less nodes
     // that fail n8n pre-execution validation.
     const mappedParameters = step.parameters || step.config || {};
+    const cfg = inspection.configured;
     enrichedSteps.push({
       ...step,
       nodeType: selectedNodeType,
-      parameters: mappedParameters,
+      // A configured node carries n8n's current typeVersion and real parameters.
+      ...(cfg ? { typeVersion: cfg.typeVersion } : {}),
+      parameters: cfg ? cfg.parameters : mappedParameters,
       n8nInspection: inspection,
     });
   }
@@ -269,7 +302,7 @@ async function enrichStepsWithMcp(steps) {
 
 async function prepareWorkflowDraft({ workflowId, description, steps }) {
   const resolvedWorkflowId = workflowId || buildWorkflowId();
-  const { steps: enrichedSteps, inspectionReport } = await enrichStepsWithMcp(steps || []);
+  const { steps: enrichedSteps, inspectionReport } = await enrichStepsWithMcp(steps || [], { intent: description });
 
   const buildResult = await callN8nAsCodeService('/drafts/build', {
     session_id: resolvedWorkflowId,
