@@ -312,11 +312,14 @@ function parseSearchCandidates(text, limit) {
   const seen = new Set();
   const out = [];
   let cur = null;
+  let inDisc = false;
+  let topKey = null;
+  let curRes = null;
   for (const line of String(text).split('\n')) {
     const head = /^- ((?:@n8n\/n8n-nodes-[a-z0-9-]+|n8n-nodes-[a-z0-9-]+)\.[A-Za-z][A-Za-z0-9]*)(\s+\[TRIGGER\])?\s*$/.exec(line);
     if (head) {
       const id = head[1];
-      cur = null;
+      cur = null; inDisc = false; topKey = null; curRes = null;
       if (seen.has(id) || /Tool$/.test(id)) continue;
       seen.add(id);
       cur = {
@@ -324,6 +327,8 @@ function parseSearchCandidates(text, limit) {
         workflowNodeType: id,
         displayName: humanizeNodeName(id),
         description: null,
+        version: null,
+        discriminators: null,
         package: id.slice(0, id.lastIndexOf('.')),
         category: head[2] ? 'trigger' : null,
         relevance: out.length === 0 ? 'high' : null,
@@ -337,6 +342,24 @@ function parseSearchCandidates(text, limit) {
     if (dn) { cur.displayName = dn[1].trim(); continue; }
     const ds = /^\s+Description:\s*(.+)$/.exec(line);
     if (ds) { cur.description = ds[1].trim(); continue; }
+    const ver = /^\s+Version:\s*([0-9.]+)\s*$/.exec(line);
+    if (ver) { cur.version = Number(ver[1]); continue; }
+
+    // "  Discriminators:" block: resource → operations, or flat operation/mode lists.
+    if (/^  Discriminators:\s*$/.test(line)) { inDisc = true; cur.discriminators = { resources: {}, operations: [], modes: [] }; topKey = null; curRes = null; continue; }
+    if (!inDisc) continue;
+    if (/^  \S/.test(line)) { inDisc = false; continue; } // back to node-level text
+    const key = /^    (resource|operation|mode):\s*$/.exec(line);
+    if (key) { topKey = key[1]; curRes = null; continue; }
+    if (topKey === 'resource') {
+      const res = /^      - ([\w-]+):\s*$/.exec(line);
+      if (res) { curRes = res[1]; cur.discriminators.resources[curRes] = []; continue; }
+      const op = /^ {12}- ([\w-]+)\s*$/.exec(line);
+      if (op && curRes) cur.discriminators.resources[curRes].push(op[1]);
+    } else if (topKey === 'operation' || topKey === 'mode') {
+      const flat = /^      - ([\w-]+)(?::.*)?\s*$/.exec(line);
+      if (flat) cur.discriminators[topKey === 'operation' ? 'operations' : 'modes'].push(flat[1]);
+    }
   }
   return out;
 }
@@ -363,6 +386,39 @@ async function searchNodes(query, options = {}) {
   }
 }
 
+/**
+ * Type definitions for one node, optionally narrowed by discriminators
+ * ({ resource, operation, mode }). Returns
+ * { definitions, version, credentials, error }. Never throws.
+ */
+async function getNodeDefinitions(nodeType, disc = {}) {
+  const id = toFullNodeType(nodeType);
+  const clean = Object.fromEntries(Object.entries(disc || {}).filter(([, v]) => typeof v === 'string' && v));
+  const nodeId = Object.keys(clean).length ? { nodeId: id, ...clean } : id;
+  try {
+    const { structured, text } = await callTool('get_node_types', { nodeIds: [nodeId] });
+    const body = (structured && typeof structured.definitions === 'string' ? structured.definitions : text || '').trim();
+    if (!body) return { definitions: '', version: null, credentials: [], error: 'empty response' };
+    if (/^#\s*Errors/m.test(body) || /^Error:/m.test(body)) {
+      return { definitions: '', version: null, credentials: [], error: (/^Error:\s*(.+)$/m.exec(body) || [])[1] || 'unknown error' };
+    }
+    const ver = /Version\s+(\d+(?:\.\d+)?)/.exec(body);
+    const credBlock = /interface Credentials\s*\{([^}]*)\}/.exec(body);
+    const credentials = credBlock ? [...credBlock[1].matchAll(/^\s*(\w+)\??:/gm)].map((m) => m[1]) : [];
+    return { definitions: body, version: ver ? Number(ver[1]) : null, credentials, error: null };
+  } catch (err) {
+    return { definitions: '', version: null, credentials: [], error: err.message };
+  }
+}
+
+/** Find one node's search hit (version, discriminators) by its exact id. */
+async function lookupNode(nodeType) {
+  const id = toFullNodeType(nodeType);
+  if (!id) return null;
+  const hits = await searchNodes('', { terms: [humanizeNodeName(id).toLowerCase()], limit: 12 });
+  return hits.find((h) => h.workflowNodeType === id) || null;
+}
+
 /** Is the MCP configured, reachable and authorised? */
 async function isAvailable() {
   if (!cfg().url) return false;
@@ -380,6 +436,8 @@ module.exports = {
   validateNodeConfig,
   validateWorkflow,
   searchNodes,
+  getNodeDefinitions,
+  lookupNode,
   isAvailable,
   // Exposed for testing
   _toFullNodeType: toFullNodeType,
