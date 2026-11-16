@@ -103,6 +103,133 @@
   background: rgba(255, 255, 255, 0.9);
 }
 
+/* ---------------------------------------------------------------- prompt */
+
+/* The dashboard console's empty-state composer, in the hero's light ground:
+   message on top, + and send underneath, then the connect-your-apps strip. */
+.prompt {
+  position: relative;
+  width: 100%;
+  margin: 28px auto 0;
+  text-align: left;
+  border-radius: 20px;
+  background: rgba(17, 18, 20, 0.045);
+  box-shadow:
+    inset 0 0 0 1px rgba(17, 18, 20, 0.08),
+    0 24px 60px -28px rgba(20, 30, 70, 0.35);
+}
+.promptCard {
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.1), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+  transition: box-shadow 0.2s ease;
+}
+.promptCard:focus-within {
+  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.22), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+}
+.promptInput {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  padding: 16px 20px 4px;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.promptInput::placeholder {
+  color: rgba(17, 18, 20, 0.62);
+}
+.promptBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 12px 14px;
+}
+.promptIcon,
+.promptSend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.16s ease, transform 0.16s ease;
+}
+.promptIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(17, 18, 20, 0.55);
+}
+.promptIcon:hover {
+  background: rgba(17, 18, 20, 0.06);
+  color: var(--ink);
+}
+.promptSend {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+}
+.promptSend:hover {
+  background: #23262b;
+}
+.promptIcon:active,
+.promptSend:active {
+  transform: scale(0.94);
+}
+.promptIcon:focus-visible,
+.promptSend:focus-visible {
+  outline: 2px solid #1d4a9a;
+  outline-offset: 2px;
+}
+.promptApps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px 11px;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
+  font-size: 12.5px;
+  color: rgba(17, 18, 20, 0.5);
+}
+.promptAppIcons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+.promptAppIcons img {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+.promptAppsLabel {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .promptAppIcons img:nth-child(n + 8) {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .promptAppsLabel {
+    display: none;
+  }
+}
+
 /* ---------------------------------------------------------------- cards */
 
 .card {
@@ -670,7 +797,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  margin-top: 52px;
+  /* The one rail sits at the foot of the hero, under the prompt. */
+  margin-top: auto;
+  padding-top: 48px;
   padding-bottom: 56px;
 }
 .row {
@@ -755,7 +884,12 @@
   .copy {
     width: max-content;
     max-width: calc(100% - 40px);
-    padding-top: clamp(170px, 26svh, 280px);
+    padding-top: clamp(124px, 22svh, 300px);
+  }
+  .prompt {
+    width: 720px;
+    max-width: 100%;
+    margin-top: 32px;
   }
   .h {
     font-size: 44px;
@@ -765,7 +899,7 @@
     white-space: nowrap;
   }
   .rails {
-    margin-top: clamp(56px, 8.5svh, 100px);
+    padding-top: clamp(40px, 6svh, 80px);
     margin-bottom: 0;
     padding-bottom: 0;
   }
@@ -777,6 +911,9 @@
   }
 }
 @media (min-width: 1100px) and (max-height: 840px) {
+  .copy {
+    padding-top: clamp(124px, 17svh, 210px);
+  }
   .root {
     --slot: 170px;
     --k: 0.867;
@@ -841,13 +978,13 @@
 .trustBadge {
   height: 28px;
 }
-/* Desktop: the trust mark drops to the foot of the hero, against the lower rail's fade. */
+/* Desktop: the trust mark sits under the rail at the foot of the hero. */
 @media (min-width: 1100px) {
   .trust {
     position: relative;
     z-index: 2;
-    margin-top: auto;
-    padding-top: 10px;
+    margin-top: 0;
+    padding-top: 22px;
     padding-bottom: 26px;
   }
 }
