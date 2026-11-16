@@ -113,8 +113,8 @@
   margin: 28px auto 0;
   text-align: left;
   border-radius: 20px;
-  /* The dark lip under the white card, a touch lighter than the console's #191919. */
-  background: #2a2a2d;
+  /* The slate lip under the white card (user-picked #3b3e44). */
+  background: #3b3e44;
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.06),
     0 24px 60px -28px rgba(10, 14, 30, 0.55);
