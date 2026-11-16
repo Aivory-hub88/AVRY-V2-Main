@@ -222,9 +222,6 @@
   white-space: nowrap;
 }
 @media (max-width: 560px) {
-  .promptInput {
-    min-height: 92px;
-  }
   .promptAppIcons img:nth-child(n + 8) {
     display: none;
   }

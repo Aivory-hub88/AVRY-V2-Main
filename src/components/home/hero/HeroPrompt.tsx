@@ -7,12 +7,12 @@ import styles from './HeroOrbit.module.css';
 /** Things a business would actually ask Aivory to run. They type themselves
  *  into the empty field one after another. No full stops (on-screen copy rule). */
 const EXAMPLES = [
-  'Reconcile this month’s Odoo invoices against Stripe payouts and flag every mismatch for finance',
-  'Forecast next quarter’s cash flow from open deals, payroll and supplier terms, then brief the board',
-  'Watch stock across all warehouses and reorder before any SKU drops under two weeks of cover',
-  'Score every inbound lead against our ICP, route the top 10% to sales and draft the first touch',
-  'Find where procurement approvals stall and redesign the flow with clear owners and SLAs',
-  'Close the books by day three: match ledgers, chase missing receipts and draft the variance report',
+  'Reconcile Odoo invoices with Stripe and flag mismatches',
+  'Forecast next quarter’s cash flow and brief the board',
+  'Reorder stock before any SKU runs low',
+  'Score inbound leads and route the best to sales',
+  'Find where approvals stall and fix the flow',
+  'Close the books by day three, variance report included',
 ];
 
 const ICONS = '/integrations/icons';
