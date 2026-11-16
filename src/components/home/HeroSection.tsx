@@ -4,6 +4,7 @@ import Link from 'next/link';
 import styles from './hero/HeroOrbit.module.css';
 import { HERO_CARDS, HeroCard } from './hero/HeroCards';
 import HeroPrompt from './hero/HeroPrompt';
+import HeroBlob from './hero/HeroBlob';
 
 export const WALKTHROUGH_URL = 'https://book.aivory.uk/book/aivory-call';
 
@@ -33,6 +34,7 @@ export default function HeroSection() {
     <div className="hero relative w-full pb-16 md:pb-24">
       <div className="relative z-10 w-full animate-slide-up-1">
         <div className={styles.root}>
+          <HeroBlob />
           <div className={styles.copy}>
             <h1 className={styles.h}>Your business, minus the busywork</h1>
             <p className={styles.sub}>
