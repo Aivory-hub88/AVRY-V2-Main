@@ -204,7 +204,9 @@
   border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%),
-    rgba(90, 100, 138, 0.23);
+    rgba(90, 100, 138, 0.23),
+    /* veil: takes the wash behind the composer down by 40% (the CTAs keep theirs) */
+    linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.4));
   -webkit-backdrop-filter: blur(28px) saturate(1.6);
   backdrop-filter: blur(28px) saturate(1.6);
   box-shadow:
