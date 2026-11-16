@@ -28,7 +28,7 @@ const APPS: [string, string][] = [
   ['Jira', `${ICONS}/jira.svg`],
   ['Salesforce', `${ICONS}/salesforce.svg`],
   ['Shopify', `${ICONS}/shopify.svg`],
-  ['Odoo', `${ICONS}/odoo.svg`],
+  ['Odoo', `${ICONS}/odoo-wordmark.svg`],
   ['WhatsApp', `${ICONS}/whatsapp.svg`],
 ];
 
