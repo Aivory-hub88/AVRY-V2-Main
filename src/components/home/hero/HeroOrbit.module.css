@@ -115,14 +115,14 @@
 }
 /* Secondary: lighter milky glass. */
 .btnGhost {
-  background: rgba(140, 146, 162, 0.36);
+  background: rgba(122, 130, 150, 0.44);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     0 12px 30px -18px rgba(30, 36, 60, 0.35);
 }
 .btnGhost:hover {
-  background: rgba(140, 146, 162, 0.46);
+  background: rgba(122, 130, 150, 0.54);
 }
 
 /* ---------------------------------------------------------------- blob */
@@ -130,37 +130,35 @@
 /* The user's "Gradient" reference, copied: a soft sky-blue blob, periwinkle
    under its core, a pink rim along the lower left, white all round, fine grain.
    Colours are sampled from the reference. Static on purpose (perf budget). */
+.stage {
+  position: relative;
+}
+/* The blob sits only behind the prompt and the CTAs (user idea, 2026-11-16);
+   the headline stays on white. It spills past the stage and fades out. */
 .blobWrap {
   position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
+  inset: -150px -20% -130px;
+  z-index: -1;
   pointer-events: none;
-  /* Own blend group on white, so the overlay grain only shows where there is colour. */
-  isolation: isolate;
-  background: #fff;
 }
 .blob {
   position: absolute;
-  left: 54%;
-  top: -10%;
-  width: min(1240px, 86vw);
-  height: 88%;
-  transform: translateX(-50%);
-  filter: blur(36px);
+  inset: 0;
+  filter: blur(30px);
   background:
     /* sky core */
-    radial-gradient(34% 34% at 56% 40%, #84cbf3 0%, rgba(132, 203, 243, 0.85) 45%, rgba(132, 203, 243, 0) 100%),
+    radial-gradient(34% 32% at 60% 40%, #84cbf3 0%, rgba(132, 203, 243, 0.85) 45%, rgba(132, 203, 243, 0) 100%),
     /* periwinkle under the core */
-    radial-gradient(34% 22% at 54% 70%, #96b9e5 0%, rgba(150, 185, 229, 0.75) 45%, rgba(150, 185, 229, 0) 100%),
+    radial-gradient(32% 26% at 50% 58%, #96b9e5 0%, rgba(150, 185, 229, 0.75) 45%, rgba(150, 185, 229, 0) 100%),
     /* lavender into pink along the lower rim */
-    radial-gradient(30% 16% at 46% 83%, #d6b8da 0%, rgba(214, 184, 218, 0.8) 45%, rgba(217, 188, 220, 0) 100%),
-    radial-gradient(40% 14% at 44% 91%, #f6c8df 0%, rgba(246, 200, 223, 0.85) 45%, rgba(247, 207, 227, 0) 100%),
-    /* pink on the lower left flank */
-    radial-gradient(16% 26% at 24% 70%, #f4d3e5 0%, rgba(244, 211, 229, 0.7) 45%, rgba(244, 211, 229, 0) 100%),
+    radial-gradient(28% 20% at 40% 70%, #d6b8da 0%, rgba(214, 184, 218, 0.8) 45%, rgba(214, 184, 218, 0) 100%),
+    radial-gradient(36% 16% at 42% 79%, #f6c8df 0%, rgba(246, 200, 223, 0.85) 45%, rgba(246, 200, 223, 0) 100%),
+    /* pink on the left flank */
+    radial-gradient(14% 26% at 22% 56%, #f4d3e5 0%, rgba(244, 211, 229, 0.7) 45%, rgba(244, 211, 229, 0) 100%),
     /* pale blue halo that melts into white */
-    radial-gradient(46% 50% at 57% 42%, #c9e9fa 0%, rgba(201, 233, 250, 0.7) 50%, rgba(201, 233, 250, 0) 100%);
+    radial-gradient(48% 46% at 56% 46%, #c9e9fa 0%, rgba(201, 233, 250, 0.7) 50%, rgba(201, 233, 250, 0) 100%);
 }
+/* Grain only where there is colour: masked to the blob's footprint. */
 .blobGrain {
   position: absolute;
   inset: 0;
@@ -168,13 +166,12 @@
   height: 100%;
   mix-blend-mode: overlay;
   opacity: 0.22;
+  -webkit-mask-image: radial-gradient(48% 44% at 52% 52%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(48% 44% at 52% 52%, #000 45%, transparent 100%);
 }
 @media (max-width: 1099px) {
-  .blob {
-    width: 190vw;
-    left: 52%;
-    top: -6%;
-    height: 82%;
+  .blobWrap {
+    inset: -110px -16% -100px;
   }
 }
 

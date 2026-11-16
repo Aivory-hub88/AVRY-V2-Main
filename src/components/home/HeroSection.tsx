@@ -34,25 +34,28 @@ export default function HeroSection() {
     <div className="hero relative w-full pb-16 md:pb-24">
       <div className="relative z-10 w-full animate-slide-up-1">
         <div className={styles.root}>
-          <HeroBlob />
           <div className={styles.copy}>
             <h1 className={styles.h}>Your business, minus the busywork</h1>
             <p className={styles.sub}>
               Aivory takes you from first analysis to AI that works with you at any scale
             </p>
-            <HeroPrompt />
-            <div className={styles.cta}>
-              <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
-                Start free operations analysis
-              </Link>
-              <a
-                href={WALKTHROUGH_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${styles.btn} ${styles.btnGhost}`}
-              >
-                Book a walkthrough
-              </a>
+            {/* The colour lives only behind the prompt and the buttons. */}
+            <div className={styles.stage}>
+              <HeroBlob />
+              <HeroPrompt />
+              <div className={styles.cta}>
+                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
+                  Start free operations analysis
+                </Link>
+                <a
+                  href={WALKTHROUGH_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${styles.btn} ${styles.btnGhost}`}
+                >
+                  Book a walkthrough
+                </a>
+              </div>
             </div>
           </div>
 
