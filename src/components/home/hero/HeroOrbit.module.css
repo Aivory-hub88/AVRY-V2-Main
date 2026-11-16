@@ -188,20 +188,28 @@
   margin: 28px auto 0;
   text-align: left;
   border-radius: 20px;
-  /* The slate lip under the white card (user-picked #3b3e44). */
-  background: #3b3e44;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 24px 60px -28px rgba(10, 14, 30, 0.55);
+  box-shadow: 0 24px 60px -30px rgba(10, 14, 30, 0.45);
 }
+/* iOS frosted glass, like the CTAs: milky grey tint over a heavy blur, white
+   type, a faint light rim and a soft top glow. */
 .promptCard {
+  position: relative;
+  z-index: 1;
   border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.1), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%),
+    rgba(112, 118, 136, 0.44);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
   transition: box-shadow 0.2s ease;
 }
 .promptCard:focus-within {
-  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.22), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .promptInput {
   display: block;
@@ -216,10 +224,12 @@
   font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-size: 15.5px;
   line-height: 1.45;
-  color: var(--ink);
+  color: #fff;
+  caret-color: #fff;
+  text-shadow: 0 1px 2px rgba(20, 24, 40, 0.16);
 }
 .promptInput::placeholder {
-  color: rgba(17, 18, 20, 0.62);
+  color: rgba(255, 255, 255, 0.88);
 }
 .promptBar {
   display: flex;
@@ -241,21 +251,22 @@
   height: 32px;
   border-radius: 10px;
   background: transparent;
-  color: rgba(17, 18, 20, 0.55);
+  color: rgba(255, 255, 255, 0.85);
 }
 .promptIcon:hover {
-  background: rgba(17, 18, 20, 0.06);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 .promptSend {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 12px -6px rgba(20, 24, 40, 0.45);
 }
 .promptSend:hover {
-  background: #23262b;
+  background: rgba(255, 255, 255, 0.86);
 }
 .promptIcon:active,
 .promptSend:active {
@@ -267,11 +278,25 @@
   outline-offset: 2px;
 }
 .promptApps {
+  /* The slate lip (user-picked #3b3e44). It tucks 20px up behind the glass card;
+     the mask cuts the card's rounded bottom out of it, so the lip never shows
+     through the frosted glass. */
+  margin-top: -20px;
+  border-radius: 0 0 20px 20px;
+  background: #3b3e44;
+  -webkit-mask:
+    radial-gradient(circle at 100% 0, transparent 19.5px, #000 20px) 0 0 / 20px 20px no-repeat,
+    radial-gradient(circle at 0 0, transparent 19.5px, #000 20px) 100% 0 / 20px 20px no-repeat,
+    linear-gradient(#000, #000) 0 20px / 100% calc(100% - 20px) no-repeat;
+  mask:
+    radial-gradient(circle at 100% 0, transparent 19.5px, #000 20px) 0 0 / 20px 20px no-repeat,
+    radial-gradient(circle at 0 0, transparent 19.5px, #000 20px) 100% 0 / 20px 20px no-repeat,
+    linear-gradient(#000, #000) 0 20px / 100% calc(100% - 20px) no-repeat;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 18px 8px;
+  padding: 28px 18px 8px;
   font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.55);
