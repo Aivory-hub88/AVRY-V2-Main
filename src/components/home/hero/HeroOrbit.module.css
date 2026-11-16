@@ -83,20 +83,51 @@
   outline: 2px solid #1d4a9a;
   outline-offset: 3px;
 }
+.btn {
+  position: relative;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
+/* Liquid glass: a curved specular sheen on the top half, a bright rim on top,
+   a soft refraction shadow on the bottom edge. */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.12) 46%, rgba(255, 255, 255, 0) 52%);
+  opacity: 0.55;
+}
+/* Primary: smoked glass, so it still leads. */
 .btnPrimary {
-  background: var(--ink);
+  background: rgba(17, 18, 20, 0.72);
   color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 -8px 16px -10px rgba(255, 255, 255, 0.25),
+    0 10px 28px -12px rgba(10, 14, 30, 0.55);
+}
+.btnPrimary::before {
+  opacity: 0.22;
 }
 .btnPrimary:hover {
-  background: #23262b;
+  background: rgba(17, 18, 20, 0.82);
 }
+/* Secondary: clear glass over the blob. */
 .btnGhost {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.26);
   color: var(--ink);
-  box-shadow: inset 0 0 0 1px rgba(17, 18, 20, 0.16), 0 8px 20px -12px rgba(20, 30, 60, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 -10px 18px -12px rgba(120, 140, 200, 0.45),
+    0 10px 26px -14px rgba(40, 60, 120, 0.45);
 }
 .btnGhost:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* ---------------------------------------------------------------- blob */
