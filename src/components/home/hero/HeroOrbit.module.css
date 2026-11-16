@@ -146,14 +146,14 @@
   -webkit-mask-image: linear-gradient(
     180deg,
     transparent 0,
-    #000 64px,
+    #000 34px,
     #000 calc(100% - var(--below)),
     rgba(0, 0, 0, 0.4) calc(100% - var(--below) + 24px)
   );
   mask-image: linear-gradient(
     180deg,
     transparent 0,
-    #000 64px,
+    #000 34px,
     #000 calc(100% - var(--below)),
     rgba(0, 0, 0, 0.4) calc(100% - var(--below) + 24px)
   );
@@ -163,6 +163,11 @@
   inset: 0;
   filter: blur(30px);
   background:
+    /* deeper accents behind the glass, so the white type reads and the
+       wash has depth: azure top right, indigo-violet left, rose low left */
+    radial-gradient(22% 26% at 70% 34%, #4aa6ea 0%, rgba(74, 166, 234, 0.75) 45%, rgba(74, 166, 234, 0) 100%),
+    radial-gradient(20% 28% at 32% 36%, #7c84e4 0%, rgba(124, 132, 228, 0.75) 45%, rgba(124, 132, 228, 0) 100%),
+    radial-gradient(16% 20% at 30% 64%, #e08dbd 0%, rgba(224, 141, 189, 0.65) 45%, rgba(224, 141, 189, 0) 100%),
     /* sky core */
     radial-gradient(34% 32% at 60% 40%, #84cbf3 0%, rgba(132, 203, 243, 0.85) 45%, rgba(132, 203, 243, 0) 100%),
     /* periwinkle under the core */
