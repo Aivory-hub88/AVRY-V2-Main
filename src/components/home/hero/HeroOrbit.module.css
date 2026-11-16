@@ -17,12 +17,8 @@
   min-height: 100svh;
   overflow: hidden;
   color: var(--ink);
-  background:
-    radial-gradient(560px 380px at 12% 84%, rgba(43, 99, 198, 0.2), transparent 70%),
-    radial-gradient(460px 320px at 90% 72%, rgba(228, 106, 36, 0.16), transparent 70%),
-    radial-gradient(540px 340px at 76% 12%, rgba(120, 110, 220, 0.14), transparent 70%),
-    radial-gradient(400px 280px at 20% 14%, rgba(154, 174, 220, 0.18), transparent 70%),
-    var(--paper);
+  /* Plain paper; the colour comes from the one blob behind the copy (.blob). */
+  background: #fff;
   box-shadow: 0 40px 120px -40px rgba(0, 0, 0, 0.65);
 }
 
@@ -87,20 +83,104 @@
   outline: 2px solid #1d4a9a;
   outline-offset: 3px;
 }
-.btnPrimary {
-  background: var(--ink);
+.btn {
+  position: relative;
+  overflow: hidden;
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  backdrop-filter: blur(24px) saturate(1.4);
   color: #fff;
+  text-shadow: 0 1px 2px rgba(20, 24, 40, 0.18);
+}
+/* iOS frosted glass (user refs: weather widget, Notes menu, sidebar): a milky
+   grey tint over a heavy blur, white type, a faint light rim, a soft top glow.
+   No glossy band. */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
+}
+/* Primary: deeper grey glass, so it still leads. */
+.btnPrimary {
+  background: rgba(78, 82, 96, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px -16px rgba(30, 36, 60, 0.45);
 }
 .btnPrimary:hover {
-  background: #23262b;
+  background: rgba(78, 82, 96, 0.6);
 }
+/* Secondary: lighter milky glass. */
 .btnGhost {
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px rgba(17, 18, 20, 0.16), 0 8px 20px -12px rgba(20, 30, 60, 0.3);
+  background: rgba(122, 130, 150, 0.44);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 12px 30px -18px rgba(30, 36, 60, 0.35);
 }
 .btnGhost:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(122, 130, 150, 0.54);
+}
+
+/* ---------------------------------------------------------------- blob */
+
+/* The user's "Gradient" reference, copied: a soft sky-blue blob, periwinkle
+   under its core, a pink rim along the lower left, white all round, fine grain.
+   Colours are sampled from the reference. Static on purpose (perf budget). */
+.stage {
+  position: relative;
+}
+/* The blob sits only behind the prompt and the CTAs (user idea, 2026-11-16);
+   the headline stays on white. It spills past the stage and fades out. */
+.blobWrap {
+  position: absolute;
+  --below: 130px;
+  inset: -28px -20% calc(var(--below) * -1);
+  z-index: -1;
+  pointer-events: none;
+  /* Clipped by HeroBlob to the glass shapes; nothing shows outside them. */
+}
+.blob {
+  position: absolute;
+  inset: 0;
+  filter: blur(30px);
+  background:
+    /* deeper accents behind the glass, so the white type reads and the
+       wash has depth: azure top right, indigo-violet left, rose low left */
+    radial-gradient(22% 26% at 70% 34%, #4aa6ea 0%, rgba(74, 166, 234, 0.75) 45%, rgba(74, 166, 234, 0) 100%),
+    radial-gradient(20% 28% at 32% 36%, #7c84e4 0%, rgba(124, 132, 228, 0.75) 45%, rgba(124, 132, 228, 0) 100%),
+    radial-gradient(16% 20% at 30% 64%, #e08dbd 0%, rgba(224, 141, 189, 0.65) 45%, rgba(224, 141, 189, 0) 100%),
+    /* sky core */
+    radial-gradient(34% 32% at 60% 40%, #84cbf3 0%, rgba(132, 203, 243, 0.85) 45%, rgba(132, 203, 243, 0) 100%),
+    /* periwinkle under the core */
+    radial-gradient(32% 26% at 50% 58%, #96b9e5 0%, rgba(150, 185, 229, 0.75) 45%, rgba(150, 185, 229, 0) 100%),
+    /* lavender into pink along the lower rim */
+    radial-gradient(28% 20% at 40% 70%, #d6b8da 0%, rgba(214, 184, 218, 0.8) 45%, rgba(214, 184, 218, 0) 100%),
+    radial-gradient(36% 16% at 42% 79%, #f6c8df 0%, rgba(246, 200, 223, 0.85) 45%, rgba(246, 200, 223, 0) 100%),
+    /* pink on the left flank */
+    radial-gradient(14% 26% at 22% 56%, #f4d3e5 0%, rgba(244, 211, 229, 0.7) 45%, rgba(244, 211, 229, 0) 100%),
+    /* pale blue halo that melts into white */
+    radial-gradient(48% 46% at 56% 46%, #c9e9fa 0%, rgba(201, 233, 250, 0.7) 50%, rgba(201, 233, 250, 0) 100%);
+}
+/* Grain only where there is colour: masked to the blob's footprint. */
+.blobGrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: overlay;
+  opacity: 0.22;
+  -webkit-mask-image: radial-gradient(48% 44% at 52% 52%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(48% 44% at 52% 52%, #000 45%, transparent 100%);
+}
+@media (max-width: 1099px) {
+  .blobWrap {
+    --below: 100px;
+    inset: -24px -16% calc(var(--below) * -1);
+  }
 }
 
 /* ---------------------------------------------------------------- prompt */
@@ -113,20 +193,28 @@
   margin: 28px auto 0;
   text-align: left;
   border-radius: 20px;
-  /* The slate lip under the white card (user-picked #3b3e44). */
-  background: #3b3e44;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 24px 60px -28px rgba(10, 14, 30, 0.55);
+  box-shadow: 0 24px 60px -30px rgba(10, 14, 30, 0.45);
 }
+/* iOS frosted glass, like the CTAs: milky grey tint over a heavy blur, white
+   type, a faint light rim and a soft top glow. */
 .promptCard {
+  position: relative;
+  z-index: 1;
   border-radius: 20px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.1), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%),
+    rgba(112, 118, 136, 0.44);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  backdrop-filter: blur(28px) saturate(1.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
   transition: box-shadow 0.2s ease;
 }
 .promptCard:focus-within {
-  box-shadow: 0 0 0 1px rgba(17, 18, 20, 0.22), 0 2px 6px -2px rgba(20, 30, 60, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .promptInput {
   display: block;
@@ -141,10 +229,12 @@
   font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-size: 15.5px;
   line-height: 1.45;
-  color: var(--ink);
+  color: #fff;
+  caret-color: #fff;
+  text-shadow: 0 1px 2px rgba(20, 24, 40, 0.16);
 }
 .promptInput::placeholder {
-  color: rgba(17, 18, 20, 0.62);
+  color: rgba(255, 255, 255, 0.88);
 }
 .promptBar {
   display: flex;
@@ -166,21 +256,22 @@
   height: 32px;
   border-radius: 10px;
   background: transparent;
-  color: rgba(17, 18, 20, 0.55);
+  color: rgba(255, 255, 255, 0.85);
 }
 .promptIcon:hover {
-  background: rgba(17, 18, 20, 0.06);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
 }
 .promptSend {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 12px -6px rgba(20, 24, 40, 0.45);
 }
 .promptSend:hover {
-  background: #23262b;
+  background: rgba(255, 255, 255, 0.86);
 }
 .promptIcon:active,
 .promptSend:active {
@@ -192,11 +283,25 @@
   outline-offset: 2px;
 }
 .promptApps {
+  /* The slate lip (user-picked #3b3e44). It tucks 20px up behind the glass card;
+     the mask cuts the card's rounded bottom out of it, so the lip never shows
+     through the frosted glass. */
+  margin-top: -20px;
+  border-radius: 0 0 20px 20px;
+  background: #3b3e44;
+  -webkit-mask:
+    radial-gradient(circle at 100% 0, transparent 19.5px, #000 20px) 0 0 / 20px 20px no-repeat,
+    radial-gradient(circle at 0 0, transparent 19.5px, #000 20px) 100% 0 / 20px 20px no-repeat,
+    linear-gradient(#000, #000) 0 20px / 100% calc(100% - 20px) no-repeat;
+  mask:
+    radial-gradient(circle at 100% 0, transparent 19.5px, #000 20px) 0 0 / 20px 20px no-repeat,
+    radial-gradient(circle at 0 0, transparent 19.5px, #000 20px) 100% 0 / 20px 20px no-repeat,
+    linear-gradient(#000, #000) 0 20px / 100% calc(100% - 20px) no-repeat;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 18px 8px;
+  padding: 28px 18px 8px;
   font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.55);
@@ -805,6 +910,8 @@
   --k: 0.765;
 }
 .rails {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 14px;

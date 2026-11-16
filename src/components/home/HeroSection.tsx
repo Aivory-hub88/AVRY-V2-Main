@@ -4,6 +4,7 @@ import Link from 'next/link';
 import styles from './hero/HeroOrbit.module.css';
 import { HERO_CARDS, HeroCard } from './hero/HeroCards';
 import HeroPrompt from './hero/HeroPrompt';
+import HeroBlob from './hero/HeroBlob';
 
 export const WALKTHROUGH_URL = 'https://book.aivory.uk/book/aivory-call';
 
@@ -38,19 +39,24 @@ export default function HeroSection() {
             <p className={styles.sub}>
               Aivory takes you from first analysis to AI that works with you at any scale
             </p>
-            <HeroPrompt />
-            <div className={styles.cta}>
-              <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
-                Start free operations analysis
-              </Link>
-              <a
-                href={WALKTHROUGH_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`${styles.btn} ${styles.btnGhost}`}
-              >
-                Book a walkthrough
-              </a>
+            {/* The colour lives only inside the prompt card and the buttons. */}
+            <div className={styles.stage}>
+              <HeroBlob />
+              <HeroPrompt />
+              <div className={styles.cta}>
+                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`} data-glass>
+                  Start free operations analysis
+                </Link>
+                <a
+                  href={WALKTHROUGH_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${styles.btn} ${styles.btnGhost}`}
+                  data-glass
+                >
+                  Book a walkthrough
+                </a>
+              </div>
             </div>
           </div>
 
