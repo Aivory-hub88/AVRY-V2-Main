@@ -101,7 +101,7 @@ export default function HeroPrompt() {
 
   return (
     <form className={styles.prompt} onSubmit={send}>
-      <div className={styles.promptCard}>
+      <div className={styles.promptCard} data-glass>
         <textarea
           ref={ref}
           rows={2}

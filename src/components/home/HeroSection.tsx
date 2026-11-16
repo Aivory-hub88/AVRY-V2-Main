@@ -39,12 +39,12 @@ export default function HeroSection() {
             <p className={styles.sub}>
               Aivory takes you from first analysis to AI that works with you at any scale
             </p>
-            {/* The colour lives only behind the prompt and the buttons. */}
+            {/* The colour lives only inside the prompt card and the buttons. */}
             <div className={styles.stage}>
               <HeroBlob />
               <HeroPrompt />
               <div className={styles.cta}>
-                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
+                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`} data-glass>
                   Start free operations analysis
                 </Link>
                 <a
@@ -52,6 +52,7 @@ export default function HeroSection() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${styles.btn} ${styles.btnGhost}`}
+                  data-glass
                 >
                   Book a walkthrough
                 </a>

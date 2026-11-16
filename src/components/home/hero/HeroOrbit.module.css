@@ -141,22 +141,7 @@
   inset: -28px -20% calc(var(--below) * -1);
   z-index: -1;
   pointer-events: none;
-  /* Starts below the sub line, so the headline block stays on clean white;
-     under the CTAs it drops to 40% (user asked 60% less there). */
-  -webkit-mask-image: linear-gradient(
-    180deg,
-    transparent 0,
-    #000 34px,
-    #000 calc(100% - var(--below)),
-    rgba(0, 0, 0, 0.4) calc(100% - var(--below) + 24px)
-  );
-  mask-image: linear-gradient(
-    180deg,
-    transparent 0,
-    #000 34px,
-    #000 calc(100% - var(--below)),
-    rgba(0, 0, 0, 0.4) calc(100% - var(--below) + 24px)
-  );
+  /* Clipped by HeroBlob to the glass shapes; nothing shows outside them. */
 }
 .blob {
   position: absolute;
