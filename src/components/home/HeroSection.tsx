@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import styles from './hero/HeroOrbit.module.css';
 import { HERO_CARDS, HeroCard } from './hero/HeroCards';
+import HeroPrompt from './hero/HeroPrompt';
 
 export const WALKTHROUGH_URL = 'https://book.aivory.uk/book/aivory-call';
 
@@ -14,19 +15,15 @@ const COPIES = [0, 1];
  *  so no two of a kind or two near hues sit side by side, also across the seams. */
 const RAIL_A = ['automate', 'photo-celebrating', 'ui-crm', 'streamline', 'aether', 'audit', 'ui-timeline', 'apps'];
 const RAIL_B = ['decision', 'mail', 'team', 'encrypted', 'photo-profile', 'ui-report', 'sovereignty', 'proof'];
-// Both rails carry all sixteen cards. The upper one is the readable row; the lower
-// one runs the same set half a loop apart, so the two never show the same card together.
-const ROWS = [
-  [...RAIL_A, ...RAIL_B],
-  [...RAIL_B, ...RAIL_A],
-];
+// One rail carries all sixteen cards, at the foot of the hero.
+const ROWS = [[...RAIL_A, ...RAIL_B]];
 const byId = (ids: string[]) => ids.map((id) => HERO_CARDS.find((c) => c.id === id)!);
 
 /**
- * The hero is one light field: the headline, sub line and buttons on top, and
- * under them two rails of cards running in opposite directions. The layout and
- * motion are the same at every width; only the card size changes. The rails
- * are CSS animations (transform only), so there is no script loop here.
+ * The hero is one light field: the headline, sub line, the console-style prompt
+ * and buttons on top, and one rail of cards running along the foot. The layout
+ * and motion are the same at every width; only the card size changes. The rail
+ * is a CSS animation (transform only), so there is no script loop here.
  *
  * `hero` opts the whole block out of ScrollRevealProvider's global `h2, p`
  * GSAP pass, which would otherwise hold the subline at opacity 0 on first paint.
@@ -41,6 +38,7 @@ export default function HeroSection() {
             <p className={styles.sub}>
               Aivory takes you from first analysis to AI that works with you at any scale
             </p>
+            <HeroPrompt />
             <div className={styles.cta}>
               <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
                 Start free operations analysis
