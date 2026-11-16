@@ -137,7 +137,17 @@ export default function HeroPrompt() {
         <span className={styles.promptAppIcons} aria-hidden>
           {APPS.map(([name, src]) => (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={name} src={src} alt="" title={name} width={16} height={16} loading="lazy" decoding="async" />
+            <img
+              key={name}
+              src={src}
+              alt=""
+              title={name}
+              width={16}
+              height={16}
+              loading="lazy"
+              decoding="async"
+              className={name === 'Odoo' ? styles.promptWordmark : undefined}
+            />
           ))}
         </span>
         <span className={styles.promptAppsLabel}>
