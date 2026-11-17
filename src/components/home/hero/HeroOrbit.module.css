@@ -342,6 +342,20 @@
   gap: 7px;
   white-space: nowrap;
 }
+/* "connect your tools to <wordmark>" (user ref 2026-11-17): light lowercase line, the Aivory
+   wordmark in soft white. */
+.promptAppsLabel {
+  gap: 8px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.62);
+}
+.promptBrand {
+  display: block;
+  width: auto;
+  height: 11px;
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+}
 @media (max-width: 560px) {
   .promptInput {
     min-height: 96px;

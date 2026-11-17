@@ -151,10 +151,8 @@ export default function HeroPrompt() {
           ))}
         </span>
         <span className={styles.promptAppsLabel}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0V8ZM12 18v4" />
-          </svg>
-          Connect your apps to do more
+          connect your tools to
+          <img src="/aivory-wordmark.svg" alt="Aivory" className={styles.promptBrand} decoding="async" />
         </span>
       </div>
     </form>
