@@ -102,27 +102,29 @@
   pointer-events: none;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
 }
-/* Primary: deeper grey glass, so it still leads. */
+/* Primary: midnight glass, deep navy but still see-through so the blob tints it. */
 .btnPrimary {
-  background: rgba(78, 82, 96, 0.5);
+  background: rgba(24, 34, 78, 0.82);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 12px 30px -16px rgba(30, 36, 60, 0.45);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 12px 30px -16px rgba(24, 34, 78, 0.5);
 }
 .btnPrimary:hover {
-  background: rgba(78, 82, 96, 0.6);
+  background: rgba(24, 34, 78, 0.9);
 }
-/* Secondary: lighter milky glass. */
+/* Secondary: clear white glass, navy type. */
 .btnGhost {
-  background: rgba(122, 130, 150, 0.44);
+  background: rgba(255, 255, 255, 0.42);
+  color: #1d2a5c;
+  text-shadow: none;
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 12px 30px -18px rgba(30, 36, 60, 0.35);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 12px 30px -18px rgba(24, 34, 78, 0.28);
 }
 .btnGhost:hover {
-  background: rgba(122, 130, 150, 0.54);
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* ---------------------------------------------------------------- blob */
