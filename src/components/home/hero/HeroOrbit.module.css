@@ -293,7 +293,10 @@
      through the frosted glass. */
   margin-top: -20px;
   border-radius: 0 0 20px 20px;
-  background: #3b3e44;
+  /* Same slate-blue family as the CTAs, a few steps darker so the white type and app icons hold. */
+  background:
+    radial-gradient(70% 90% at 50% 60%, rgba(64, 78, 102, 0.55), rgba(64, 78, 102, 0) 75%),
+    linear-gradient(180deg, rgb(112, 120, 134) 0%, rgb(82, 96, 120) 52%, rgb(98, 114, 140) 100%);
   -webkit-mask:
     radial-gradient(circle at 100% 0, transparent 19.5px, #000 20px) 0 0 / 20px 20px no-repeat,
     radial-gradient(circle at 0 0, transparent 19.5px, #000 20px) 100% 0 / 20px 20px no-repeat,
