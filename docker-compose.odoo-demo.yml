@@ -1,0 +1,70 @@
+version: '3.8'
+
+# ─── Aivory Odoo Demo — persistent demo instance for prospect demos ──────────
+# URL: https://odoo-demo.aivory.id (Odoo 19 Community — mirrors prospect env)
+# (https://odoo.aivory.id is the team's Odoo 17 — a different box.)
+# DNS: A record odoo-demo -> VPS IP, DNS-only (Traefik TLS-ALPN/HTTP challenge)
+# Secrets: NOT in this file — ops/odoo-demo/odoo.conf on the VPS only
+#   (see ops/odoo-demo/odoo.conf.example). Never commit the real odoo.conf.
+# Usage (on VPS, from repo root):
+#   docker compose -f docker-compose.odoo-demo.yml up -d
+#   ./ops/odoo-demo/bootstrap_demo.sh all            # modules + agent user/API key + roofer data
+#   ./ops/odoo-demo/seed_demo.py --scenario retail   # other (XML-RPC) scenarios
+#   ./ops/odoo-demo/reset_demo.sh                    # wipe after demo
+#
+# Data flow:
+#   inject (seed_demo.py via XML-RPC) -> demo -> reset (drop + restore golden)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  odoo-demo-db:
+    image: postgres:15
+    container_name: aivory-odoo-demo-db
+    environment:
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=${ODOO_DB_PASSWORD:?set ODOO_DB_PASSWORD (ops/odoo-demo/odoo.conf on VPS)}
+      - POSTGRES_DB=postgres
+    volumes:
+      - odoo_demo_db:/var/lib/postgresql/data
+      # golden dump lives on host so reset works even after volume wipe
+      - ./ops/odoo-demo/golden:/golden:ro
+    networks:
+      - aivory-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 60s
+      timeout: 5s
+      retries: 5
+
+  odoo-demo:
+    image: odoo:19
+    container_name: aivory-odoo-demo
+    depends_on:
+      odoo-demo-db:
+        condition: service_healthy
+    command: -c /etc/odoo/odoo.conf
+    volumes:
+      - odoo_demo_data:/var/lib/odoo
+      - ./ops/odoo-demo/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./services/aivory-cerveau-odoo/addons:/mnt/extra-addons:ro
+    networks:
+      - aivory-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.odoo-demo.rule=Host(`odoo-demo.aivory.id`)"
+      - "traefik.http.routers.odoo-demo.entrypoints=websecure"
+      - "traefik.http.routers.odoo-demo.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.odoo-demo.middlewares=aivory-odoo-secure@file"
+      - "traefik.http.services.odoo-demo.loadbalancer.server.port=8069"
+
+volumes:
+  odoo_demo_db:
+  odoo_demo_data:
+
+networks:
+  aivory-network:
+    name: aivory-network
+    external: true

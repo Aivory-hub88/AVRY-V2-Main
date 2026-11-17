@@ -8,13 +8,13 @@ services:
       - aivory-network
     environment:
       - POSTGRES_USER=aivory
-      - POSTGRES_PASSWORD=AivoryApp2026!@#123
+      - POSTGRES_PASSWORD=5FeYfB9RtX4MwaHRmLdltWZUPof3E5igoUHafCcG
       - POSTGRES_DB=aivory
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aivory -d aivory"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 30s
@@ -28,6 +28,7 @@ services:
     restart: unless-stopped
     networks:
       - aivory-network
+      - avry-mail-web-edge
     ports:
       - "80:80"
       - "443:443"
@@ -35,6 +36,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /home/ubuntu/AVRY-V2-Main/traefik/dynamic:/etc/traefik/dynamic:ro
       - /home/ubuntu/AVRY-V2-Main/traefik/letsencrypt:/letsencrypt
+      - /home/ubuntu/AVRY-V2-Main/traefik/secrets:/etc/traefik/secrets:ro
+      - /home/ubuntu/AVRY-V2-Main/traefik/logs:/var/log/traefik
+    environment:
+      - CF_DNS_API_TOKEN_FILE=/etc/traefik/secrets/cf-dns-token
     command:
       - "--api.insecure=false"
       - "--api.dashboard=false"
@@ -47,12 +52,16 @@ services:
       - "--entrypoints.web.http.middlewares=aivory-secure@file"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.websecure.http.middlewares=aivory-secure@file"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
       - "--certificatesresolvers.letsencrypt.acme.email=admin@aivory.id"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--log.level=INFO"
       - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--experimental.plugins.crowdsec-bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      - "--experimental.plugins.crowdsec-bouncer.version=v1.8.1"
 
   # ── Main Website (landing, /blog, /careers — catch-all priority=1) ─────────
   avry-website:
@@ -75,7 +84,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null --timeout=3 http://127.0.0.1:3000/favicon.ico || exit 1"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
@@ -100,6 +109,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
       - "traefik.http.routers.main-app.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`x.aivory.uk`)) && PathPrefix(`/`)"
+      - "traefik.http.routers.main-app.middlewares=aivory-csp-strict@file"
       - "traefik.http.routers.main-app.entrypoints=websecure,web"
       - "traefik.http.routers.main-app.tls.certresolver=letsencrypt"
       - "traefik.http.routers.main-app.priority=1"
@@ -142,6 +152,10 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "9001:9001"
+    volumes:
+      # Workflow/canvas JSON stores (.data) survive redeploys. It used to be baked
+      # into the image, so every deploy reset it and deleted workflows came back.
+      - avry-dashboard-data:/app/.data
     environment:
       - PORT=9001
       - NODE_ENV=production
@@ -156,15 +170,30 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_URL=${DATABASE_URL}
       - N8N_CREDENTIALS_ENCRYPTION_KEY=${N8N_CREDENTIALS_ENCRYPTION_KEY}
+      - KAPSO_API_KEY=${KAPSO_API_KEY}
+      - KAPSO_PHONE_NUMBER_ID=${KAPSO_PHONE_NUMBER_ID}
+      - KAPSO_WEBHOOK_SECRET=${KAPSO_WEBHOOK_SECRET}
+      - KAPSO_CRM_TENANT_ID=${KAPSO_CRM_TENANT_ID}
+      - KAPSO_DISPLAY_PHONE=${KAPSO_DISPLAY_PHONE}
+      - WHATSAPP_WEBHOOK_BASE=${WHATSAPP_WEBHOOK_BASE}
+      - DASHBOARD_AGENT_TURN_TOKEN=${DASHBOARD_AGENT_TURN_TOKEN}
       - N8N_API_KEY=${N8N_API_KEY}
-      - N8N_MCP_URL=http://n8n-mcp:3020
-      - N8N_MCP_AUTH_TOKEN=${N8N_MCP_AUTH_TOKEN}
       - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
       - COMPOSIO_REDIRECT_URL=${COMPOSIO_REDIRECT_URL}
+      - COLLAB_URL=http://aivory-collab:3200
+      - COLLAB_SERVICE_TOKEN=${COLLAB_SERVICE_TOKEN}
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
+      - R2_ENDPOINT=${R2_ENDPOINT}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+      - R2_BUCKET=${R2_BUCKET}
+      - CRM_URL=http://avry-crm:8091
+      - CRM_SERVICE_TOKEN=${CRM_SERVICE_TOKEN}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
       - "traefik.http.routers.user-dashboard.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`dashboard.aivory.id`) || Host(`app.aivory.id`)) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.user-dashboard.middlewares=aivory-csp-strict@file"
       - "traefik.http.routers.user-dashboard.entrypoints=web,websecure"
       - "traefik.http.routers.user-dashboard.tls=true"
       - "traefik.http.routers.user-dashboard.tls.certresolver=letsencrypt"
@@ -178,8 +207,96 @@ services:
       - "traefik.http.routers.user-dashboard-api.tls=true"
       - "traefik.http.routers.user-dashboard-api.priority=5"
       - "traefik.http.routers.user-dashboard-api.service=user-dashboard"
-      - "traefik.http.routers.user-dashboard-api.middlewares=user-dashboard-addprefix"
-      - "traefik.http.middlewares.user-dashboard-addprefix.addprefix.prefix=/dashboard"
+      - traefik.http.routers.user-dashboard-api.middlewares=user-dashboard-api-prefix
+      - traefik.http.middlewares.user-dashboard-api-prefix.addprefix.prefix=/dashboard
+      # dashboard dedicated host to canonical path-based origin
+      - "traefik.http.routers.user-dashboard-uk.rule=Host(`dashboard.aivory.uk`)"
+      - "traefik.http.routers.user-dashboard-uk.entrypoints=web,websecure"
+      - "traefik.http.routers.user-dashboard-uk.tls=true"
+      - "traefik.http.routers.user-dashboard-uk.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.user-dashboard-uk.priority=20"
+      - "traefik.http.routers.user-dashboard-uk.service=user-dashboard"
+      - "traefik.http.routers.user-dashboard-uk.middlewares=user-dashboard-uk-redirect,aivory-csp-strict@file"
+      - "traefik.http.middlewares.user-dashboard-uk-redirect.redirectregex.regex=^https://dashboard\\.aivory\\.uk/(.*)"
+      - "traefik.http.middlewares.user-dashboard-uk-redirect.redirectregex.replacement=https://aivory.uk/dashboard/$${1}"
+      - "traefik.http.middlewares.user-dashboard-uk-redirect.redirectregex.permanent=true"
+  # ── Aivory Console (standalone chat console) — console.aivory.id:8086 ──
+  avry-console:
+    build:
+      context: ./services/avry-console
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://backend.aivory.id
+        NEXT_PUBLIC_CONSOLE_URL: https://console.aivory.id
+        NEXT_PUBLIC_N8N_EDITOR_BASE_URL: https://n8n.aivory.id
+    container_name: avry-console
+    restart: unless-stopped
+    networks:
+      - aivory-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8086:8086"
+    environment:
+      - N8N_BASE_URL=http://n8n:5678
+      - N8N_AS_CODE_URL=http://host.docker.internal:3500
+      - ZEROCLAW_WEBHOOK_URL=http://host.docker.internal:3003/webhook
+      - PORT=8086
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://backend.aivory.id
+      - NEXT_PUBLIC_CONSOLE_URL=https://console.aivory.id
+      - VPS_BRIDGE_URL=http://host.docker.internal:3003
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8086/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.avry-console.rule=Host(`console.aivory.id`)"
+      - "traefik.http.routers.avry-console.middlewares=aivory-csp-strict@file"
+      - "traefik.http.routers.avry-console.entrypoints=websecure"
+      - "traefik.http.routers.avry-console.tls=true"
+      - "traefik.http.routers.avry-console.tls.certresolver=letsencrypt"
+      - "traefik.http.services.avry-console.loadbalancer.server.port=8086"
+  # ── Collab (y-octo + OctoBase) — aivory-collab:3200 ──────────────────────
+  aivory-collab:
+    build:
+      context: ./services/collab
+      dockerfile: Dockerfile
+    container_name: aivory-collab
+    restart: unless-stopped
+    networks:
+      - aivory-network
+    ports:
+      - "3201:3200"
+    environment:
+      - PORT=3200
+      - RUST_LOG=${RUST_LOG:-info}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - COLLAB_SERVICE_TOKEN=${COLLAB_SERVICE_TOKEN}
+      - OCTOBASE_PATH=/data
+    volumes:
+      - collab_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3200/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.collab.rule=PathPrefix(`/yjs`)"
+      - "traefik.http.routers.collab.entrypoints=web,websecure"
+      - "traefik.http.routers.collab.tls=true"
+      - "traefik.http.routers.collab.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.collab.priority=100"
+      - "traefik.http.services.collab.loadbalancer.server.port=3200"
 
   # ── Admin Dashboard (port 9002) ────────────────────────────────────────────
   avry-admin-dashboards:
@@ -215,6 +332,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
       - "traefik.http.routers.admin-app.rule=(Host(`aivory.id`) || Host(`www.aivory.id`) || Host(`stag.aivory.id`) || Host(`admin.aivory.id`)) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin-app.middlewares=aivory-csp-strict@file"
       - "traefik.http.routers.admin-app.entrypoints=web,websecure"
       - "traefik.http.routers.admin-app.tls=true"
       - "traefik.http.routers.admin-app.tls.certresolver=letsencrypt"
@@ -233,8 +351,12 @@ services:
     ports:
       - "8081:8081"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=8081
+      - DASHBOARD_AGENT_TURN_TOKEN=${DASHBOARD_AGENT_TURN_TOKEN}
       - DATABASE_URL=${DATABASE_URL}
+      - ROOM_REMINDER_SWEEPER_ENABLED=true
+      - DASHBOARD_INTERNAL_URL=http://avry-user-dashboard:9001/dashboard
       - LEAD_INGEST_TOKEN=${LEAD_INGEST_TOKEN}
       - JWT_SECRET=${JWT_SECRET}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -249,6 +371,10 @@ services:
       # backend falls back to TELEGRAM_GATEWAY_TOKEN, which differs, and every
       # paid order fails with 403 (paid_grant_failed). Fixed on prod 2026-10-19.
       - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN:-}
+      # Cloudflare Turnstile on /auth/register (avry-backend#42); same values the landing uses.
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
+      - TURNSTILE_HOSTNAMES=${TURNSTILE_HOSTNAMES:-}
+      - OD_MCP_ADMIN_TOKEN=${OD_MCP_ADMIN_TOKEN:-}
       - TELEGRAM_BOT_TOKEN_CUSTOMER_SERVICE=${TELEGRAM_BOT_TOKEN_CUSTOMER_SERVICE:-}
       - TELEGRAM_BOT_USERNAME_CUSTOMER_SERVICE=${TELEGRAM_BOT_USERNAME_CUSTOMER_SERVICE:-}
       - TELEGRAM_BOT_TOKEN_LEADS_QUALIFIER=${TELEGRAM_BOT_TOKEN_LEADS_QUALIFIER:-}
@@ -257,11 +383,14 @@ services:
       - TELEGRAM_BOT_USERNAME_FINANCE_INVOICE_OPS=${TELEGRAM_BOT_USERNAME_FINANCE_INVOICE_OPS:-}
       - TELEGRAM_BOT_TOKEN_OFFICE_ASSISTANT=${TELEGRAM_BOT_TOKEN_OFFICE_ASSISTANT:-}
       - TELEGRAM_BOT_USERNAME_OFFICE_ASSISTANT=${TELEGRAM_BOT_USERNAME_OFFICE_ASSISTANT:-}
+      - TELEGRAM_BOT_TOKEN_CHIEF_OF_STAFF=${TELEGRAM_BOT_TOKEN_CHIEF_OF_STAFF:-}
+      - TELEGRAM_BOT_USERNAME_CHIEF_OF_STAFF=${TELEGRAM_BOT_USERNAME_CHIEF_OF_STAFF:-}
       - SLACK_CLIENT_ID=${SLACK_CLIENT_ID:-}
       - SLACK_CLIENT_SECRET=${SLACK_CLIENT_SECRET:-}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET:-}
       - HONEYPOT_INGEST_TOKEN=${HONEYPOT_INGEST_TOKEN}
       - MCP_SERVER_AUTH_ENCRYPTION_KEY=${MCP_SERVER_AUTH_ENCRYPTION_KEY}
+      - CERVEAU_WEBHOOK_SECRET=${CERVEAU_WEBHOOK_SECRET}
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       # Password-reset mail. Same relay avry-careers/avry-payments already use;
@@ -284,6 +413,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - avry-backend-data:/app/data
+      - /home/ubuntu/mcp-image-releases:/data/mcp-image-releases:ro
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=aivory-network"
@@ -292,6 +422,7 @@ services:
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
       - "traefik.http.routers.backend.priority=10"
       - "traefik.http.services.backend.loadbalancer.server.port=8081"
+      - "traefik.http.services.backend.loadbalancer.responseForwarding.flushInterval=100ms"  # SSE prep: streaming Console/Cerveau path (2026-09-10), harmless for plain JSON responses
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 15s
@@ -372,6 +503,7 @@ services:
     ports:
       - "8082:8082"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=8082
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -408,6 +540,7 @@ services:
     ports:
       - "8083:8083"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=8083
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -444,6 +577,7 @@ services:
     ports:
       - "8084:8084"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=8084
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -480,6 +614,7 @@ services:
     ports:
       - "8087:8087"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=8087
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -516,6 +651,7 @@ services:
     ports:
       - "3030:3030"
     environment:
+      - N8N_BASE_URL=http://n8n:5678
       - PORT=3030
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -561,12 +697,76 @@ services:
       postgres:
         condition: service_healthy
 
+  avry-crm-db:
+    image: postgres:16-alpine
+    container_name: avry-crm-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=avry_crm
+      - POSTGRES_PASSWORD=${CRM_DB_PASSWORD}
+      - POSTGRES_DB=avry_crm
+    volumes:
+      - avry-crm-db-data:/var/lib/postgresql/data
+    networks:
+      - aivory-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avry_crm -d avry_crm"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+
+  avry-crm:
+    build:
+      context: ./services/avry-crm
+      dockerfile: Dockerfile
+    container_name: avry-crm
+    restart: unless-stopped
+    environment:
+      - PORT=8091
+      - DATABASE_URL=postgres://avry_crm:${CRM_DB_PASSWORD}@avry-crm-db:5432/avry_crm
+      - CRM_SERVICE_TOKEN=${CRM_SERVICE_TOKEN}
+    depends_on:
+      avry-crm-db:
+        condition: service_healthy
+    networks:
+      - aivory-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aivory-network"
+      - "traefik.http.routers.avry-crm-mcp.rule=Host(`api.aivory.id`) && PathPrefix(`/crm/mcp`)"
+      - "traefik.http.routers.avry-crm-mcp.entrypoints=websecure"
+      - "traefik.http.routers.avry-crm-mcp.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.avry-crm-mcp.priority=30"
+      - "traefik.http.routers.avry-crm-mcp.middlewares=avry-crm-mcp-rl,avry-crm-mcp-strip"
+      - "traefik.http.middlewares.avry-crm-mcp-rl.ratelimit.average=30"
+      - "traefik.http.middlewares.avry-crm-mcp-rl.ratelimit.burst=60"
+      - "traefik.http.middlewares.avry-crm-mcp-strip.stripprefix.prefixes=/crm"
+      - "traefik.http.services.avry-crm-mcp.loadbalancer.server.port=8091"
+
 networks:
   aivory-network:
     external: true
   aivory_aivory-net:
     external: true
+  # AVRY-Mail webmail frontend (avry-mail-web) runs on this isolated
+  # network; Traefik must be a member to route mail.aivory.uk to it.
+  # Live-attached via 'docker network connect' on 2026-09-13 after a
+  # 504 Gateway Timeout outage; this makes it declarative so a future
+  # 'docker compose up -d traefik' does not regress it. NOT committed
+  # to git -- this file has extensive uncommitted local drift, see
+  # HANDOFF_2026-09-13-VPS-INFRA-DRIFT.md.
+  avry-mail-web-edge:
+    external: true
 
 volumes:
+  avry-dashboard-data:
+  avry-crm-db-data:
   avry-backend-data:
   postgres_data:
+  collab_data:
