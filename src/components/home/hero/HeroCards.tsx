@@ -279,7 +279,7 @@ const UiMail = () => (
 
 /** Bump (and rename the files) whenever the renders change: Cloudflare caches
  *  /landing/* for a year, so a new image needs a new URL. */
-const RENDER_VERSION = 'v13';
+const RENDER_VERSION = 'v14';
 
 /** The whole card art, baked to one WebP: a gradient sampled from the brand references, one clear-glass
     object in extreme close-up refracting it, and the film grain (scripts/hero-renders/glass). */
@@ -359,12 +359,6 @@ export const HERO_CARDS: CardDef[] = [
         {glassCap('Streamline your business operations')}
       </>
     ),
-  },
-  {
-    id: 'photo-celebrating',
-    classes: ['glass', 'photo', 'zoom'],
-    body: ({ decorative }) =>
-      photo(`${IMG}/woman-celebrating.webp`, 'A woman celebrating with her laptop on an orange bean bag', decorative),
   },
   {
     id: 'ui-crm',
