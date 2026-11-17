@@ -44,7 +44,7 @@ export default function HeroSection() {
               <HeroBlob />
               <HeroPrompt />
               <div className={styles.cta}>
-                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`} data-glass>
+                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
                   Start free operations analysis
                 </Link>
                 <a
@@ -52,7 +52,6 @@ export default function HeroSection() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`${styles.btn} ${styles.btnGhost}`}
-                  data-glass
                 >
                   Book a walkthrough
                 </a>
