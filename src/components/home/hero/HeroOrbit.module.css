@@ -35,11 +35,11 @@
 
 .h {
   margin: 0;
-  font-family: var(--font-literata), 'Literata', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-manrope), 'Manrope', sans-serif;
   font-weight: 400;
   font-size: clamp(30px, 6.2vw, 44px);
   line-height: 1.1;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.03em;
   text-wrap: balance;
   color: var(--ink);
 }
