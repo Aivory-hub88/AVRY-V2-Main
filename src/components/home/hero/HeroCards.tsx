@@ -491,12 +491,6 @@ export const HERO_CARDS: CardDef[] = [
     ),
   },
   {
-    id: 'photo-profile',
-    classes: ['glass', 'photo'],
-    body: ({ decorative }) =>
-      photo(`${IMG}/woman-profile.webp`, 'A smiling woman in profile against a blue studio backdrop', decorative),
-  },
-  {
     id: 'ui-timeline',
     classes: ['ui', 'uiLight'],
     body: () => (
