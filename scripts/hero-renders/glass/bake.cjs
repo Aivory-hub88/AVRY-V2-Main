@@ -3,6 +3,9 @@
 const fs = require('fs');
 const { chromium } = require('playwright');
 const NAMES = ['audit', 'growth', 'automation', 'lock', 'decision', 'vault'];
+const VER = process.env.CARD_VER || 'v12';
+// BG_IMAGES='{"audit":"/abs/a.jpg",...}' swaps a card's gradient for an image backdrop; BG_POS='{"audit":[0.5,0.3]}' sets the crop.
+const BG = JSON.parse(process.env.BG_IMAGES || '{}'), POS = JSON.parse(process.env.BG_POS || '{}');
 const PROD_CAP = `<style>
 #chosen .cards{grid-template-columns:repeat(6,360px)!important}main{max-width:none!important}
 /* production caption metrics on a 196px card, as cqw so they scale with the bake size */
@@ -13,6 +16,9 @@ const PROD_CAP = `<style>
   fs.writeFileSync(__dirname + '/bake.html', src);
   const b = await chromium.launch({ args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: 2400, height: 1200 }, deviceScaleFactor: 2 });
+  const src64 = {};
+  for (const [k, f] of Object.entries(BG)) src64[k] = 'data:image/jpeg;base64,' + fs.readFileSync(f).toString('base64');
+  await p.addInitScript(([a, c]) => { window.__bgSrc = a; window.__bgPos = c; }, [src64, POS]);
   await p.goto('file://' + __dirname + '/bake.html');
   await p.waitForFunction(() => window.__done, null, { timeout: 180000 });
   await p.evaluate(() => document.fonts.ready);
@@ -36,6 +42,6 @@ const PROD_CAP = `<style>
     });
   });
   fs.mkdirSync(__dirname + '/baked', { recursive: true });
-  out.forEach(([w, ph, u], i) => { fs.writeFileSync(`${__dirname}/baked/card-${NAMES[i]}-v12.webp`, Buffer.from(u.split(',')[1], 'base64')); console.log(NAMES[i], w, 'pane px @196:', ph); });
+  out.forEach(([w, ph, u], i) => { fs.writeFileSync(`${__dirname}/baked/card-${NAMES[i]}-${VER}.webp`, Buffer.from(u.split(',')[1], 'base64')); console.log(NAMES[i], w, 'pane px @196:', ph); });
   await b.close();
 })();

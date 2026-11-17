@@ -245,7 +245,15 @@ const els = [...document.querySelectorAll('[data-i]')];
 function renderCard(el) {
   const i = +el.dataset.i, s = S[i], name = s.scene || NAMES[i % 6];
   const scene = new THREE.Scene(), g = new THREE.Group(); scene.add(g);
-  const bg = window.__paintBg(s, SIZE / (Math.min(2, devicePixelRatio || 1)), SIZE / (Math.min(2, devicePixelRatio || 1)));
+  const bgW = SIZE / (Math.min(2, devicePixelRatio || 1));
+  let bg;
+  const ck = el.closest('#chosen') ? NAMES[[...el.parentNode.children].indexOf(el)] : null;
+  if (ck && window.__bgImgs && window.__bgImgs[ck]) { // image backdrop (BG_IMAGES in bake.cjs): cover-crop, light defocus
+    const im = window.__bgImgs[ck]; bg = document.createElement('canvas'); bg.width = bg.height = bgW;
+    const k = Math.max(bgW / im.width, bgW / im.height), dw = im.width * k, dh = im.height * k, cx = (window.__bgPos && window.__bgPos[ck]) || [0.5, 0.5];
+    const b = bg.getContext('2d'); b.imageSmoothingQuality = 'high'; b.filter = `blur(${(bgW * 0.012).toFixed(1)}px)`;
+    b.drawImage(im, -(dw - bgW) * cx[0], -(dh - bgW) * cx[1], dw, dh); b.filter = 'none';
+  } else bg = window.__paintBg(s, bgW, bgW);
   const tex = new THREE.CanvasTexture(bg); tex.colorSpace = THREE.SRGBColorSpace; scene.background = tex;
   const ec = document.createElement('canvas'); ec.width = 1024; ec.height = 512; const ex = ec.getContext('2d'); ex.drawImage(bg, 0, 0, 1024, 512);
   ex.fillStyle = '#ffffff'; ex.filter = 'blur(6px)'; [[120, 60, 220, 70], [560, 40, 300, 50], [820, 300, 140, 120], [40, 330, 120, 90]].forEach(r => ex.fillRect(...r)); ex.filter = 'none';
@@ -260,6 +268,8 @@ function renderCard(el) {
   window.__grain(c, w, w, s.g);
   scene.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); tex.dispose(); et.dispose(); envRT.dispose();
 }
+window.__bgImgs = {};
+await Promise.all(Object.entries(window.__bgSrc || {}).map(([k, u]) => new Promise((res, rej) => { const im = new Image(); im.onload = () => { window.__bgImgs[k] = im; res(); }; im.onerror = rej; im.src = u; })));
 let n = 0; (function next() { if (n >= els.length) { window.__done = true; return; } renderCard(els[n++]); requestAnimationFrame(next); })();
 </script>
 </body></html>
