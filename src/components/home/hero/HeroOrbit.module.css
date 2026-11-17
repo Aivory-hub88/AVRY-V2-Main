@@ -332,6 +332,8 @@
 .promptAppIcons img.promptWordmark {
   width: auto;
   height: 9px;
+  /* Solid white on the slate lip (user ask 2026-11-17). */
+  filter: brightness(0) invert(1);
 }
 .promptAppsLabel {
   display: inline-flex;
