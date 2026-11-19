@@ -608,7 +608,7 @@ export default function HeroDiagramGraphic() {
               width={380}
               rotate={-1.5}
               tone="dark"
-              title="Start free operations analysis"
+              title="Start free analysis"
               caption="Self-guided · One sitting · No sales pitch"
             />
             <CtaCard
@@ -618,7 +618,7 @@ export default function HeroDiagramGraphic() {
               width={290}
               rotate={1.5}
               tone="light"
-              title="Book a walkthrough"
+              title="Book Demo"
               external
             />
           </div>

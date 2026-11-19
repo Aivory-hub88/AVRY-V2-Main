@@ -45,7 +45,7 @@ export default function HeroSection() {
               <HeroPrompt />
               <div className={styles.cta}>
                 <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
-                  Start free operations analysis
+                  Start free analysis
                 </Link>
                 <a
                   href={WALKTHROUGH_URL}
@@ -53,7 +53,7 @@ export default function HeroSection() {
                   rel="noopener noreferrer"
                   className={`${styles.btn} ${styles.btnGhost}`}
                 >
-                  Book a walkthrough
+                  Book Demo
                 </a>
               </div>
             </div>
