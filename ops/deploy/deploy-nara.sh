@@ -8,9 +8,9 @@
 #   ops/deploy/deploy-ivo-services.sh  (avry-backend -> aivory-collab -> user-dashboard)
 # Backend must be live before the dashboard, or the dashboard's Nara card 400s.
 #
-# BEFORE ENABLING FOR USERS: [web_search] search_provider is "duckduckgo" on the VPS and the
-# VPS IP is rate-limited; Nara is not useful until it is switched to tavily with its key
-# (a separate step, not done here). This script does not change the search provider.
+# Search: Nara searches in the obscura browser (results pages), not with web_search_tool, so this
+# script does not change the global [web_search] provider. Re-running it replaces the Nara block
+# with the current mirror (--replace), so edits to the block roll out.
 #
 # Safe to re-run: every step is idempotent. On an unhealthy Cerveau it restores the
 # config.toml and identity files it backed up and restarts.
@@ -120,7 +120,7 @@ PY
 fi
 
 echo "-- 2/3 config"
-sudo python3 "$D/config/apply_nara_config.py" "$C/config.toml" "$D/config/block.toml"
+sudo python3 "$D/config/apply_nara_config.py" "$C/config.toml" "$D/config/block.toml" --replace
 sudo chown ubuntu:ubuntu "$C/config.toml"
 
 echo "-- 3/3 restart cerveau"
