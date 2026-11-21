@@ -1,6 +1,6 @@
 # ADR-025 — Departments: an organisation layer over the delegation engine, with Aira at the top and shared services beside the leaders
 
-**Status:** Draft 2026-11-21, not yet reviewed. Nothing built. Every "today" claim below was read on 2026-11-21 from `ops/cerveau-config/config.redacted.toml` (a redacted mirror, **not** live `config.toml`), `ADR-020`, and the `avry-user-dashboard` repo. Anything not read is in §8.
+**Status:** Draft 2026-11-21, not yet reviewed. Owner decisions recorded 2026-11-21: Nara is the DeepResearcher (Q5), research goes to Nara not Geno (Q1), Business tier and above (D3). Nothing built. Every "today" claim below was read on 2026-11-21 from `ops/cerveau-config/config.redacted.toml` (a redacted mirror, **not** live `config.toml`), `ADR-020`, and the `avry-user-dashboard` repo. Anything not read is in §8.
 **Related:** ADR-008 (delegation engine, depth, bounded mode), ADR-014 (envelope and ledger), ADR-020 (active agents, Teams, `X-Active-Agents`), ADR-021 (agent-to-agent tools), ADR-009 (scheduled runs). Source analysis: `docs/ORKAS-ADOPTION-PLAN-2026-11.md` in `avry-user-dashboard` (workstream D, decisions D1 to D6).
 
 ## 1. Decision
@@ -33,7 +33,7 @@ Add **departments** as a data-driven organisation layer on top of the existing d
 | Active agents reach Cerveau as `X-Active-Agents` (allow-list, capped length) and the delegate roster becomes an intersection with them. | ADR-020 §3.2 |
 | Dashboard roster has 9 agents. Tier gating is a boolean `enterprise` flag (`ENTERPRISE_AGENT_TYPES`, only `office_assistant`), shown as a lock icon; there is no minimum-tier concept. | `lib/agentRoster.ts`, `lib/agentRoster.generated.ts` |
 | A 9-agent ceiling was decided on 2026-11-09 because of Aira routing accuracy (quoted from the adoption plan; `CERVEAU-NEW-AGENTS-PLAN.md` itself was not re-read here). | adoption plan §2 |
-| No Aira routing eval harness was found. `evals/` contains only `typesafe-jev`; `CERVEAU-ERP-SCALING-PLAN.md` Phase 0 is a plan. | `evals/`, ERP-SCALING-PLAN |
+| Aira routing eval harness: `evals/aira-routing/` (added 2026-11-21, #70). Run 2026-11-21 on `deepseek/deepseek-v4.1-flash` (Aira's live model), 52 cases x 3 rosters x 3 trials = 468 calls. Results kept in `evals/aira-routing/results/`. See Q1. | `evals/aira-routing/` |
 
 ## 3. Delegation rules
 
@@ -120,12 +120,12 @@ DeepResearcher is available from **Business ($99) up** (Business and Enterprise)
 | D3 | Department memory scope and aggregate budget (after reading ADR-004, 016, 024) | M |
 | D4 | Org-chart UI and per-chain cost indicator from the ledger | M |
 
-D0 and D1 can start in parallel with the DeepResearcher build; D2 needs DeepResearcher's edge to exist. **Prerequisite for D1's Aira-routing claims:** an eval harness for Aira routing (Q1).
+D0 and D1 can start in parallel with the DeepResearcher build; D2 needs DeepResearcher's edge to exist. Routing eval for D1: done (Q1); re-run it after any change to agent descriptions.
 
 ## 8. Open questions and not verified
 
 **Open questions**
-- **Q1 (blocking for the 10th agent).** No routing eval harness was found. The "routing does not regress" gate cannot be met until one exists. Build the minimal replay harness first (ERP-SCALING-PLAN Phase 0 is the design), or restate the gate.
+- **Q1 (resolved 2026-11-21, owner decision: proceed).** Harness built and run (synthetic prompt, one model, so read deltas, not absolutes). Baseline domain accuracy 0.914. Adding Nara: regression 0.019 (limit 0.03, pass); research reaching Nara 0.926 (pass); false capture 0.008 (pass). Adding Nara with Geno re-scoped: regression 0.038, **one trial over** the 0.03 limit (4 vs 3 of 105), driven mostly by `con-5` (a content-reference request captured by Nara). Geno's new scope: 5 of 6 cases (the miss, `gen-4`, meeting follow-ups, goes to Ofira). Today research goes to Geno (24 of 27 baseline trials), so Nara moves work that already exists. Several baseline misses are harness artifacts (cases cite files that are not attached, so Aira answers instead of delegating). The owner accepted these results and decided research goes to Nara; the gate is not re-run. Follow-ups: keep Nara's roster description limited to external companies, markets and regulations so "find references" for content stays with Mira; fix the attachment-citing cases if the harness is reused.
 - **Q2.** Geno's current hub role (four outbound delegates, three back-edges) is removed. Confirm that is acceptable, and decide how users who rely on Geno-as-generalist are told and measured before and after.
 - **Q3 (resolved from code 2026-11-21, tests not run).** Hops are counted by tool depth with a ceiling that only tightens down the chain (§2). Aira to leader to staff or shared service works only if leaders' cap is raised to 2; raising it is part of D1. Still to do: run `bounded_sub_delegation_depth_limit_enforced_through_chain` and add a leader-through-Aira case to the D2 test matrix. Raising leaders from 1 to 2 also changes what a directly-called leader may do; D2 tests must show it still stops at staff.
 - **Q4.** Static config for system departments (no header) vs the plan's per-tenant header from day one. This ADR prefers static for D1 and D2.
