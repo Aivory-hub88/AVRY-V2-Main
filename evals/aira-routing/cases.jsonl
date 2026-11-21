@@ -1,0 +1,52 @@
+{"id": "reg-teo-1", "lang": "id", "group": "regular", "expected": "customer_service", "text": "Pelanggan komplain barang belum sampai 2 minggu, tolong buatkan balasan dan cek statusnya di tiket."}
+{"id": "reg-teo-2", "lang": "en", "group": "regular", "expected": "customer_service", "text": "Triage today's open support tickets and flag anything about refunds."}
+{"id": "reg-teo-3", "lang": "id", "group": "regular", "expected": "customer_service", "text": "Tiket #4821 minta refund, bagaimana prosedurnya dan buatkan draft jawabannya."}
+{"id": "reg-teo-4", "lang": "en", "group": "regular", "expected": "customer_service", "text": "A customer is threatening to leave because of repeated outages. Draft a reply and escalate."}
+{"id": "reg-lex-1", "lang": "en", "group": "regular", "expected": "leads_qualifier", "text": "Qualify this inbound lead: 40-person logistics firm, budget around 50 million rupiah, wants a demo next month."}
+{"id": "reg-lex-2", "lang": "id", "group": "regular", "expected": "leads_qualifier", "text": "Tolong kualifikasi prospek baru dari webinar kemarin dan beri skor BANT."}
+{"id": "reg-lex-3", "lang": "mixed", "group": "regular", "expected": "leads_qualifier", "text": "Follow up leads yang belum balas minggu lalu, draft email singkat per lead."}
+{"id": "reg-lex-4", "lang": "en", "group": "regular", "expected": "leads_qualifier", "text": "Which deals in the pipeline have been stalled for more than 14 days?"}
+{"id": "reg-finn-1", "lang": "id", "group": "regular", "expected": "finance_invoice_ops", "text": "Buatkan invoice untuk PT Maju Jaya, jumlah 12 juta, jatuh tempo 30 hari."}
+{"id": "reg-finn-2", "lang": "en", "group": "regular", "expected": "finance_invoice_ops", "text": "List overdue invoices and draft payment reminders."}
+{"id": "reg-finn-3", "lang": "id", "group": "regular", "expected": "finance_invoice_ops", "text": "Cocokkan tagihan vendor bulan ini dengan purchase order yang ada."}
+{"id": "reg-finn-4", "lang": "en", "group": "regular", "expected": "finance_invoice_ops", "text": "Record this expense receipt and categorize it."}
+{"id": "reg-ofira-1", "lang": "en", "group": "regular", "expected": "office_assistant", "text": "Turn these meeting notes into a one-page Word summary and save it to Drive."}
+{"id": "reg-ofira-2", "lang": "id", "group": "regular", "expected": "office_assistant", "text": "Buatkan presentasi PowerPoint 8 slide dari dokumen proposal ini."}
+{"id": "reg-ofira-3", "lang": "en", "group": "regular", "expected": "office_assistant", "text": "Schedule a 30-minute call with the vendor next Tuesday and send the invite."}
+{"id": "reg-ofira-4", "lang": "id", "group": "regular", "expected": "office_assistant", "text": "Gabungkan 10 file PDF kontrak ini jadi satu dan beri nomor halaman."}
+{"id": "reg-ivo-1", "lang": "en", "group": "regular", "expected": "data_analyst", "text": "Build a sales forecast for next quarter from this CSV of monthly revenue."}
+{"id": "reg-ivo-2", "lang": "id", "group": "regular", "expected": "data_analyst", "text": "Buatkan laporan mingguan KPI dari data penjualan dan tampilkan tren-nya."}
+{"id": "reg-ivo-3", "lang": "en", "group": "regular", "expected": "data_analyst", "text": "Why did churn rise in October? Analyse the cohort data."}
+{"id": "reg-ivo-4", "lang": "id", "group": "regular", "expected": "data_analyst", "text": "Hitung rata-rata nilai pesanan per segmen pelanggan dari data ini."}
+{"id": "reg-juno-1", "lang": "en", "group": "regular", "expected": "operations_inventory", "text": "Which SKUs are below reorder level? Draft purchase requests for them."}
+{"id": "reg-juno-2", "lang": "id", "group": "regular", "expected": "operations_inventory", "text": "Cek stok gudang Surabaya, ada barang yang hampir habis?"}
+{"id": "reg-juno-3", "lang": "en", "group": "regular", "expected": "operations_inventory", "text": "Plan this week's delivery schedule given three delayed shipments."}
+{"id": "reg-juno-4", "lang": "id", "group": "regular", "expected": "operations_inventory", "text": "Catat penerimaan barang dari supplier dan perbarui stok."}
+{"id": "reg-mira-1", "lang": "en", "group": "regular", "expected": "marketing_content", "text": "Write three Instagram captions for our Ramadan promo."}
+{"id": "reg-mira-2", "lang": "id", "group": "regular", "expected": "marketing_content", "text": "Buatkan kalender konten bulan Desember untuk LinkedIn dan Instagram."}
+{"id": "reg-mira-3", "lang": "en", "group": "regular", "expected": "marketing_content", "text": "Draft a newsletter announcing our new pricing."}
+{"id": "reg-mira-4", "lang": "id", "group": "regular", "expected": "marketing_content", "text": "Tulis artikel blog 600 kata tentang manfaat otomasi untuk UKM."}
+{"id": "res-1", "lang": "en", "group": "research", "expected": "deep_researcher", "text": "Research our top five competitors in Indonesian logistics SaaS: pricing, positioning and recent funding, with sources."}
+{"id": "res-2", "lang": "id", "group": "research", "expected": "deep_researcher", "text": "Riset regulasi terbaru soal perlindungan data pribadi untuk perusahaan SaaS di Indonesia, lengkap dengan sumber."}
+{"id": "res-3", "lang": "en", "group": "research", "expected": "deep_researcher", "text": "Build an evidence-backed brief on the market size for cold-chain logistics in Southeast Asia, and flag where sources disagree."}
+{"id": "res-4", "lang": "id", "group": "research", "expected": "deep_researcher", "text": "Cari tahu kabar terbaru tentang kompetitor kami PT X dan rangkum dengan sitasi."}
+{"id": "res-5", "lang": "en", "group": "research", "expected": "deep_researcher", "text": "Monitor these three industry RSS feeds weekly and summarize anything relevant to our product."}
+{"id": "res-6", "lang": "id", "group": "research", "expected": "deep_researcher", "text": "Tolong riset tren harga bahan baku kemasan 6 bulan terakhir, bandingkan beberapa sumber."}
+{"id": "res-7", "lang": "en", "group": "research", "expected": "deep_researcher", "text": "What are the compliance requirements for selling food supplements online in Indonesia? Cite official sources."}
+{"id": "res-8", "lang": "mixed", "group": "research", "expected": "deep_researcher", "text": "Deep dive soal tren AI agent untuk sales, kasih ringkasan dan link sumbernya."}
+{"id": "con-1", "lang": "id", "group": "confusable", "expected": "leads_qualifier", "text": "Cari email dan nomor telepon direktur PT Sinar Abadi untuk prospek kita."}
+{"id": "con-2", "lang": "en", "group": "confusable", "expected": "data_analyst", "text": "Analyze our own Q3 sales data and explain what drove the drop."}
+{"id": "con-3", "lang": "id", "group": "confusable", "expected": "customer_service", "text": "Rangkum semua tiket support minggu ini dan cari pola keluhan."}
+{"id": "con-4", "lang": "en", "group": "confusable", "expected": "operations_inventory", "text": "Find the cheapest supplier for our packaging among the vendors already in our system."}
+{"id": "con-5", "lang": "id", "group": "confusable", "expected": "marketing_content", "text": "Cari referensi desain untuk konten kampanye bulan depan dan buatkan draf caption."}
+{"id": "con-6", "lang": "en", "group": "confusable", "expected": "finance_invoice_ops", "text": "Look up the status of invoice INV-1032 and tell me whether it was paid."}
+{"id": "gen-1", "lang": "en", "group": "geno_scope", "expected": "autonomous", "text": "Track the action items from yesterday's cross-team meeting and chase owners who haven't updated them."}
+{"id": "gen-2", "lang": "id", "group": "geno_scope", "expected": "autonomous", "text": "Ingatkan saya setiap Senin untuk cek status semua tugas lintas tim yang belum selesai."}
+{"id": "gen-3", "lang": "en", "group": "geno_scope", "expected": "autonomous", "text": "Give me a progress report on the launch project: what's done, what's blocked, who owes what."}
+{"id": "gen-4", "lang": "id", "group": "geno_scope", "expected": "autonomous", "text": "Buatkan daftar tindak lanjut dari rapat tadi dan pantau sampai selesai."}
+{"id": "gen-5", "lang": "en", "group": "geno_scope", "expected": "autonomous", "text": "Follow up on the three open requests I gave the team last week and report back."}
+{"id": "gen-6", "lang": "id", "group": "geno_scope", "expected": "autonomous", "text": "Pantau tugas yang melewati tenggat dan ingatkan penanggung jawabnya."}
+{"id": "dir-1", "lang": "en", "group": "direct", "expected": "aira", "text": "What can your team of agents do for me?"}
+{"id": "dir-2", "lang": "id", "group": "direct", "expected": "aira", "text": "Siapa saja agent yang aktif di akun saya dan apa tugasnya?"}
+{"id": "res-9", "lang": "id", "group": "research", "expected": "deep_researcher", "text": "Nara, tolong riset kompetitor kami di segmen UKM dan sertakan sumbernya."}
+{"id": "reg-mira-5", "lang": "id", "group": "regular", "expected": "marketing_content", "text": "Mira, tolong buatkan draf postingan peluncuran produk untuk LinkedIn."}

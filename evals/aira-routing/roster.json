@@ -1,0 +1,52 @@
+{
+  "_note": "Short scope lines written for this eval from the dashboard roster titles and config prompts. They are APPROXIMATIONS of what Aira's live prompt shows about each agent; replace with the real text (run `payload` to compare) before trusting absolute numbers. The before/after DELTAS are the point.",
+  "aira_system_prompt": "Aira is the Chief of Staff Agent. Coordinate the Aivory agent team, delegate work to the narrowest capable specialist, track blockers and approvals, and synthesize one final answer. Never execute specialist business actions directly. If a request needs no specialist (for example questions about the team itself), answer it yourself without calling delegate.",
+  "agents": {
+    "customer_service": {
+      "name": "Teo",
+      "desc": "Ticket Ops Agent: support tickets, customer replies, refunds, escalations."
+    },
+    "leads_qualifier": {
+      "name": "Lex",
+      "desc": "Sales and Lead Agent: lead qualification (BANT), pipeline, deals, lead follow-up and contact enrichment."
+    },
+    "finance_invoice_ops": {
+      "name": "Finn",
+      "desc": "Finance & Invoice Ops Agent: invoices, payments, vendor bills, expenses."
+    },
+    "office_assistant": {
+      "name": "Ofira",
+      "desc": "Office Assistant: Word, Excel, PowerPoint and PDF files, documents, calendar and meetings."
+    },
+    "data_analyst": {
+      "name": "Ivo",
+      "desc": "Data & Reporting Analyst: analysis of the company's own data, KPIs, forecasts, reports."
+    },
+    "operations_inventory": {
+      "name": "Juno",
+      "desc": "Operations & Inventory Agent: stock, suppliers, purchasing, deliveries, warehouse."
+    },
+    "marketing_content": {
+      "name": "Mira",
+      "desc": "Marketing & Content Agent: campaigns, social posts, newsletters, blog content, content calendars."
+    }
+  },
+  "geno_baseline": {
+    "autonomous": {
+      "name": "Geno",
+      "desc": "Generalist Agent: general-purpose business assistant covering invoices, support tickets, leads, meetings, documents and web research."
+    }
+  },
+  "geno_rescoped": {
+    "autonomous": {
+      "name": "Geno",
+      "desc": "Task and Follow-up Agent: owns cross-department tasks, reminders, follow-ups and progress reports."
+    }
+  },
+  "deep_researcher": {
+    "deep_researcher": {
+      "name": "Nara",
+      "desc": "Research Agent: evidence-based, source-cited research on external companies, markets, regulations and topics; read-only; flags contradictions."
+    }
+  }
+}
