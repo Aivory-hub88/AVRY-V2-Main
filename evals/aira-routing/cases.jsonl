@@ -48,3 +48,5 @@
 {"id": "gen-6", "lang": "id", "group": "geno_scope", "expected": "autonomous", "text": "Pantau tugas yang melewati tenggat dan ingatkan penanggung jawabnya."}
 {"id": "dir-1", "lang": "en", "group": "direct", "expected": "aira", "text": "What can your team of agents do for me?"}
 {"id": "dir-2", "lang": "id", "group": "direct", "expected": "aira", "text": "Siapa saja agent yang aktif di akun saya dan apa tugasnya?"}
+{"id": "res-9", "lang": "id", "group": "research", "expected": "deep_researcher", "text": "Nara, tolong riset kompetitor kami di segmen UKM dan sertakan sumbernya."}
+{"id": "reg-mira-5", "lang": "id", "group": "regular", "expected": "marketing_content", "text": "Mira, tolong buatkan draf postingan peluncuran produk untuk LinkedIn."}

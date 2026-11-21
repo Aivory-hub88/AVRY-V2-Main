@@ -6,12 +6,12 @@ because of routing accuracy; this is the regression net its lifting needs.
 
 It does not prove the live system is accurate. It compares the same requests across three rosters.
 
-## Conditions (same 50 cases in each)
+## Conditions (same 52 cases in each)
 
 | Condition | Delegable agents | Geno |
 |---|---|---|
 | `baseline` | 8 (Teo, Lex, Finn, Ofira, Ivo, Juno, Mira, Geno) | generalist (today) |
-| `plus_dr` | 9 (+ DeepResearcher) | generalist |
+| `plus_dr` | 9 (+ DeepResearcher, named Nara) | generalist |
 | `plus_dr_geno` | 9 | task and follow-up keeper |
 
 Aira itself is the root and is not delegable; the dashboard roster counts it, which is why the "nine agents"
@@ -21,7 +21,7 @@ ceiling and the 8 here are the same set plus Aira.
 
 | File | What it is |
 |---|---|
-| `cases.jsonl` | 50 synthetic requests, EN / ID / mixed. Groups: `regular` (28, one clear owner), `confusable` (6, research-flavoured but owned by someone else), `research` (8, should go to DeepResearcher), `geno_scope` (6, task/follow-up), `direct` (2, Aira answers itself) |
+| `cases.jsonl` | 52 synthetic requests, EN / ID / mixed. Groups: `regular` (29, one clear owner), `confusable` (6, research-flavoured but owned by someone else), `research` (9, should go to DeepResearcher), `geno_scope` (6, task/follow-up), `direct` (2, Aira answers itself) |
 | `roster.json` | Aira's system prompt (from the redacted config) and a one-line scope per agent per condition. **Approximations** of what the live prompt shows. Replace with the real text before trusting absolute numbers |
 | `thresholds.json` | Pass criteria, **fixed before any model call** (2026-11-21). Edit before the first real run, not after |
 | `run_eval.py` | `validate`, `payload`, `run`, `report` (stdlib only) |
@@ -64,3 +64,5 @@ agent config) or the numbers answer a different question. 450 calls at k=3.
 `geno_usage.sql` measures how Geno is used today, from `billing.credit_ledger.meta`. It is read-only and has
 not been run from this repo. It reads one thing: whether the people who use Geno use it as the one agent for
 everything, or alongside the others. See ADR-025 Q2 for how to read the result.
+
+Two cases address agents by name (`res-9` Nara, `reg-mira-5` Mira) because the chosen name Nara is close to Aira and Mira (ADR-025 Q5). Two cases are a thin check, not proof; add more if the per-case diff shows name-driven misroutes.
