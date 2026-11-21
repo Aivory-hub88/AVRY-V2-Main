@@ -11,7 +11,7 @@ Add **departments** as a data-driven organisation layer on top of the existing d
 2. **Leader** = the incumbent agent of a domain (Lex for Sales, Teo for Support, Finn for Finance, Mira for Marketing, Juno for Operations, Ivo for Data and Reporting, Ofira for Admin/Office). A leader delegates to its own staff and to shared services.
 3. **Staff** = worker agents inside a department (none today; custom workers later, workstream E of the plan). Staff delegate to nobody; cross-department asks go up to the leader or Aira and are recorded as handoff packets (ADR-014 ledger).
 4. **Shared service** = an agent that reports to Aira and can be called by Aira or any leader. Two at the start:
-   - **DeepResearcher** (new agent, read-only evidence-based research, available from the Business tier up).
+   - **DeepResearcher**, named Nara (new agent, read-only evidence-based research, available from the Business tier up).
    - **Geno**, re-scoped from generalist to **task and follow-up keeper** for cross-department work (§4.3).
 5. **Shared services are executors.** A shared service cannot delegate further. This is enforced by its risk profile (`delegation_policy` not permitting delegation, no `[[delegates]]` entries) plus a runtime profile `max_delegation_depth = 1`. It is **not** expressed as `max_delegation_depth = 0`: in `delegate.rs` a value of `0` is filtered out and resolves to the default of 3 (§2).
 6. **Humans stay the approvers.** Leaders are LLMs and never approve anything; the F-1 gate and the Approvals page are unchanged.
@@ -129,7 +129,7 @@ D0 and D1 can start in parallel with the DeepResearcher build; D2 needs DeepRese
 - **Q2.** Geno's current hub role (four outbound delegates, three back-edges) is removed. Confirm that is acceptable, and decide how users who rely on Geno-as-generalist are told and measured before and after.
 - **Q3 (resolved from code 2026-11-21, tests not run).** Hops are counted by tool depth with a ceiling that only tightens down the chain (§2). Aira to leader to staff or shared service works only if leaders' cap is raised to 2; raising it is part of D1. Still to do: run `bounded_sub_delegation_depth_limit_enforced_through_chain` and add a leader-through-Aira case to the D2 test matrix. Raising leaders from 1 to 2 also changes what a directly-called leader may do; D2 tests must show it still stops at staff.
 - **Q4.** Static config for system departments (no header) vs the plan's per-tenant header from day one. This ADR prefers static for D1 and D2.
-- **Q5.** DeepResearcher name and `agent_type` (`deep_researcher` proposed); owner decides the name (plan D2).
+- **Q5 (decided 2026-11-21).** DeepResearcher is named **Nara**, `agent_type` `deep_researcher`. Known risk: the "-ra" ending is close to Aira and Mira, and names drive `@mention` and routing. The routing eval includes two name-addressed cases; revisit the name if it shows name-driven misroutes.
 - **Q6.** Should a shared service ever delegate? Allowing it means raising the depth limit, which contradicts ADR-008's cost containment; if wanted, it needs its own ADR.
 
 **Not verified**
