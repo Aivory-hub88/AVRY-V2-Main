@@ -58,3 +58,9 @@ agent config) or the numbers answer a different question. 450 calls at k=3.
 - About 34 domain cases: one flip is about 3 points. Read the per-case diff the report prints, not only rates.
 - Three rosters changed at once in `plus_dr_geno`; `plus_dr` isolates the DeepResearcher effect.
 - Labels are one author's judgement of the "narrowest capable specialist"; have a second person review them.
+
+## Companion: Geno usage query (ADR-025 Q2)
+
+`geno_usage.sql` measures how Geno is used today, from `billing.credit_ledger.meta`. It is read-only and has
+not been run from this repo. It reads one thing: whether the people who use Geno use it as the one agent for
+everything, or alongside the others. See ADR-025 Q2 for how to read the result.
