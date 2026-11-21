@@ -454,7 +454,7 @@ Added 2026-11-21 from ADR-025 and `avry-user-dashboard/docs/ORKAS-ADOPTION-PLAN-
 (workstream A). The tenth agent type, allowed by the owner after the Aira routing eval
 (`evals/aira-routing`, ADR-025 Q1).
 
-- Read-only: web search and fetch, Obscura page reading (the "lightpanda-browsing" bundle name is legacy; its server is obscura), memory and graph recall, `team_*`.
+- Read-only toward business systems: web search and fetch, Obscura page reading (the "lightpanda-browsing" bundle name is legacy; its server is obscura), memory and graph recall, `team_*`.
   No write tools, no mail, no posting. A shared service: depth 1, delegation forbidden,
   `delegate` and `team_delegate` allowed in the profile but not auto-approved.
 - Business tier and above, enforced in avry-backend `AGENT_MIN_TIER`.
