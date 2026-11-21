@@ -66,3 +66,7 @@ not been run from this repo. It reads one thing: whether the people who use Geno
 everything, or alongside the others. See ADR-025 Q2 for how to read the result.
 
 Two cases address agents by name (`res-9` Nara, `reg-mira-5` Mira) because the chosen name Nara is close to Aira and Mira (ADR-025 Q5). Two cases are a thin check, not proof; add more if the per-case diff shows name-driven misroutes.
+
+## First run
+
+2026-11-21, `deepseek/deepseek-v4.1-flash`, k=3: `results/20261121-142625-deepseek_deepseek-v4.1-flash.jsonl` (468 calls). Summary and decision in ADR-025 Q1. `.gitignore` excludes `results/` by default; this file was added with `git add -f` as evidence.
