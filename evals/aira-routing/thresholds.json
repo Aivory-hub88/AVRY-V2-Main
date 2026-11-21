@@ -1,0 +1,9 @@
+{
+  "_note": "Pre-registered before any model call (2026-11-21). Edit BEFORE the first real run, not after seeing results. 'domain' = regular + confusable cases. n is small (about 38 domain cases x k trials): treat a 1-case swing as noise and read the per-case diff, not just the rates.",
+  "baseline_domain_acc_min": 0.85,
+  "domain_regression_max": 0.03,
+  "research_to_dr_min": 0.8,
+  "dr_false_capture_max": 0.05,
+  "geno_scope_acc_min": 0.8,
+  "geno_false_capture_max": 0.05
+}
