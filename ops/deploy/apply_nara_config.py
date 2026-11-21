@@ -89,7 +89,7 @@ def set_tavily(s, envfile):
 LOOP_GUARD_TOOLS = [
     "web_search_tool", "web_fetch", "obscura__browser_navigate", "obscura__browser_read",
     "obscura__browser_extract", "obscura__browser_elements", "obscura__browser_get_attribute",
-    "obscura__browser_count", "obscura__browser_wait", "obscura__browser_scroll",
+    "obscura__browser_count", "obscura__browser_search", "obscura__browser_wait", "obscura__browser_scroll",
     "obscura__browser_tabs", "obscura__browser_history", "obscura__browser_logs", "obscura__browser_close",
 ]
 
