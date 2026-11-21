@@ -848,23 +848,6 @@
   line-height: 1;
   letter-spacing: -0.05em;
 }
-/* Aether orb */
-.orbCanvas {
-  position: absolute;
-  left: 8px;
-  top: -2px;
-  width: 180px;
-  height: 180px;
-}
-.orbLogo {
-  position: absolute;
-  left: 18px;
-  bottom: 17px;
-  z-index: 3;
-  width: 150px;
-  height: auto;
-}
-
 /* Team: heads only, tilted, different sizes, two blurred behind */
 .heads {
   position: absolute;
@@ -1008,7 +991,7 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
-/* The track holds two runs of all sixteen cards; one loop moves it by one run
+/* The track holds two runs of all fifteen cards; one loop moves it by one run
    (half its width plus half of one 14px gap). The upper rail runs faster. */
 @keyframes rail {
   to {

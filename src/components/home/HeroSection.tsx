@@ -14,9 +14,9 @@ const COPIES = [0, 1];
 
 /** Two rails: every card once. Surfaces take turns (gradient, photo, dark UI, white)
  *  so no two of a kind or two near hues sit side by side, also across the seams. */
-const RAIL_A = ['automate', 'ui-crm', 'streamline', 'aether', 'audit', 'ui-timeline', 'apps'];
+const RAIL_A = ['automate', 'ui-crm', 'streamline', 'ui-timeline', 'audit', 'apps'];
 const RAIL_B = ['decision', 'mail', 'team', 'encrypted', 'ui-report', 'sovereignty', 'proof'];
-// One rail carries all sixteen cards, at the foot of the hero.
+// One rail carries all fifteen cards, at the foot of the hero.
 const ROWS = [[...RAIL_A, ...RAIL_B]];
 const byId = (ids: string[]) => ids.map((id) => HERO_CARDS.find((c) => c.id === id)!);
 
