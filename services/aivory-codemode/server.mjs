@@ -10,7 +10,14 @@ if (!KEY) {
 }
 
 const log = (level, msg, attrs = {}) => console.log(JSON.stringify({ level, msg, ts: new Date().toISOString(), ...attrs }));
-const { app } = createApp({ key: KEY, baseUrl: BASE, log });
+const { app } = createApp({
+  key: KEY,
+  baseUrl: BASE,
+  log,
+  backendUrl: process.env.AVRY_BACKEND_INTERNAL_URL,
+  backendToken: process.env.AVRY_BACKEND_INTERNAL_TOKEN,
+  odooBase: process.env.OD_MCP_BASE_URL || 'https://odoo-mcp.aivory.uk',
+});
 
 app.listen(PORT, '127.0.0.1', () => log('info', 'aivory-codemode listening', { port: PORT, upstream: BASE }));
 process.on('SIGTERM', () => {

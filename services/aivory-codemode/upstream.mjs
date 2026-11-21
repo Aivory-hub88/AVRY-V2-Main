@@ -6,6 +6,7 @@
 // (create/update/close/reply...) stays a normal Cerveau tool behind approval.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { ODOO_READ_ALLOW } from './tenant_odoo.mjs';
 
 export const READ_ALLOW = new Set([
   'list_leads',
@@ -43,7 +44,9 @@ export const DEFAULT_UPSTREAM_PATHS = [
 ];
 
 export class TenantUpstreams {
-  constructor({ tenantId, baseUrl, key, paths = DEFAULT_UPSTREAM_PATHS, allow = READ_ALLOW, log = () => {} }) {
+  constructor({ tenantId, baseUrl, key, paths = DEFAULT_UPSTREAM_PATHS, allow = READ_ALLOW, log = () => {}, agentType, odooResolver }) {
+    this.agentType = agentType;
+    this.odooResolver = odooResolver;
     this.tenantId = tenantId;
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.key = key;
@@ -74,6 +77,30 @@ export class TenantUpstreams {
         }
       }),
     );
+    await this.initOdoo();
+  }
+
+  async initOdoo() {
+    if (!this.odooResolver || !this.agentType) return;
+    const reg = await this.odooResolver(this.tenantId, this.agentType);
+    if (!reg) return;
+    const client = new Client({ name: 'aivory-codemode', version: '0.1.0' });
+    try {
+      await client.connect(new StreamableHTTPClientTransport(new URL(reg.url), { requestInit: { headers: reg.headers } }));
+      this.clients.push(client);
+      const { tools } = await client.listTools();
+      let n = 0;
+      for (const tool of tools) {
+        if (ODOO_READ_ALLOW.has(tool.name) && !reg.disabledTools.has(tool.name) && !this.tools.has(tool.name)) {
+          this.tools.set(tool.name, { client, tool });
+          n++;
+        }
+      }
+      this.log('info', 'odoo upstream connected', { agentType: this.agentType, tools: n });
+    } catch (e) {
+      // never include reg.url: it carries the tenant's token
+      this.log('warn', 'odoo upstream unavailable, skipping', { agentType: this.agentType, error: String(e).replace(reg.url, '<url>').slice(0, 140) });
+    }
   }
 
   toolList() {

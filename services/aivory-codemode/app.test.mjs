@@ -109,3 +109,109 @@ test('profiles never widen an agent: customer_service cannot see invoice or lead
     await c.close();
   } finally { await stop(); proxy.close(); up.close(); }
 });
+
+// ---- Odoo (per-tenant, via backend internal API) ----
+function fakeOdooMcp(seenTokens) {
+  const app = express();
+  app.use(express.json());
+  const sessions = new Map();
+  app.all('/mcp', async (req, res) => {
+    const sid = req.headers['mcp-session-id'];
+    if (sid && sessions.has(sid)) return sessions.get(sid).handleRequest(req, res, req.body);
+    const token = req.query.token;
+    const s = new McpServer({ name: 'odoo', version: '0' });
+    const text = (o) => ({ content: [{ type: 'text', text: JSON.stringify(o) }] });
+    s.registerTool('odoo_read_group', { description: 'Aggregate', inputSchema: { model: z.string() } }, async () => { seenTokens.push(token); return text({ success: true, data: [{ total: 42, token }] }); });
+    s.registerTool('odoo_count', { description: 'Count', inputSchema: { model: z.string() } }, async () => text({ success: true, data: 7 }));
+    s.registerTool('odoo_unlink', { description: 'DELETE records', inputSchema: { ids: z.array(z.number()) } }, async () => { writesCalled.push('odoo_unlink'); return text({ ok: true }); });
+    s.registerTool('odoo_write', { description: 'Write records', inputSchema: { ids: z.array(z.number()) } }, async () => { writesCalled.push('odoo_write'); return text({ ok: true }); });
+    const t = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), onsessioninitialized: (id) => sessions.set(id, t) });
+    await s.connect(t);
+    await t.handleRequest(req, res, req.body);
+  });
+  return new Promise((resolve) => { const srv = app.listen(0, '127.0.0.1', () => resolve(srv)); });
+}
+
+function fakeBackend(registry, calls) {
+  const app = express();
+  app.get('/api/v1/tenant-mcp-servers/internal/:user/:agent', (req, res) => {
+    calls.push({ user: req.params.user, agent: req.params.agent, token: req.headers['x-internal-token'] });
+    if (req.headers['x-internal-token'] !== 'internal-secret') return res.status(401).end();
+    res.json({ servers: registry[`${req.params.user}/${req.params.agent}`] || [], unavailable: [] });
+  });
+  return new Promise((resolve) => { const srv = app.listen(0, '127.0.0.1', () => resolve(srv)); });
+}
+
+test('odoo: per-tenant token, read-only tools, disabled_tools, SSRF guard, no token leak', async () => {
+  const seenTokens = [];
+  const calls = [];
+  const logs = [];
+  const odoo = await fakeOdooMcp(seenTokens);
+  const odooBase = `http://127.0.0.1:${odoo.address().port}`;
+  const registry = {
+    'tenant-a/data_analyst': [{ name: 'odoo', url: `${odooBase}/mcp?token=SECRET_A`, auth_header_name: null, auth_header_value: null, disabled_tools: [] }],
+    'tenant-b/data_analyst': [{ name: 'odoo', url: `${odooBase}/mcp?token=SECRET_B`, disabled_tools: ['odoo_count'] }],
+    'tenant-evil/data_analyst': [{ name: 'odoo', url: 'http://169.254.169.254/mcp?token=x', disabled_tools: [] }],
+    'tenant-wrongname/data_analyst': [{ name: 'other', url: `${odooBase}/mcp?token=Z`, disabled_tools: [] }],
+  };
+  const backend = await fakeBackend(registry, calls);
+  const { app, stop } = createApp({
+    key: KEY, baseUrl: 'http://127.0.0.1:1', paths: [],
+    backendUrl: `http://127.0.0.1:${backend.address().port}`, backendToken: 'internal-secret', odooBase,
+    log: (l, m, a) => logs.push(JSON.stringify([l, m, a])),
+  });
+  const proxy = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const port = proxy.address().port;
+  const descr = async (c) => (await c.listTools()).tools.find((t) => t.name === 'execute').description;
+  try {
+    const a = await connect(port, 'tenant-a', 'data_analyst');
+    const da = await descr(a);
+    assert.match(da, /codemode\.odoo_read_group/);
+    assert.match(da, /codemode\.odoo_count/);
+    assert.doesNotMatch(da, /odoo_unlink|odoo_write/, 'write tools never advertised');
+    assert.doesNotMatch(da, /SECRET_A/, 'token never shown to the model');
+    const ra = await a.callTool({ name: 'execute', arguments: { code: `const g = await codemode.odoo_read_group({model:'sale.order'}); return g.data[0].total` } });
+    assert.equal(JSON.parse(ra.content[0].text).result, 42);
+    const rw = await a.callTool({ name: 'execute', arguments: { code: `return await codemode.odoo_unlink({ids:[1]})` } });
+    assert.equal(rw.isError, true);
+    assert.deepEqual(writesCalled.filter((w) => w.startsWith('odoo')), []);
+
+    const b = await connect(port, 'tenant-b', 'data_analyst');
+    const db = await descr(b);
+    assert.doesNotMatch(db, /odoo_count/, 'tenant disabled_tools honoured');
+    await b.callTool({ name: 'execute', arguments: { code: `return await codemode.odoo_read_group({model:'x'})` } });
+    assert.deepEqual([...new Set(seenTokens)].sort(), ['SECRET_A', 'SECRET_B']);
+
+    // tenant-supplied URL outside the shared Odoo base is never contacted
+    const e = await connect(port, 'tenant-evil', 'data_analyst');
+    assert.doesNotMatch(await descr(e), /odoo_/);
+    const w = await connect(port, 'tenant-wrongname', 'data_analyst');
+    assert.doesNotMatch(await descr(w), /odoo_/);
+
+    // backend was asked with the right tenant + agent type and the internal token
+    assert.ok(calls.some((c) => c.user === 'tenant-a' && c.agent === 'data_analyst' && c.token === 'internal-secret'));
+    assert.ok(!logs.join('\n').match(/SECRET_[AB]/), 'tenant token must not be logged');
+    for (const c of [a, b, e, w]) await c.close();
+  } finally {
+    await stop(); proxy.close(); backend.close(); odoo.close();
+  }
+});
+
+test('odoo: backend failure or missing token degrades to native tools only', async () => {
+  const calls = [];
+  const backend = await fakeBackend({}, calls);
+  const up = await fakeUpstream();
+  const bad = createApp({ key: KEY, baseUrl: `http://127.0.0.1:${up.address().port}`, paths: ['customer-service'], backendUrl: `http://127.0.0.1:${backend.address().port}`, backendToken: 'WRONG', odooBase: 'http://127.0.0.1:9' });
+  const off = createApp({ key: KEY, baseUrl: `http://127.0.0.1:${up.address().port}`, paths: ['customer-service'] }); // no backend config
+  const p1 = await new Promise((r) => { const s = bad.app.listen(0, '127.0.0.1', () => r(s)); });
+  const p2 = await new Promise((r) => { const s = off.app.listen(0, '127.0.0.1', () => r(s)); });
+  try {
+    for (const p of [p1, p2]) {
+      const c = await connect(p.address().port, 'tenant-a', 'customer_service');
+      const d = (await c.listTools()).tools.find((t) => t.name === 'execute').description;
+      assert.match(d, /codemode\.list_tickets/);
+      assert.doesNotMatch(d, /odoo_/);
+      await c.close();
+    }
+  } finally { await bad.stop(); await off.stop(); p1.close(); p2.close(); backend.close(); up.close(); }
+});

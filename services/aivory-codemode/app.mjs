@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { TenantUpstreams, PROFILES } from './upstream.mjs';
 import { runInSandbox } from './sandbox.mjs';
 import { search, signatures } from './catalog.mjs';
+import { createOdooResolver } from './tenant_odoo.mjs';
 
 const TENANT_ID_RE = /^[A-Za-z0-9._-]{1,128}$/;
 const SESSION_IDLE_MS = 30 * 60 * 1000;
@@ -18,15 +19,17 @@ function safeEqual(a, b) {
 
 const EXECUTE_INTRO = `Run a short JavaScript program that calls this tenant's read-only tools and returns one combined answer. Use it when a question needs several reads, or one read plus processing (counting, filtering, summing, joining): write ONE program instead of making separate tool calls.
 Rules: the code is the body of an async function; use await and Promise.all to read in parallel; return a small JSON-serialisable value (aggregate, do not return raw lists unless asked); console.log is allowed for debugging. There is no network, filesystem, process or timers. Calls take one object argument and return parsed JSON, usually shaped {success, data}: read the .data field. Writes are not available here.`;
+const ODOO_HINT = `\nodoo_* tools read the tenant's Odoo ERP. Prefer odoo_read_group for totals and breakdowns instead of fetching rows, and fetch only the fields you need. Use odoo_list_models / odoo_get_model_metadata only if you do not know the model or field names.`;
 
-export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
+export function createApp({ key, baseUrl, log = () => {}, limits, paths, backendUrl, backendToken, odooBase, fetchImpl }) {
+  const odooResolver = createOdooResolver({ backendUrl, token: backendToken, odooBase, log, fetchImpl });
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   /** @type {Map<string, {transport: any, upstreams: TenantUpstreams, tenantId: string, last: number}>} */
   const sessions = new Map();
 
   async function buildServer(tenantId, profile) {
-    const upstreams = new TenantUpstreams({ tenantId, baseUrl, key, paths, log, allow: new Set(PROFILES[profile]) });
+    const upstreams = new TenantUpstreams({ tenantId, baseUrl, key, paths, log, allow: new Set(PROFILES[profile]), agentType: profile, odooResolver });
     await upstreams.init();
     const tools = upstreams.toolList();
     const toolNames = tools.map((t) => t.name);
@@ -44,7 +47,7 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
     server.registerTool(
       'execute',
       {
-        description: `${EXECUTE_INTRO}\n\nAvailable (all read-only):\n${signatures(tools) || '(none available)'}`,
+        description: `${EXECUTE_INTRO}${toolNames.some((n) => n.startsWith('odoo_')) ? ODOO_HINT : ''}\n\nAvailable (all read-only):\n${signatures(tools) || '(none available)'}`,
         inputSchema: { code: z.string().describe('JavaScript: the body of an async function that returns the final value') },
       },
       async ({ code }) => {
