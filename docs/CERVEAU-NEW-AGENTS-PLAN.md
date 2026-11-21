@@ -458,6 +458,9 @@ Added 2026-11-21 from ADR-025 and `avry-user-dashboard/docs/ORKAS-ADOPTION-PLAN-
   No write tools, no mail, no posting. A shared service: depth 1, delegation forbidden,
   `delegate` and `team_delegate` allowed in the profile but not auto-approved.
 - Business tier and above, enforced in avry-backend `AGENT_MIN_TIER`.
+- Browser: 22 of the 23 obscura tools (all but `browser_capture`), including interaction, `evaluate` and the cookie and
+  storage-state tools, by owner decision 2026-11-21. This widens ADR-006 D1 (no login-gated scraping) for Nara only;
+  her identity limits it to reading and forbids exporting cookies or credentials.
 - Aira delegates to Nara (`independent`). Leaders delegating to Nara needs leaders' depth raised
   from 1 to 2 (ADR-025 D1) and is not part of this phase.
 - Not ready for users until web search works: `[web_search] search_provider` is `duckduckgo`
