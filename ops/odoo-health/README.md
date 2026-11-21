@@ -20,7 +20,11 @@ The diagnosis names the broken layer. "Odoo is healthy but the public URL fails"
 - A failure must persist for 2 runs (about 4 minutes) before it alerts; warnings (certificate) alert at once.
 - Reminders every 6h while failing (24h for warnings); a recovery message when it clears. A blip never alerts.
 - Channels are opt-in through `/home/ubuntu/odoo-health/odoo-health.env` (see `odoo-health.env.example`): Telegram and/or a webhook.
-  `python3 odoo_health.py --test-alert` sends a test message. With no channel configured, problems go to the journal only.
+  `python3 odoo_health.py --test-alert` sends a test message.
+  **Production uses Telegram via Geno:** `TELEGRAM_BOT_TOKEN` is the shared bot Geno uses (`@AivoryAgentBot`, the `TELEGRAM_BOT_TOKEN`
+  of `avry-backend`) and `TELEGRAM_CHAT_ID` is the owner's *private* Geno chat from the `telegram_bindings` collection (not the
+  "Aivory Agent team" group, so infra alerts stay private). The values live only in the VPS env file (mode 600); to repoint
+  alerts to the group, use the Geno `supergroup` binding's chat id instead. With no channel configured, problems go to the journal only.
 - Exit code is 1 while anything fails, so the unit also appears in `systemctl --failed`.
 
 ## Operate
