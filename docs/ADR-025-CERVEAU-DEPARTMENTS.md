@@ -13,7 +13,7 @@ Add **departments** as a data-driven organisation layer on top of the existing d
 4. **Shared service** = an agent that reports to Aira and can be called by Aira or any leader. Two at the start:
    - **DeepResearcher** (new agent, read-only evidence-based research, available from the Business tier up).
    - **Geno**, re-scoped from generalist to **task and follow-up keeper** for cross-department work (§4.3).
-5. **Shared services are executors.** A shared service called through a leader sits at depth two, so it does not delegate further (`max_delegation_depth = 0`).
+5. **Shared services are executors.** A shared service cannot delegate further. This is enforced by its risk profile (`delegation_policy` not permitting delegation, no `[[delegates]]` entries) plus a runtime profile `max_delegation_depth = 1`. It is **not** expressed as `max_delegation_depth = 0`: in `delegate.rs` a value of `0` is filtered out and resolves to the default of 3 (§2).
 6. **Humans stay the approvers.** Leaders are LLMs and never approve anything; the F-1 gate and the Approvals page are unchanged.
 7. Agent identity in all departmental tables is an `agent_ref`, not an `agent_type` enum, so custom workers can join later without another refactor.
 
@@ -24,6 +24,9 @@ Add **departments** as a data-driven organisation layer on top of the existing d
 | Aira's runtime profile has `max_delegation_depth = 2`; its allowed tools include `delegate` and the `team_*` set; delegation policy mode is `allow`. | `config.redacted.toml` `[runtime_profiles.agent_chief_of_staff]`, `[risk_profiles.agent_chief_of_staff]` |
 | Aira delegates to its agents in `independent` mode (ADR-020 §2 says five agents). | ADR-020 §2; `[[agents.chief_of_staff.delegates]]` |
 | Most other agent profiles have `max_delegation_depth = 1`; one profile has `0` (it reads like `verifier_brain`, not confirmed). | `config.redacted.toml` |
+| **Depth mechanics (read from code 2026-11-21, tests not executed).** The root `DelegateTool` has depth 0. A delegation is refused when `self.depth >= max_depth`. Each hop builds a sub-delegate tool at `depth + 1` whose carried ceiling is `min(parent's ceiling, target's own profile cap)`, so a chain can only tighten. A target can sub-delegate at all only if its risk profile's `delegation_policy.permits()`. A test named `bounded_sub_delegation_depth_limit_enforced_through_chain` documents that with cap 2 caller to middle to leaf succeeds on tool depths 0 and 1 and the leaf's own attempt (depth 2) fails. | `zeroclaw-runtime/src/tools/delegate.rs` (`effective_max_depth_from_config`, `tightened_max_depth_from_config`, sub-delegate construction near line 6400, depth check near line 3776) |
+| **A profile cap of `0` is not "none".** `resolve_max_depth*` filters `d > 0` and falls back to **3**. Any profile written as `0` (including the one noted above) resolves to 3 for depth purposes. | `delegate.rs` `resolve_max_depth`, `resolve_max_depth_from_config` |
+| **Consequence for the leader hop.** Aira (cap 2) to a leader whose runtime profile cap is 1 carries ceiling `min(2, 1) = 1`; the leader's tool then sits at depth 1 and its own delegation is refused. With today's depth-1 specialists, Aira to leader to staff or shared service would not work. | derived from the two rows above |
 | **Geno (`autonomous`) is a hub, not a leaf.** It delegates in `bounded` mode to `customer_service`, `leads_qualifier`, `finance_invoice_ops` and `office_assistant`. `finance_invoice_ops` and `office_assistant` delegate back to it, and a "Geno<->Teo room canary" exists for `customer_service`. | `[[agents.autonomous.delegates]]`, `[[agents.finance_invoice_ops.delegates]]`, `[[agents.office_assistant.delegates]]` |
 | Geno's `skill_bundles` span `finance-invoice-ops`, `office-assistant`, `customer-service`, `leads-qualifier`, `tool-gate`, with matching MCP bundles (CRM, Slack and others). Its prompt is "general-purpose business assistant". | `[agents.autonomous]` |
 | ADR-008 originally capped depth at one and shipped a full mesh at depth 1; Aira's depth 2 is a later change. | ADR-008 §§ on depth and "what shipped" |
@@ -46,7 +49,12 @@ Add **departments** as a data-driven organisation layer on top of the existing d
 | Staff | anyone | **no** |
 | Shared service | anyone | **no** (depth exhausted, executor by design) |
 
-- Maximum depth stays two hops: Aira to leader to staff or shared service. This fits Aira's current `max_delegation_depth = 2`; it needs to be re-verified against how `delegate.rs` counts hops through a leader (§8).
+- Maximum depth stays two hops: Aira to leader to staff or shared service. Given the mechanics in §2, this needs these profile values:
+  - **Aira:** runtime profile `max_delegation_depth = 2` (already so).
+  - **Leaders:** runtime profile `max_delegation_depth = 2` (today 1). Without this the second hop is refused by the leader's tighter cap.
+  - **Staff and shared services:** runtime profile `max_delegation_depth = 1`, and a risk profile whose `delegation_policy` does not permit delegation. Either alone stops a third hop; together they leave no path.
+  - A leader called directly (depth 0, cap 2) can still delegate once to staff, and the staff's cap of 1 stops anything further.
+  - Never use `0` to mean "cannot delegate" (it resolves to 3).
 - Existing guardrails are reused, not rebuilt: `max_delegation_depth`, hourly and daily budgets per agent, `context_turn_cap`, loop detector, `velocity_gate`, and framing peer output as untrusted (ADR-008, ADR-014).
 - **Permissions:** the existing containment invariant (`policy.rs`) already rejects a child broader than its parent. A department adds a **ceiling**: staff tool scope is a subset of the department ceiling, which is a subset of the leader's.
 - **Budget:** one total budget per request at Aira, plus a new aggregate budget per department, so one request cannot fan out into dozens of LLM calls.
@@ -74,7 +82,7 @@ Every tenant gets the system departments from the built-in roster with no setup.
 Geno stops being a generalist hub and becomes the shared service that **owns cross-department tasks and their follow-through**. Aira decides and routes; Geno executes and chases.
 
 - **Tools:** the existing task and reminder tools (`task_*`, `team_remind`, `team_delegate` only to create and track a task, not to hand work to other agents), memory and graph recall, and run results from the ledger. No new write tool to business systems.
-- **Depth:** `max_delegation_depth = 0`.
+- **Depth:** runtime profile `max_delegation_depth = 1`, and its risk profile no longer permits delegation (outbound `delegates` removed, see below). Not `0` (§2).
 - **Unchanged:** `agent_type = autonomous` (hardcoded in many places), the name Geno, and the Aivory roster entry.
 - **Removed from Geno:** the four toolkit skill bundles and their MCP bundles, and its outbound `delegates` to `customer_service`, `leads_qualifier`, `finance_invoice_ops`, `office_assistant`. Requests that fit no department stay with Aira as Chief of Staff.
 - **Edges that remain valid:** Aira to Geno and leader to Geno are now "to a shared service". The existing back-edges from `finance_invoice_ops` and `office_assistant` to Geno are leader-to-shared-service and stay legal. The Geno-to-leader edges go away.
@@ -107,7 +115,7 @@ DeepResearcher is available from **Business ($99) up** (Business and Enterprise)
 | Phase | Content | Size |
 |---|---|---|
 | D0 | This ADR reviewed; owner decisions D1 to D6 recorded | S |
-| D1 | Static mapping (config `delegates`, `IDENTITY.md` peers, roster, grouping on the Agents page); Geno re-scope (prompt, title, tool scope, depth 0, remove outbound delegates) | M |
+| D1 | Static mapping (config `delegates`, `IDENTITY.md` peers, roster, grouping on the Agents page); Geno re-scope (prompt, title, tool scope, remove outbound delegates, delegation not permitted); raise leaders' runtime profile `max_delegation_depth` from 1 to 2 and keep staff and shared services at 1 (§3) | M |
 | D2 | Admission enforcement and the test matrix in §3 and §6; Business-tier enforcement for DeepResearcher | M |
 | D3 | Department memory scope and aggregate budget (after reading ADR-004, 016, 024) | M |
 | D4 | Org-chart UI and per-chain cost indicator from the ledger | M |
@@ -119,14 +127,14 @@ D0 and D1 can start in parallel with the DeepResearcher build; D2 needs DeepRese
 **Open questions**
 - **Q1 (blocking for the 10th agent).** No routing eval harness was found. The "routing does not regress" gate cannot be met until one exists. Build the minimal replay harness first (ERP-SCALING-PLAN Phase 0 is the design), or restate the gate.
 - **Q2.** Geno's current hub role (four outbound delegates, three back-edges) is removed. Confirm that is acceptable, and decide how users who rely on Geno-as-generalist are told and measured before and after.
-- **Q3.** Aira depth 2 vs the leader-to-staff hop: confirm how hops are counted so Aira to leader to shared service stays within two.
+- **Q3 (resolved from code 2026-11-21, tests not run).** Hops are counted by tool depth with a ceiling that only tightens down the chain (§2). Aira to leader to staff or shared service works only if leaders' cap is raised to 2; raising it is part of D1. Still to do: run `bounded_sub_delegation_depth_limit_enforced_through_chain` and add a leader-through-Aira case to the D2 test matrix. Raising leaders from 1 to 2 also changes what a directly-called leader may do; D2 tests must show it still stops at staff.
 - **Q4.** Static config for system departments (no header) vs the plan's per-tenant header from day one. This ADR prefers static for D1 and D2.
 - **Q5.** DeepResearcher name and `agent_type` (`deep_researcher` proposed); owner decides the name (plan D2).
 - **Q6.** Should a shared service ever delegate? Allowing it means raising the depth limit, which contradicts ADR-008's cost containment; if wanted, it needs its own ADR.
 
 **Not verified**
 - `config.toml` live on the VPS (only the redacted mirror was read); whether the profile with depth `0` is `verifier_brain`; the full contents of Aira's `delegates` list (only the head of it was read; ADR-020 says five).
-- `delegate.rs` hop counting and the exact admission path.
+- The exact admission path in `delegate.rs` (depth counting itself was read, §2). Whether the profile written as `max_delegation_depth = 0` is in fact `verifier_brain`, and whether the fallback to 3 matters there (it may be moot if its delegation policy forbids delegation).
 - That the roster intersection actually hides an agent from Aira for tenants without access (ADR-020 describes this design; its rollout status was not checked).
 - `CERVEAU-NEW-AGENTS-PLAN.md` details of the 9-agent decision; ADR-004, 016, 024; the end of ADR-008 and ADR-014.
 - Production state of Ivo, Juno and Mira (listed as leaders here); all "live" statements date from September 2026 documents.
