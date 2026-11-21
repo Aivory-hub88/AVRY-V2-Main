@@ -55,7 +55,7 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
           limits,
           callTool: (name, args) => upstreams.call(name, args),
         });
-        log('info', 'execute', { tenantId, calls: out.calls, ms: Date.now() - started, error: out.error ? out.error.slice(0, 160) : undefined });
+        log('info', 'execute', { tenantId, profile, calls: out.calls, ms: Date.now() - started, error: out.error ? out.error.slice(0, 160) : undefined });
         const payload = out.error ? { error: out.error, logs: out.logs, calls: out.calls } : { result: out.result, logs: out.logs, calls: out.calls };
         return { isError: Boolean(out.error), content: [{ type: 'text', text: JSON.stringify(payload) }] };
       },
@@ -102,7 +102,7 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
         sessions.set(id, { transport, upstreams: built.upstreams, tenantId, last: Date.now() });
-        log('info', 'session initialized', { sessionId: id, tenantId, tools: built.upstreams.tools.size });
+        log('info', 'session initialized', { sessionId: id, tenantId, profile, tools: built.upstreams.tools.size });
       },
       onsessionclosed: async (id) => {
         const s = sessions.get(id);
