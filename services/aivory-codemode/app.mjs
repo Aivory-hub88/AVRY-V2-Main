@@ -3,7 +3,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { TenantUpstreams } from './upstream.mjs';
+import { TenantUpstreams, PROFILES } from './upstream.mjs';
 import { runInSandbox } from './sandbox.mjs';
 import { search, signatures } from './catalog.mjs';
 
@@ -17,7 +17,7 @@ function safeEqual(a, b) {
 }
 
 const EXECUTE_INTRO = `Run a short JavaScript program that calls this tenant's read-only tools and returns one combined answer. Use it when a question needs several reads, or one read plus processing (counting, filtering, summing, joining): write ONE program instead of making separate tool calls.
-Rules: the code is the body of an async function; use await and Promise.all to read in parallel; return a small JSON-serialisable value (aggregate, do not return raw lists unless asked); console.log is allowed for debugging. There is no network, filesystem, process or timers. Calls take one object argument and return parsed JSON. Writes are not available here.`;
+Rules: the code is the body of an async function; use await and Promise.all to read in parallel; return a small JSON-serialisable value (aggregate, do not return raw lists unless asked); console.log is allowed for debugging. There is no network, filesystem, process or timers. Calls take one object argument and return parsed JSON, usually shaped {success, data}: read the .data field. Writes are not available here.`;
 
 export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
   const app = express();
@@ -25,8 +25,8 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
   /** @type {Map<string, {transport: any, upstreams: TenantUpstreams, tenantId: string, last: number}>} */
   const sessions = new Map();
 
-  async function buildServer(tenantId) {
-    const upstreams = new TenantUpstreams({ tenantId, baseUrl, key, paths, log });
+  async function buildServer(tenantId, profile) {
+    const upstreams = new TenantUpstreams({ tenantId, baseUrl, key, paths, log, allow: new Set(PROFILES[profile]) });
     await upstreams.init();
     const tools = upstreams.toolList();
     const toolNames = tools.map((t) => t.name);
@@ -63,9 +63,14 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
     return { server, upstreams };
   }
 
-  app.all('/mcp/codemode', async (req, res) => {
+  app.all('/mcp/codemode/:profile', async (req, res) => {
     if (!safeEqual(req.headers['x-bridge-key'], key)) {
       res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    const profile = req.params.profile;
+    if (!Object.hasOwn(PROFILES, profile)) {
+      res.status(404).json({ error: 'unknown profile' });
       return;
     }
     const sid = req.headers['mcp-session-id'];
@@ -87,7 +92,7 @@ export function createApp({ key, baseUrl, log = () => {}, limits, paths }) {
     }
     let built;
     try {
-      built = await buildServer(tenantId);
+      built = await buildServer(tenantId, profile);
     } catch (e) {
       log('error', 'failed to build session', { error: String(e) });
       res.status(500).json({ error: 'server misconfiguration' });

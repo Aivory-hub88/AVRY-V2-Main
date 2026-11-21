@@ -39,9 +39,9 @@ function fakeUpstream() {
   return new Promise((resolve) => { const srv = app.listen(0, '127.0.0.1', () => resolve(srv)); });
 }
 
-async function connect(port, tenant) {
+async function connect(port, tenant, profile = 'customer_service') {
   const c = new Client({ name: 't', version: '0' });
-  await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp/codemode?tenant_id=${tenant}`), { requestInit: { headers: { 'x-bridge-key': KEY } } }));
+  await c.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp/codemode/${profile}?tenant_id=${tenant}`), { requestInit: { headers: { 'x-bridge-key': KEY } } }));
   return c;
 }
 
@@ -88,10 +88,24 @@ test('proxy: tenant binding, read-only allowlist, execute + search', async () =>
 test('proxy rejects bad key and malformed tenant', async () => {
   const { app, stop } = createApp({ key: KEY, baseUrl: 'http://127.0.0.1:1', paths: [] });
   const proxy = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
-  const base = `http://127.0.0.1:${proxy.address().port}/mcp/codemode`;
+  const base = `http://127.0.0.1:${proxy.address().port}/mcp/codemode/customer_service`;
   try {
     assert.equal((await fetch(`${base}?tenant_id=x`, { method: 'POST' })).status, 401);
     assert.equal((await fetch(`${base}?tenant_id=../etc`, { method: 'POST', headers: { 'x-bridge-key': KEY } })).status, 400);
     assert.equal((await fetch(base, { method: 'POST', headers: { 'x-bridge-key': KEY } })).status, 400);
   } finally { await stop(); proxy.close(); }
+});
+
+test('profiles never widen an agent: customer_service cannot see invoice or lead tools', async () => {
+  const up = await fakeUpstream();
+  const { app, stop } = createApp({ key: KEY, baseUrl: `http://127.0.0.1:${up.address().port}`, paths: ['customer-service'] });
+  const proxy = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  try {
+    const c = await connect(proxy.address().port, 'tenant-a', 'finance_invoice_ops');
+    const ex = (await c.listTools()).tools.find((t) => t.name === 'execute');
+    assert.doesNotMatch(ex.description, /list_tickets/, 'finance profile must not expose ticket reads');
+    const r = await fetch(`http://127.0.0.1:${proxy.address().port}/mcp/codemode/not-a-profile?tenant_id=x`, { method: 'POST', headers: { 'x-bridge-key': KEY } });
+    assert.equal(r.status, 404);
+    await c.close();
+  } finally { await stop(); proxy.close(); up.close(); }
 });

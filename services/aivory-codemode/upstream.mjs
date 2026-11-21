@@ -20,6 +20,20 @@ export const READ_ALLOW = new Set([
   'reorder_suggestion',
 ]);
 
+// Each agent only gets the read tools it already has natively: a profile never
+// widens what an agent can see, it only lets it batch those reads into one call.
+export const PROFILES = {
+  autonomous: ['list_leads', 'get_lead', 'pipeline_summary', 'sales_funnel_forecast', 'list_tickets', 'get_ticket', 'list_invoices', 'get_invoice'],
+  customer_service: ['list_tickets', 'get_ticket'],
+  finance_invoice_ops: ['list_invoices', 'get_invoice'],
+  leads_qualifier: ['list_leads', 'get_lead', 'pipeline_summary', 'sales_funnel_forecast'],
+  data_analyst: ['kpi_snapshot', 'sales_funnel_forecast'],
+  chief_of_staff: ['kpi_snapshot', 'sales_funnel_forecast'],
+};
+for (const [name, tools] of Object.entries(PROFILES)) {
+  for (const t of tools) if (!READ_ALLOW.has(t)) throw new Error(`profile ${name} lists non-read tool ${t}`);
+}
+
 export const DEFAULT_UPSTREAM_PATHS = [
   'leads-qualifier',
   'customer-service',
