@@ -1,0 +1,18 @@
+{
+  "name": "aivory-codemode",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Code Mode MCP proxy: exposes search + execute over a tenant's read-only native tools. The model writes one small program that calls many tools; it runs in a QuickJS (WASM) sandbox with no network, filesystem or process access. Tenant identity is bound to the connection URL, never to model arguments.",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test --test-timeout=30000"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "express": "^4.19.0",
+    "quickjs-emscripten": "^0.32.0",
+    "zod": "^3.23.0"
+  }
+}
