@@ -1,0 +1,14 @@
+[Unit]
+Description=Aivory Odoo health check (edge, origin, login, database, cert, Od-MCP)
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/bin/python3 /home/ubuntu/odoo-health/odoo_health.py
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/ubuntu/.local/state/odoo-health
+PrivateTmp=true
+TimeoutStartSec=90
+# The script exits 1 while anything is failing, so a broken Odoo also shows up in `systemctl --failed`.
