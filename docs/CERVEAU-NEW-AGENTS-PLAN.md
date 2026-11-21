@@ -447,3 +447,23 @@ service. Worth borrowing the patterns, not the product.
   business context; campaign hand-off uses the handoff packet.
 - New small item, any time after Phase 1: Lex skill modules for scoring, reply
   labels and follow-up cadence (≈ 2 days, no new agent type).
+
+## Phase 5 — Nara, the Research & Evidence Agent (`deep_researcher`)
+
+Added 2026-11-21 from ADR-025 and `avry-user-dashboard/docs/ORKAS-ADOPTION-PLAN-2026-11.md`
+(workstream A). The tenth agent type, allowed by the owner after the Aira routing eval
+(`evals/aira-routing`, ADR-025 Q1).
+
+- Read-only: web search and fetch, Lightpanda page reading, memory and graph recall, `team_*`.
+  No write tools, no mail, no posting. A shared service: depth 1, delegation forbidden,
+  `delegate` and `team_delegate` allowed in the profile but not auto-approved.
+- Business tier and above, enforced in avry-backend `AGENT_MIN_TIER`.
+- Aira delegates to Nara (`independent`). Leaders delegating to Nara needs leaders' depth raised
+  from 1 to 2 (ADR-025 D1) and is not part of this phase.
+- Not ready for users until web search works: `[web_search] search_provider` is `duckduckgo`
+  and the VPS IP is rate-limited (11 of 13 calls failed on 2026-10-04). Switch to Tavily with
+  its key first. Also pending: a `feed_read` tool, and confirming that `web_fetch` output is
+  framed as untrusted (`web_search_tool` and browser tools are covered by name in
+  `security/external_content.rs`; `web_fetch` is tainted for memory but its framing was not checked).
+- Deploy: `ops/deploy/deploy-nara.sh` (identities and config; no bridge or skills), then the
+  backend migration and `ops/deploy/deploy-ivo-services.sh`. Not run yet.
