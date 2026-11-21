@@ -463,10 +463,9 @@ Added 2026-11-21 from ADR-025 and `avry-user-dashboard/docs/ORKAS-ADOPTION-PLAN-
   her identity limits it to reading and forbids exporting cookies or credentials.
 - Aira delegates to Nara (`independent`). Leaders delegating to Nara needs leaders' depth raised
   from 1 to 2 (ADR-025 D1) and is not part of this phase.
-- Not ready for users until web search works: `[web_search] search_provider` is `duckduckgo`
-  and the VPS IP is rate-limited (11 of 13 calls failed on 2026-10-04). Switch to Tavily with
-  its key first. Also pending: a `feed_read` tool, and confirming that `web_fetch` output is
-  framed as untrusted (`web_search_tool` and browser tools are covered by name in
-  `security/external_content.rs`; `web_fetch` is tainted for memory but its framing was not checked).
+- Search: Nara does not use `web_search_tool` (its DuckDuckGo HTTP provider is rate-limited from the VPS IP, and
+  rate-limited again in the 2026-11-21 live test). She searches in the obscura browser by opening a results page
+  (`html.duckduckgo.com/html/?q=` and Bing load; Google shows a bot check). `max_tool_iterations` is 20. Still pending:
+  a `feed_read` tool, and confirming that `web_fetch` output is framed as untrusted.
 - Deploy: `ops/deploy/deploy-nara.sh` (identities and config; no bridge or skills), then the
   backend migration and `ops/deploy/deploy-ivo-services.sh`. Not run yet.
