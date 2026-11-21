@@ -10,7 +10,6 @@ import { ANNUAL_PRODUCT_FOR, PRODUCT_IDS, getProductPrice } from '@/lib/pricing'
 import { GrainPlanCard, STEP_TWO_WORLDS } from '@/components/home/landing/GrainPlanCard';
 
 type Billing = 'monthly' | 'annual';
-
 /* ─── Icons ─── */
 function ArrowUpRight({ className = '' }: { className?: string }) {
   return (
@@ -257,7 +256,8 @@ export default function PricingStepTwo({ currency, variant = 'default' }: { curr
                 <GrainPlanCard
                   key={plan.name}
                   world={STEP_TWO_WORLDS[idx]}
-              surface="window"
+              surface="floral"
+                  art={`/landing/pricing/plan-${plan.name.toLowerCase()}-v1.webp`}
                   badge={plan.mostPopular ? 'Most popular' : undefined}
                   title={plan.name}
                   subtitle={plan.description}

@@ -75,6 +75,19 @@ function CheckCircle() {
 // `main .grid` until it scrolls in, which would fade each card part separately.
 const SUBGRID = { display: 'grid' } as const;
 
+function Tick() {
+  return (
+    <svg className="mt-[5px] h-[10px] w-[12px] shrink-0 text-[#17181c]" viewBox="0 0 12 10" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M1.5 5.2l3 3 6-6.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** The header art melts into the white body; the shade keeps white type readable on the lightest blooms. */
+const ART_FADE = 'linear-gradient(180deg,#000 52%,transparent 100%)';
+const SHADE =
+  'linear-gradient(180deg,rgba(8,10,24,0) 20%,rgba(8,10,24,.34) 62%,rgba(8,10,24,0) 100%)';
+
 export interface GrainPlanFeature {
   text: string;
   strong?: boolean;
@@ -95,6 +108,7 @@ export function GrainPlanCard({
   cta,
   onCta,
   surface = 'full',
+  art,
 }: {
   world: PlanWorld;
   badge?: string;
@@ -112,7 +126,9 @@ export function GrainPlanCard({
   cta: string;
   onCta: () => void;
   /** 'full' paints the whole card; 'window' keeps the card neutral and puts the gradient in a tile behind title and price, the way ElevenLabs frames its one colour moment. */
-  surface?: 'full' | 'window';
+  surface?: 'full' | 'window' | 'floral';
+  /** 'floral': the baked header art (a WebP). Only the badge and the plan name sit on it; everything else stays on white. */
+  art?: string;
 }) {
   const win = surface === 'window';
   const head = (
@@ -175,6 +191,84 @@ export function GrainPlanCard({
   // Six rows on a subgrid of the cards' grid, so title, sub-headline, price,
   // description, features and CTA line up across every card in the row. The
   // parent grid must leave rows to auto-placement; each card spans six.
+  // Floral surface: a calm, blurred floral header (badge + plan name only) fading into a white body, so
+  // price, features and CTA always sit on a plain surface. Six rows on the cards' subgrid, as the others.
+  if (surface === 'floral' && art) {
+    const hi = Boolean(badge);
+    return (
+      <div
+        className={`row-span-6 grid-cols-[minmax(0,1fr)] grid-rows-subgrid gap-y-0 overflow-hidden rounded-[24px] bg-white ring-1 ring-black/5 ${
+          hi ? 'shadow-[0_30px_50px_-26px_rgba(140,40,160,0.45)]' : 'shadow-[0_24px_40px_-28px_rgba(20,30,60,0.35)]'
+        }`}
+        style={SUBGRID}
+      >
+        <div className="relative h-[176px]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={art}
+            alt=""
+            aria-hidden="true"
+            width={720}
+            height={360}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="absolute inset-0 h-full w-full select-none object-cover"
+            style={{ WebkitMaskImage: ART_FADE, maskImage: ART_FADE }}
+          />
+          <div className="absolute inset-0" style={{ background: SHADE, WebkitMaskImage: 'linear-gradient(180deg,#000 60%,transparent)', maskImage: 'linear-gradient(180deg,#000 60%,transparent)' }} />
+          {badge && (
+            <span className="absolute left-6 top-5 inline-flex items-center whitespace-nowrap rounded-full bg-white/20 px-3 py-[5px] text-[11.5px] font-medium tracking-[0.02em] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] backdrop-blur-[14px] backdrop-saturate-[1.4]">
+              {badge}
+            </span>
+          )}
+          <h3
+            className={`absolute left-6 right-6 whitespace-pre-line font-light tracking-[-0.03em] text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.35)] ${
+              title.length > 14 ? 'bottom-[44px] text-[28px] leading-[1.08]' : 'bottom-[52px] text-[34px] leading-none'
+            }`}
+          >
+            {title}
+          </h3>
+        </div>
+
+        <div className="px-6 pt-1">
+          {(subtitle || description) && <div className="max-w-[300px] text-[13.5px] leading-[1.5] text-[#5c6070]">{subtitle ?? description}</div>}
+        </div>
+
+        <div className="px-6 pt-5">
+          <div className="flex items-baseline gap-2 whitespace-nowrap">
+            <span className={`${priceSmall ? 'text-[34px]' : 'text-[46px]'} font-light leading-none tracking-[-0.04em] text-[#17181c]`}>{price}</span>
+            <span className={`text-[13px] ${priceSuffixStrong ? 'font-semibold text-[#3a3d48]' : 'font-medium text-[#5c6070]'}`}>{priceSuffix}</span>
+          </div>
+          {note && <p className="mt-[6px] text-[12px] text-[#8a8e9c]">{note}</p>}
+        </div>
+
+        <div />
+
+        <div className="px-6 pt-[18px]">
+          <button
+            type="button"
+            onClick={onCta}
+            className={`w-full rounded-[14px] px-6 py-3 text-center text-[14px] font-medium text-white transition-[background-color,transform] duration-150 active:scale-[0.98] ${
+              hi ? 'bg-[#5b3df5] hover:bg-[#4a2ee0]' : 'bg-[#0c0a09] hover:bg-[#292524]'
+            }`}
+          >
+            {cta}
+          </button>
+        </div>
+
+        <ul className="mx-6 mt-5 space-y-[9px] border-t border-black/[0.08] pb-7 pt-[18px] text-[13.5px] leading-[1.4] text-[#2a2c34]">
+          {features.map((f) => (
+            <li key={f.text} className={`flex gap-[10px] ${f.strong ? 'font-semibold text-[#17181c]' : ''}`}>
+              <Tick />
+              <span>{f.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   if (win) {
     return (
       <div className="row-span-6 grid-cols-[minmax(0,1fr)] grid-rows-subgrid gap-y-0 rounded-[28px] bg-[#f0efed] p-2 pb-8" style={SUBGRID}>
