@@ -479,7 +479,11 @@ catch_up_on_startup = true
 max_run_history = 50
 
 [pacing]
-loop_ignore_tools = []
+# 2026-11-21: read-only research tools are exempt from the loop detector. The success-burst check warned at
+# 6 and blocked at 7 successful calls of one tool per turn, which parked Nara's page reads (web_fetch,
+# browser_navigate) mid-research in the live test. Interactive tools (click, input, evaluate, cookies) stay
+# under detection, and max_tool_iterations plus the turn timeout still bound a run.
+loop_ignore_tools = ["web_search_tool", "web_fetch", "obscura__browser_navigate", "obscura__browser_read", "obscura__browser_extract", "obscura__browser_elements", "obscura__browser_get_attribute", "obscura__browser_count", "obscura__browser_wait", "obscura__browser_scroll", "obscura__browser_tabs", "obscura__browser_history", "obscura__browser_logs", "obscura__browser_close"]
 loop_detection_enabled = true
 loop_detection_window_size = 20
 loop_detection_max_repeats = 3

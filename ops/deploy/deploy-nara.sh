@@ -121,7 +121,7 @@ PY
 fi
 
 echo "-- 2/3 config"
-sudo python3 "$D/config/apply_nara_config.py" "$C/config.toml" "$D/config/block.toml" --replace --tavily-env /etc/zeroclaw-cerveau.env
+sudo python3 "$D/config/apply_nara_config.py" "$C/config.toml" "$D/config/block.toml" --replace --tavily-env /etc/zeroclaw-cerveau.env --loop-guard
 sudo chown ubuntu:ubuntu "$C/config.toml"
 
 echo "-- 3/3 restart cerveau"

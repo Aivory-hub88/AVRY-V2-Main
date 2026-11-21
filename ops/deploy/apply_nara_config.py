@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Add Nara (deep_researcher) to a Cerveau config.toml, idempotently.
 
-  apply_nara_config.py CONFIG BLOCK [--check] [--replace] [--tavily-env ENVFILE]
+  apply_nara_config.py CONFIG BLOCK [--check] [--replace] [--tavily-env ENVFILE] [--loop-guard]
 
 CONFIG  the live (or a test copy of) config.toml, edited in place unless --check
 BLOCK   the Nara blocks, taken from ops/cerveau-config/config.redacted.toml from the
@@ -16,6 +16,10 @@ What it does (each step skipped if already done, so a second run changes nothing
   3. with --tavily-env ENVFILE: sets [web_search] search_provider = "tavily" and adds tavily_api_key
      (read from TAVILY_API_KEY in ENVFILE, never printed) if the key is not already in CONFIG.
      web_search_tool reads the key from [web_search], not from the environment.
+
+  4. with --loop-guard: adds the read-only research tools to [pacing] loop_ignore_tools (union, order kept),
+     so the loop detector's success-burst check does not park page reads and searches mid-research.
+     Global: it applies to every agent that uses those tools.
 
 Stdlib only. Validates the result with tomllib when available (Python 3.11+) and
 refuses to write anything that does not parse. It does not change [web_search]: switching
@@ -82,10 +86,36 @@ def set_tavily(s, envfile):
     return s, steps
 
 
+LOOP_GUARD_TOOLS = [
+    "web_search_tool", "web_fetch", "obscura__browser_navigate", "obscura__browser_read",
+    "obscura__browser_extract", "obscura__browser_elements", "obscura__browser_get_attribute",
+    "obscura__browser_count", "obscura__browser_wait", "obscura__browser_scroll",
+    "obscura__browser_tabs", "obscura__browser_history", "obscura__browser_logs", "obscura__browser_close",
+]
+
+
+def set_loop_guard(s):
+    m = re.search(r"^\[pacing\]\n(?:(?!\[).*\n)*", s, re.M)
+    if not m:
+        sys.exit("[pacing] section not found")
+    sec = m.group(0)
+    lm = re.search(r"^loop_ignore_tools = \[([^\]]*)\]", sec, re.M)
+    if not lm:
+        sys.exit("loop_ignore_tools not found in [pacing]")
+    have = re.findall(r'"([^"]+)"', lm.group(1))
+    missing = [t for t in LOOP_GUARD_TOOLS if t not in have]
+    if not missing:
+        return s, []
+    new_list = "loop_ignore_tools = [" + ", ".join('"%s"' % t for t in have + missing) + "]"
+    sec2 = sec[: lm.start()] + new_list + sec[lm.end():]
+    return s[: m.start()] + sec2 + s[m.end():], ["added %d research tools to loop_ignore_tools" % len(missing)]
+
+
 def main():
     argv = sys.argv[1:]
     check = "--check" in argv
     replace = "--replace" in argv
+    guard = "--loop-guard" in argv
     tav = None
     if "--tavily-env" in argv:
         k = argv.index("--tavily-env")
@@ -106,6 +136,9 @@ def main():
     if tav:
         out, more = set_tavily(out, tav)
         steps += more
+    if guard:
+        out, more = set_loop_guard(out)
+        steps += more
     try:
         import tomllib
         d = tomllib.loads(out)
@@ -119,6 +152,8 @@ def main():
             ws = d["web_search"]
             assert ws["search_provider"] == "tavily" and ws.get("tavily_api_key"), "tavily not configured"
             assert not ws["tavily_api_key"].startswith("<<REDACTED"), "placeholder key left in place"
+        if guard:
+            assert all(t in d["pacing"]["loop_ignore_tools"] for t in LOOP_GUARD_TOOLS), "loop guard tools missing"
     except ImportError:
         print("note: tomllib unavailable (Python < 3.11); skipping parse check, run zeroclaw doctor", file=sys.stderr)
     if not steps:
