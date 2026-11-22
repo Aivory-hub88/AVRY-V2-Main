@@ -1,4 +1,5 @@
 import s from './landing.module.css';
+import LandingCta from './LandingCta';
 
 // Only claims Aivory already makes elsewhere on the site; no third-party
 // certification marks.
@@ -18,10 +19,10 @@ export default function PrivacyPanel() {
             </h2>
             <p>Aivory runs on infrastructure you control. We don&apos;t train on your data and we don&apos;t keep copies.</p>
             <div className={s.row}>
-              <a className={s.btn} href="/free-diagnostic">Start free diagnostic</a>
-              <a className={`${s.btn} ${s.ghost}`} href="https://book.aivory.uk/book/aivory-call" target="_blank" rel="noopener noreferrer">
+              <LandingCta href="/free-diagnostic">Start free diagnostic</LandingCta>
+              <LandingCta ghost external href="https://book.aivory.uk/book/aivory-call">
                 Talk to sales
-              </a>
+              </LandingCta>
             </div>
           </div>
           <div className={s.secBadges}>

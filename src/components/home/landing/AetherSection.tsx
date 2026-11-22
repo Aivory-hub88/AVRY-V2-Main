@@ -1,4 +1,5 @@
 import s from './landing.module.css';
+import LandingCta from './LandingCta';
 import WorkflowBuilderDemo from './WorkflowBuilderDemo';
 
 /* How Aivory works, told through Aivory Aether (this section absorbed the
@@ -177,7 +178,7 @@ export default function AetherSection() {
           </article>
         </div>
         <div className={`${s.row} ${s.aeCta}`}>
-          <a className={s.btn} href="/free-diagnostic">Meet Aether in your Deep Diagnostic</a>
+          <LandingCta href="/free-diagnostic">Meet Aether in your Deep Diagnostic</LandingCta>
         </div>
       </div>
     </section>

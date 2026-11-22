@@ -181,6 +181,73 @@
   color: var(--ink);
   border-color: var(--rule);
 }
+/* CTA motion (measured from a reference build): a fill slides up while the label rolls out and a
+   second copy rolls in. In 550ms expo-out, out 600ms ease-in-out. Resting looks are untouched. */
+.btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btnFill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: #1d4a9a;
+  transform: translateY(101%);
+  transition: transform 600ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.btnRoll {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  line-height: 1.4;
+}
+.btnRoll > span {
+  display: block;
+  transition: transform 600ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.btnRoll > span + span {
+  position: absolute;
+  inset: 0;
+  transform: translateY(100%);
+  color: #fff;
+}
+.btn:hover .btnFill,
+.btn:focus-visible .btnFill {
+  transform: translateY(0);
+}
+.btn:hover .btnRoll > span:first-child,
+.btn:focus-visible .btnRoll > span:first-child {
+  transform: translateY(-100%);
+}
+.btn:hover .btnRoll > span + span,
+.btn:focus-visible .btnRoll > span + span {
+  transform: translateY(0);
+}
+.btn:hover .btnFill,
+.btn:focus-visible .btnFill,
+.btn:hover .btnRoll > span,
+.btn:focus-visible .btnRoll > span {
+  transition-duration: 550ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ghost .btnFill {
+  background: var(--ink);
+}
+.dark .ghost .btnFill {
+  background: var(--snow);
+}
+.dark .ghost .btnRoll > span + span {
+  color: var(--night);
+}
+@media (prefers-reduced-motion: reduce) {
+  .btnFill,
+  .btnRoll > span {
+    transition: none;
+  }
+}
+
 .dark .btn {
   background: var(--snow);
   color: var(--night);

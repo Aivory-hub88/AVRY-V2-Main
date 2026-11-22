@@ -11,6 +11,7 @@ import LandingPricing from '@/components/home/landing/LandingPricing';
 import ComparisonSection from '@/components/home/landing/ComparisonSection';
 import PrivacyPanel from '@/components/home/landing/PrivacyPanel';
 import ClosingCTA from '@/components/home/landing/ClosingCTA';
+import { CtaCursor } from '@/components/ui/CtaCursor';
 import SectionReveal from '@/components/home/landing/SectionReveal';
 import styles from '@/components/home/landing/landing.module.css';
 import { JsonLd, buildHomePageGraph, siteUrlFromHeaders } from '@/lib/seo';
@@ -29,6 +30,7 @@ export default function HomePage() {
 
         {/* The whole page lives in this one isolated stack, so the nav needs no portal. */}
         <Navbar inPlace />
+        <CtaCursor />
         <HeroSection />
 
         {/* Everything between the hero and the footer: alternating light / dark

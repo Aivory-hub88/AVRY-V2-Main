@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { BokehGradient, type BokehScene, type LeafFigure } from '@/components/ui/BokehGradient';
+import { RollButton } from '@/components/ui/RollButton';
 
 /* One "tri" scene per card (see BokehGradient): three colours in 60/30/10 —
    a dominant field, one large soft shape, a small glow in the far corner —
@@ -246,15 +247,9 @@ export function GrainPlanCard({
         <div />
 
         <div className="px-6 pt-[18px]">
-          <button
-            type="button"
-            onClick={onCta}
-            className={`w-full rounded-[14px] px-6 py-3 text-center text-[14px] font-medium text-white transition-[background-color,transform] duration-150 active:scale-[0.98] ${
-              hi ? 'bg-[#5b3df5] hover:bg-[#4a2ee0]' : 'bg-[#0c0a09] hover:bg-[#292524]'
-            }`}
-          >
+          <RollButton onClick={onCta} tone={hi ? 'brand' : 'ink'}>
             {cta}
-          </button>
+          </RollButton>
         </div>
 
         <ul className="mx-6 mt-5 space-y-[9px] border-t border-black/[0.08] pb-7 pt-[18px] text-[13.5px] leading-[1.4] text-[#2a2c34]">

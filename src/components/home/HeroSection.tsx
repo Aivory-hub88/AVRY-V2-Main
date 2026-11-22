@@ -5,8 +5,22 @@ import styles from './hero/HeroOrbit.module.css';
 import { HERO_CARDS, HeroCard } from './hero/HeroCards';
 import HeroPrompt from './hero/HeroPrompt';
 import HeroBlob from './hero/HeroBlob';
+import { CtaCursor } from '@/components/ui/CtaCursor';
 
 export const WALKTHROUGH_URL = 'https://book.aivory.uk/book/aivory-call';
+
+/** Fill slide-up + rolling label for the hero pills; the motion lives in HeroOrbit.module.css. */
+function RollLabel({ children }: { children: string }) {
+  return (
+    <>
+      <span className={styles.fill} aria-hidden="true" />
+      <span className={styles.roll}>
+        <span>{children}</span>
+        <span aria-hidden="true">{children}</span>
+      </span>
+    </>
+  );
+}
 
 /** How many times each rail repeats its cards. One repeat is one loop of the
  *  animation, so four keep the row filled on screens up to about 5000px wide. */
@@ -43,17 +57,19 @@ export default function HeroSection() {
             <div className={styles.stage}>
               <HeroBlob />
               <HeroPrompt />
+              <CtaCursor />
               <div className={styles.cta}>
-                <Link href="/free-diagnostic" className={`${styles.btn} ${styles.btnPrimary}`}>
-                  Start free analysis
+                <Link href="/free-diagnostic" data-cta-cursor className={`${styles.btn} ${styles.btnPrimary}`}>
+                  <RollLabel>Start free analysis</RollLabel>
                 </Link>
                 <a
                   href={WALKTHROUGH_URL}
                   target="_blank"
                   rel="noopener noreferrer"
+                  data-cta-cursor
                   className={`${styles.btn} ${styles.btnGhost}`}
                 >
-                  Book Demo
+                  <RollLabel>Book Demo</RollLabel>
                 </a>
               </div>
             </div>

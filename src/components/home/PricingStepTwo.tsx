@@ -7,6 +7,7 @@ import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { useLanguage } from '@/components/context/LanguageContext';
 import { PlanConfirmModal } from '@/components/payment/PlanConfirmModal';
 import { ANNUAL_PRODUCT_FOR, PRODUCT_IDS, getProductPrice } from '@/lib/pricing';
+import { CtaCursor } from '@/components/ui/CtaCursor';
 import { GrainPlanCard, STEP_TWO_WORLDS } from '@/components/home/landing/GrainPlanCard';
 
 type Billing = 'monthly' | 'annual';
@@ -203,6 +204,7 @@ export default function PricingStepTwo({ currency, variant = 'default' }: { curr
 
   return (
     <section ref={ref} onMouseMove={handleMouseMove} className={`animate-on-scroll ${isVisible ? 'is-visible' : ''} spotlight-section w-full ${landing ? 'bg-transparent py-12 md:py-16' : 'bg-[#E4E6E8] py-24'} text-[#494949] font-sans`}>
+      {landing && <CtaCursor />}
       <div className="max-w-7xl mx-auto px-6 md:px-12 relative z-10">
         {/* Header */}
         <div className="mb-20 text-center md:text-left">

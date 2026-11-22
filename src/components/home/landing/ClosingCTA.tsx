@@ -1,5 +1,6 @@
 import { FAQ_ENTITIES } from '@/lib/seo';
 import s from './landing.module.css';
+import LandingCta from './LandingCta';
 
 // FAQ stays visible here: the homepage FAQPage JSON-LD is built from the same
 // FAQ_ENTITIES, and structured data has to match on-page content.
@@ -14,15 +15,10 @@ export default function ClosingCTA() {
             <span className={s.dim}>Prefer speaking with our team?</span>
           </h2>
           <div className={s.row}>
-            <a className={s.btn} href="/free-diagnostic">Start free diagnostic</a>
-            <a
-              className={`${s.btn} ${s.ghost}`}
-              href="https://book.aivory.uk/book/aivory-call"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Schedule a Discovery Call
-            </a>
+            <LandingCta href="/free-diagnostic">Start free diagnostic</LandingCta>
+            <LandingCta ghost external href="https://book.aivory.uk/book/aivory-call">
+              Book Demo
+            </LandingCta>
           </div>
         </div>
 
