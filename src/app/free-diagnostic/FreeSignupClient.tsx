@@ -328,7 +328,7 @@ export default function FreeSignupClient() {
                           id="free-company"
                           type="text"
                           autoComplete="organization"
-                          placeholder="PT Maju Bersama"
+                          placeholder="Acme LLC"
                           value={company}
                           onChange={(e) => setCompany(e.target.value)}
                           aria-invalid={!!errors.company}
