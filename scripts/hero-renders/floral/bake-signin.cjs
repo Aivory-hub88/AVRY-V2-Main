@@ -12,10 +12,17 @@ const SEEDS = (process.env.SEEDS || '31').split(',').map(Number);
 const PALS = {
   signin: { bg: ['#04050b', '#16154f'], petal: ['#5b4de0', '#b05ad0', '#f2a07a', '#2f6bff', '#e46a9c'], core: '#ffe2c8', shadow: '#0a0820', tip: ['#e8dcff', '#ffd2b8', '#cfe0ff'], stem: '#2a2a86', stamen: '#ffd9a8' },
   checkout: { bg: ['#03080a', '#0a2e33'], petal: ['#14b8a6', '#34d399', '#f5b942', '#0e7490', '#a3e635'], core: '#fff1c2', shadow: '#04201f', tip: ['#d9fff4', '#fff0c2', '#c8f7ff'], stem: '#0f5b56', stamen: '#ffe08a' },
+  // Calmer take on checkout: dusty teal and sage with a soft sand accent, desaturated and darker.
+  'checkout-calm': { bg: ['#03070a', '#0b2227'], petal: ['#2f7f7a', '#4a9a8c', '#b39a63', '#2c6272', '#6f8f62'], core: '#e8dfc4', shadow: '#04181a', tip: ['#cfe6df', '#e6dcc0', '#c4dde6'], stem: '#16484a', stamen: '#d9c98e' },
 };
 const PAL = PALS[process.env.PAL || 'signin'];
 const NAME = process.env.PAL || 'signin';
 const ASCII = Number(process.env.ASCII || 1.1);
+// Optional grade overrides, e.g. SAT=0.8 CON=1 BRI=-14
+const GRADE = {};
+if (process.env.SAT) GRADE.sat = Number(process.env.SAT);
+if (process.env.CON) GRADE.con = Number(process.env.CON);
+if (process.env.BRI) GRADE.bri = Number(process.env.BRI);
 const CFG = { kind: 'fan', n: 10, ls: 1.35, glitch: 4, ascii: 0, dots: 0, motion: 0, bokeh: 1, smear: 0, fiber: 0.14, hue: 0, sat: 1.35, bri: -6, con: 1.12, tmp: 0, ang: 80, bl: 8, ratio: 1.6, mode: 'pal' };
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
@@ -28,9 +35,9 @@ const CFG = { kind: 'fan', n: 10, ls: 1.35, glitch: 4, ascii: 0, dots: 0, motion
   } else console.warn('FONT not set: ASCII will use the fallback monospace face');
   await p.addScriptTag({ path: path.join(__dirname, 'floral.js') });
   for (const seed of SEEDS) {
-    const url = await p.evaluate(({ PAL, CFG, seed, ASCII }) => {
+    const url = await p.evaluate(({ PAL, CFG, seed, ASCII, GRADE }) => {
       const { render } = window.__floral;
-      const cfg = Object.assign({}, CFG, { seed });
+      const cfg = Object.assign({}, CFG, GRADE, { seed });
       cfg.col = { bg: PAL.bg.slice(), petal: PAL.petal.slice(), core: PAL.core, stem: PAL.stem, stamen: PAL.stamen, bk: PAL.petal.slice(), tip: PAL.tip, shadow: PAL.shadow };
       const cv = document.createElement('canvas'); render(cv, cfg, 800);
       // ASCII over the whole panel: light across the top (the CSS scrim keeps the copy readable there), dense over the bloom.
@@ -40,7 +47,7 @@ const CFG = { kind: 'fan', n: 10, ls: 1.35, glitch: 4, ascii: 0, dots: 0, motion
       m.globalCompositeOperation = 'destination-in'; m.fillStyle = g; m.fillRect(0, 0, a.width, a.height);
       cv.getContext('2d').drawImage(a, 0, 0);
       return cv.toDataURL('image/webp', 0.9);
-    }, { PAL, CFG, seed, ASCII });
+    }, { PAL, CFG, seed, ASCII, GRADE });
     fs.writeFileSync(path.join(OUT, `${NAME}-${seed}.webp`), Buffer.from(url.split(',')[1], 'base64'));
     console.log('ok', seed);
   }
