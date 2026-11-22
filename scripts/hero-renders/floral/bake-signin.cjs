@@ -12,6 +12,10 @@ const SEEDS = (process.env.SEEDS || '31').split(',').map(Number);
 const PALS = {
   signin: { bg: ['#04050b', '#16154f'], petal: ['#5b4de0', '#b05ad0', '#f2a07a', '#2f6bff', '#e46a9c'], core: '#ffe2c8', shadow: '#0a0820', tip: ['#e8dcff', '#ffd2b8', '#cfe0ff'], stem: '#2a2a86', stamen: '#ffd9a8' },
   checkout: { bg: ['#03080a', '#0a2e33'], petal: ['#14b8a6', '#34d399', '#f5b942', '#0e7490', '#a3e635'], core: '#fff1c2', shadow: '#04201f', tip: ['#d9fff4', '#fff0c2', '#c8f7ff'], stem: '#0f5b56', stamen: '#ffe08a' },
+  // One hue family: teal only, varied by lightness, so the bloom reads as a single colour moment.
+  'checkout-mono': { bg: ['#02080a', '#093036'], petal: ['#1d8f86', '#2fb3a7', '#146a66', '#5cd0c4', '#26a095'], core: '#d5fbf5', shadow: '#03201f', tip: ['#c9f4ee', '#b4ece5', '#d9fbf7'], stem: '#0f5b56', stamen: '#bff5ee' },
+  // Teal with a single warm touch (core and stamens only).
+  'checkout-teal-sand': { bg: ['#02080a', '#093036'], petal: ['#1d8f86', '#2fb3a7', '#146a66', '#5cd0c4', '#26a095'], core: '#f0dfb2', shadow: '#03201f', tip: ['#c9f4ee', '#b4ece5', '#e9e2c6'], stem: '#0f5b56', stamen: '#e8d49a' },
   // Calmer take on checkout: dusty teal and sage with a soft sand accent, desaturated and darker.
   'checkout-calm': { bg: ['#03070a', '#0b2227'], petal: ['#2f7f7a', '#4a9a8c', '#b39a63', '#2c6272', '#6f8f62'], core: '#e8dfc4', shadow: '#04181a', tip: ['#cfe6df', '#e6dcc0', '#c4dde6'], stem: '#16484a', stamen: '#d9c98e' },
 };

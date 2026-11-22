@@ -79,10 +79,10 @@ export function OrderSummary({
 
   return (
     <div className="relative isolate flex min-h-[560px] w-full flex-col overflow-hidden bg-[#05060d] text-white lg:min-h-screen">
-      {/* Baked floral art (scripts/hero-renders/floral/bake-signin.cjs, PAL=checkout-calm SAT=0.85 CON=1 BRI=-14 seed 77). */}
+      {/* Baked floral art (scripts/hero-renders/floral/bake-signin.cjs, PAL=checkout-teal-sand SAT=1 CON=1.05 BRI=-10 seed 77). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/landing/checkout/checkout-floral-v5.webp"
+        src="/landing/checkout/checkout-floral-v6.webp"
         alt=""
         aria-hidden="true"
         width={800}
