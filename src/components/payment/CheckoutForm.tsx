@@ -47,9 +47,7 @@ import {
   type BinInfo,
 } from '@/lib/card-brand';
 import { formatCheckoutPrice, type CheckoutCurrency } from '@/lib/checkout-format';
-import { SpotlightButton } from '@/components/ui/SpotlightButton';
-import { GrainGradient, type GrainPalette } from '@/components/ui/GrainGradient';
-import { GradientWordmark } from '@/components/ui/GradientWordmark';
+import { RollButton } from '@/components/ui/RollButton';
 import TurnstileWidget from '@/components/payment/TurnstileWidget';
 import GooglePayButton from '@/components/payment/GooglePayButton';
 import { PasswordInput } from '@/components/ui/PasswordInput';
@@ -166,7 +164,7 @@ const CHANNELS: { id: Channel; label: string; badge: React.ReactNode }[] = [
         {VA_BANKS.slice(0, 4).map((b) => (
           <ChannelMark key={b.id} src={b.logo} alt={b.label} height={Math.round(b.height * 0.72)} />
         ))}
-        <span className="text-[11px] font-medium text-gray-500">+{VA_BANKS.length - 4}</span>
+        <span className="text-[11px] font-medium text-white/50">+{VA_BANKS.length - 4}</span>
       </div>
     ),
   },
@@ -176,29 +174,20 @@ const CHANNELS: { id: Channel; label: string; badge: React.ReactNode }[] = [
 // How often the awaiting step asks whether the payment has landed.
 const CONFIRM_POLL_MS = 5000;
 
-/**
- * The header carries the grainy gradient inside the wordmark and the language
- * button rather than behind them: the same GrainGradient surface and
- * silver-blue-to-orange colours as the order summary, read left to right, on
- * a plain white header.
- */
-const HEADER_GRADIENT: GrainPalette = {
-  base: 'linear-gradient(90deg, #1b3f86 0%, #2a58a8 40%, #5d77a3 70%, #e46a24 100%)',
-  blobs: ['#1b3f86', '#7f97bd', '#2b63c6', '#a8582f', '#2a58a8'],
-};
+const WORDMARK_MASK = 'url(/aivory-wordmark.svg) center / contain no-repeat';
 
 // ---------------------------------------------------------------------------
 // Small presentational helpers
 // ---------------------------------------------------------------------------
 
 const inputClass =
-  'w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-[15px] text-[#1a1a1a] placeholder:text-gray-400 focus:outline-none focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] transition';
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[15px] text-white placeholder:text-white/30 transition focus:border-[#8b7cf6] focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-[#8b7cf6] aria-[invalid=true]:border-red-400/70';
 const labelClass =
-  'block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5';
+  'block text-xs font-medium uppercase tracking-[0.08em] text-white/50 mb-1.5';
 const primaryBtn =
-  'w-full py-4 text-[15px] font-semibold bg-[#0d0d0d] text-white hover:bg-[#1a1a1a] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full py-4 text-[15px] font-semibold bg-[#f4f4f4] text-[#0f1115] hover:bg-white rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed';
 const backBtn =
-  'text-[13px] text-gray-500 hover:text-[#1a1a1a] transition-colors mb-6 inline-flex items-center gap-1';
+  'text-[13px] text-white/50 hover:text-white transition-colors mb-6 inline-flex items-center gap-1';
 
 function formatCardNumber(raw: string): string {
   return raw
@@ -279,7 +268,7 @@ function DigitBoxes({
           value={digits[i] === ' ' ? '' : digits[i]}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          className="w-12 h-14 text-center text-[20px] text-[#1a1a1a] border border-gray-300 rounded-lg bg-white focus:outline-none focus:border-[#4a90e2] focus:ring-1 focus:ring-[#4a90e2] transition"
+          className="w-12 h-14 text-center text-[20px] text-white border border-white/15 rounded-xl bg-white/[0.04] focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition"
         />
       ))}
     </div>
@@ -349,8 +338,8 @@ function QrPlaceholder() {
  */
 function MidtransBadge() {
   return (
-    <div className="inline-flex items-center gap-2.5 border border-blue-200 bg-blue-50/50 rounded px-3 py-1.5">
-      <span className="text-[10px] font-semibold text-blue-400 tracking-wider">
+    <div className="inline-flex items-center gap-2.5 border border-[#8b7cf6]/30 bg-[#3a3aa8]/15 rounded px-3 py-1.5">
+      <span className="text-[10px] font-semibold text-[#b9b0ff] tracking-wider">
         POWERED BY
       </span>
       <img
@@ -903,36 +892,32 @@ export function CheckoutForm({
   // -- Render -------------------------------------------------------------
 
   return (
-    <div className="relative isolate w-full bg-white min-h-screen p-8 lg:p-12 text-[#1a1a1a] flex flex-col overflow-hidden">
+    <div className="relative isolate w-full bg-[#07080c] min-h-screen p-8 lg:p-12 text-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center mb-12">
-        {/* The landing page's 2026 wordmark, filled with the grainy gradient. */}
-        <GradientWordmark palette={HEADER_GRADIENT} />
+        <a href="/" aria-label="Aivory home" className="block">
+          <div
+            role="img"
+            aria-label="Aivory"
+            className="aspect-[205/30] h-6 bg-white"
+            style={{ WebkitMask: WORDMARK_MASK, mask: WORDMARK_MASK }}
+          />
+        </a>
         <div className="relative">
           <button
             type="button"
             onClick={() => setLangOpen((v) => !v)}
-            className="block overflow-hidden rounded-md shadow-sm"
+            aria-haspopup="listbox"
+            aria-expanded={langOpen}
+            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-sm font-medium text-white/85 transition hover:bg-white/10"
           >
-            <GrainGradient
-              palette={HEADER_GRADIENT}
-              contours={false}
-              blur={12}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white"
-            >
-              {language === 'id' ? 'Bahasa Indonesia' : 'English'}
-              <svg
-                className="w-4 h-4 text-white/85"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </GrainGradient>
+            {language === 'id' ? 'Bahasa Indonesia' : 'English'}
+            <svg className="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </button>
           {langOpen && (
-            <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-10 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-44 bg-[#101218] border border-white/10 rounded-xl shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)] z-10 overflow-hidden">
               {(['en', 'id'] as const).map((lng) => (
                 <button
                   key={lng}
@@ -941,8 +926,8 @@ export function CheckoutForm({
                     setLanguage(lng);
                     setLangOpen(false);
                   }}
-                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                    language === lng ? 'font-semibold text-[#4a90e2]' : 'text-gray-700'
+                  className={`block w-full text-left px-4 py-2 text-sm hover:bg-white/[0.06] ${
+                    language === lng ? 'font-semibold text-[#b9b0ff]' : 'text-white/80'
                   }`}
                 >
                   {lng === 'en' ? 'English' : 'Bahasa Indonesia'}
@@ -954,7 +939,7 @@ export function CheckoutForm({
       </div>
 
       {error && (
-        <div className="mb-6 max-w-lg mx-auto w-full bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg flex justify-between items-center">
+        <div className="mb-6 max-w-lg mx-auto w-full bg-red-500/10 border border-red-400/30 text-red-200 text-sm px-4 py-3 rounded-lg flex justify-between items-center">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="ml-4 font-bold">
             ✕
@@ -969,11 +954,11 @@ export function CheckoutForm({
             <h1 className="text-2xl font-semibold mb-1 text-center">
               {authMode === 'signin' ? 'Sign in to continue' : 'Create your account'}
             </h1>
-            <p className="text-sm text-gray-500 mb-8 text-center">
-              {productName} · <span className="font-semibold text-[#1a1a1a]">{priceLabel}</span>
+            <p className="text-sm text-white/50 mb-8 text-center">
+              {productName} · <span className="font-semibold text-white">{priceLabel}</span>
             </p>
 
-            <div className="flex mb-6 border border-gray-200 rounded-full p-1 bg-gray-50">
+            <div className="flex mb-6 border border-white/10 rounded-full p-1 bg-white/[0.04]">
               <button
                 type="button"
                 onClick={() => {
@@ -981,7 +966,7 @@ export function CheckoutForm({
                   setAuthError(null);
                 }}
                 className={`flex-1 py-2 text-sm font-medium rounded-full transition-colors ${
-                  authMode === 'signin' ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500'
+                  authMode === 'signin' ? 'bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'text-white/50'
                 }`}
               >
                 Sign In
@@ -993,7 +978,7 @@ export function CheckoutForm({
                   setAuthError(null);
                 }}
                 className={`flex-1 py-2 text-sm font-medium rounded-full transition-colors ${
-                  authMode === 'signup' ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500'
+                  authMode === 'signup' ? 'bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'text-white/50'
                 }`}
               >
                 Sign Up
@@ -1055,6 +1040,7 @@ export function CheckoutForm({
                   <TurnstileWidget
                     siteKey={TURNSTILE_SITE_KEY}
                     action={TURNSTILE_SIGNUP_ACTION}
+                    theme="dark"
                     onToken={setSignupToken}
                     onExpire={() => setSignupToken(null)}
                     resetSignal={signupTokenReset}
@@ -1062,21 +1048,21 @@ export function CheckoutForm({
                 </div>
               )}
               {authError && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+                <p className="text-sm text-red-300 bg-red-500/10 border border-red-400/30 px-3 py-2 rounded-lg">
                   {authError}
                 </p>
               )}
               <div className="mt-2 w-full">
-                <SpotlightButton type="submit" disabled={authLoading} className="w-full" roundedClass="rounded-lg">
+                <RollButton type="submit" disabled={authLoading} tone="light" className="py-3.5 text-[15px]">
                   {authLoading
                     ? 'Please wait…'
                     : authMode === 'signin'
                       ? 'Sign In'
                       : 'Create Account'}
-                </SpotlightButton>
+                </RollButton>
               </div>
             </form>
-            <p className="mt-4 text-center text-xs text-gray-400">
+            <p className="mt-4 text-center text-xs text-white/35">
               This step is real — it authenticates against your live Aivory account.
             </p>
           </div>
@@ -1090,29 +1076,29 @@ export function CheckoutForm({
                 ← Back
               </button>
             )}
-            <p className="text-sm font-semibold text-gray-500 tracking-wider mb-4 text-center">
+            <p className="text-sm font-semibold text-white/50 tracking-wider mb-4 text-center">
               PAY BEFORE {dateStr} AT {timeStr}
             </p>
-            <h1 className="text-5xl font-light text-[#4a90e2] mb-12 text-center">
+            <h1 className="text-5xl font-light text-[#b9b0ff] mb-12 text-center">
               {priceLabel}
             </h1>
 
             {isFree ? (
-              <p className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-600">
+              <p className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-center text-sm text-white/70">
                 Your promo code covers the full price &mdash; there is nothing to pay.
               </p>
             ) : (
             <>
-            <p className="text-xs font-bold text-gray-500 tracking-wider mb-4">
+            <p className="text-xs font-bold text-white/50 tracking-wider mb-4">
               PAYMENT METHOD
             </p>
-            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <div className="border border-white/10 rounded-lg overflow-hidden bg-white/[0.04]">
               {CHANNELS.map((c, i) => (
                 <label
                   key={c.id}
                   className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
-                    i < CHANNELS.length - 1 ? 'border-b border-gray-200' : ''
-                  } ${channel === c.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    i < CHANNELS.length - 1 ? 'border-b border-white/10' : ''
+                  } ${channel === c.id ? 'bg-[#3a3aa8]/20' : 'hover:bg-white/[0.06]'}`}
                 >
                   <div className="flex items-center gap-3">
                     <input
@@ -1120,7 +1106,7 @@ export function CheckoutForm({
                       name="payment_method"
                       checked={channel === c.id}
                       onChange={() => setChannel(c.id)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      className="w-4 h-4 text-[#8b7cf6] border-white/15 focus:ring-[#8b7cf6]"
                     />
                     <span className="font-medium text-sm">{c.label}</span>
                   </div>
@@ -1131,7 +1117,7 @@ export function CheckoutForm({
 
             {needsBank && (
               <div className="mt-4">
-                <p className="text-xs font-bold text-gray-500 tracking-wider mb-3">BANK</p>
+                <p className="text-xs font-bold text-white/50 tracking-wider mb-3">BANK</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {VA_BANKS.map((b) => (
                     <button
@@ -1143,8 +1129,8 @@ export function CheckoutForm({
                       title={b.label}
                       className={`flex h-14 items-center justify-center rounded-lg border px-3 transition-colors ${
                         vaBank === b.id
-                          ? 'border-[#4a90e2] bg-blue-50 ring-1 ring-[#4a90e2]'
-                          : 'border-gray-200 bg-white hover:bg-gray-50'
+                          ? 'border-[#8b7cf6] bg-[#3a3aa8]/20 ring-1 ring-[#8b7cf6]'
+                          : 'border-white/10 bg-white hover:bg-white/[0.06]'
                       }`}
                     >
                       <ChannelMark src={b.logo} alt="" height={b.height + 4} />
@@ -1161,6 +1147,7 @@ export function CheckoutForm({
                 <TurnstileWidget
                   siteKey={TURNSTILE_SITE_KEY}
                   action={TURNSTILE_ACTION}
+                  theme="dark"
                   onToken={setTurnstileToken}
                   onExpire={() => {
                     setTurnstileToken(null);
@@ -1172,8 +1159,10 @@ export function CheckoutForm({
             )}
 
             <div className="mt-6 w-full">
-              <SpotlightButton
+              <RollButton
                 type="button"
+                tone="light"
+                className="py-3.5 text-[15px]"
                 disabled={
                   (!channel && !isFree) ||
                   (needsBank && !vaBank) ||
@@ -1181,11 +1170,9 @@ export function CheckoutForm({
                   (turnstileEnabled && !turnstileToken)
                 }
                 onClick={handleMethodContinue}
-                className="w-full"
-                roundedClass="rounded-lg"
               >
                 {verifying ? 'Verifying…' : isFree ? 'Activate' : 'Continue'}
-              </SpotlightButton>
+              </RollButton>
             </div>
             <div className="mt-12 flex justify-center">
               <MidtransBadge />
@@ -1200,8 +1187,8 @@ export function CheckoutForm({
               ← Back
             </button>
             <h1 className="text-2xl font-semibold mb-1">{channelLabel}</h1>
-            <p className="text-sm text-gray-500 mb-8">
-              {productName} · <span className="font-semibold text-[#1a1a1a]">{priceLabel}</span>
+            <p className="text-sm text-white/50 mb-8">
+              {productName} · <span className="font-semibold text-white">{priceLabel}</span>
             </p>
 
             {channel === 'credit_card' && (
@@ -1229,7 +1216,7 @@ export function CheckoutForm({
                     )}
                   </div>
                   {(binInfo?.bank || binInfo?.binType) && (
-                    <p className="mt-1.5 text-xs text-gray-500">
+                    <p className="mt-1.5 text-xs text-white/50">
                       {[
                         binInfo.bank ? formatBankName(binInfo.bank) : null,
                         binInfo.binType ? formatBinType(binInfo.binType) : null,
@@ -1274,8 +1261,8 @@ export function CheckoutForm({
                     className={inputClass}
                   />
                 </div>
-                <div className="mt-2 pt-4 border-t border-gray-200">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                <div className="mt-2 pt-4 border-t border-white/10">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/50 mb-3">
                     Billing Address
                   </p>
                   <div className="flex flex-col gap-4">
@@ -1333,7 +1320,7 @@ export function CheckoutForm({
                 <div>
                   <label className={labelClass}>{channelLabel} Phone Number</label>
                   <div className="flex">
-                    <span className="flex items-center px-4 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-[15px] text-gray-600">
+                    <span className="flex items-center px-4 border border-r-0 border-white/15 rounded-l-lg bg-white/[0.04] text-[15px] text-white/70">
                       +62
                     </span>
                     <input
@@ -1346,7 +1333,7 @@ export function CheckoutForm({
                     />
                   </div>
                 </div>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className="text-sm text-white/50 leading-relaxed">
                   Next, you&apos;ll confirm with your {channelLabel.replace(' (E-Wallet)', '')} PIN
                   and a one-time code sent to this number.
                 </p>
@@ -1356,7 +1343,7 @@ export function CheckoutForm({
             {channel === 'qris' && (
               <div className="flex flex-col items-center py-2">
                 <QrPlaceholder />
-                <p className="mt-5 text-sm text-gray-600 text-center max-w-xs">
+                <p className="mt-5 text-sm text-white/70 text-center max-w-xs">
                   Open GoPay, DANA, OVO, ShopeePay, or any mobile banking app and scan this QRIS
                   code to pay {priceLabel}.
                 </p>
@@ -1374,19 +1361,19 @@ export function CheckoutForm({
               </div>
             ) : (
             <div className="mt-8 w-full">
-              <SpotlightButton
+              <RollButton
                 type="button"
+                tone="light"
+                className="py-3.5 text-[15px]"
                 disabled={!detailsValid}
                 onClick={handleDetailsContinue}
-                className="w-full"
-                roundedClass="rounded-lg"
               >
                 {channel === 'qris'
                   ? "I've scanned and paid"
                   : isEwallet
                     ? 'Continue'
                     : `Pay ${priceLabel}`}
-              </SpotlightButton>
+              </RollButton>
             </div>
             )}
             {/* This step used to render in mock mode only, so the disclaimer
@@ -1396,7 +1383,7 @@ export function CheckoutForm({
                 The live path therefore shows the Midtrans badge instead of a
                 claim about where the card data goes. */}
             {MOCK_PAYMENT ? (
-              <p className="mt-4 text-center text-xs text-gray-400">
+              <p className="mt-4 text-center text-xs text-white/35">
                 Preview only — no payment data is transmitted or stored.
               </p>
             ) : (
@@ -1416,9 +1403,9 @@ export function CheckoutForm({
             <h1 className="text-2xl font-semibold mb-1 text-center">
               Enter your {channelLabel.replace(' (E-Wallet)', '')} PIN
             </h1>
-            <p className="text-sm text-gray-500 mb-8 text-center">
+            <p className="text-sm text-white/50 mb-8 text-center">
               Confirm the payment of{' '}
-              <span className="font-semibold text-[#1a1a1a]">{priceLabel}</span> for {productName}.
+              <span className="font-semibold text-white">{priceLabel}</span> for {productName}.
             </p>
             <DigitBoxes length={6} value={pin} onChange={setPin} mask />
             <button
@@ -1429,7 +1416,7 @@ export function CheckoutForm({
             >
               Confirm PIN
             </button>
-            <p className="mt-4 text-center text-xs text-gray-400">
+            <p className="mt-4 text-center text-xs text-white/35">
               Preview only — no data is transmitted or stored.
             </p>
           </div>
@@ -1442,7 +1429,7 @@ export function CheckoutForm({
               ← Back
             </button>
             <h1 className="text-2xl font-semibold mb-1 text-center">Enter the OTP code</h1>
-            <p className="text-sm text-gray-500 mb-8 text-center">
+            <p className="text-sm text-white/50 mb-8 text-center">
               We sent a 6-digit code to +62 {phone || 'xxxxxxxxx'} to verify this payment.
             </p>
             <DigitBoxes length={6} value={otp} onChange={setOtp} />
@@ -1454,7 +1441,7 @@ export function CheckoutForm({
             >
               Verify &amp; Pay {priceLabel}
             </button>
-            <p className="mt-4 text-center text-xs text-gray-400">
+            <p className="mt-4 text-center text-xs text-white/35">
               Preview only — no data is transmitted or stored.
             </p>
           </div>
@@ -1463,8 +1450,8 @@ export function CheckoutForm({
         {/* ---- PROCESSING ---- */}
         {step === 'processing' && (
           <div className="py-16 flex flex-col items-center text-center">
-            <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-[#4a90e2] animate-spin" />
-            <p className="mt-6 text-[15px] text-gray-600">
+            <div className="w-12 h-12 rounded-full border-4 border-white/10 border-t-[#8b7cf6] animate-spin" />
+            <p className="mt-6 text-[15px] text-white/70">
               {isEwallet ? `Confirming your ${channelLabel.replace(' (E-Wallet)', '')} payment…` : 'Processing your payment…'}
             </p>
           </div>
@@ -1497,7 +1484,7 @@ export function CheckoutForm({
         {/* ---- AWAITING PAYMENT (Aivory-drawn, no Snap popup) ---- */}
         {step === 'awaiting' && charge && (
           <div className="py-8 flex flex-col items-center text-center">
-            <p className="text-[13px] uppercase tracking-[0.14em] text-gray-500">
+            <p className="text-[13px] uppercase tracking-[0.14em] text-white/50">
               {channelLabel}
             </p>
 
@@ -1508,11 +1495,11 @@ export function CheckoutForm({
                 virtual-account transfer the customer must key in the precise
                 amount, and an estimate is worse than useless there. */}
             {typeof charge.amount_idr === 'number' && (
-              <p className="mt-2 text-[26px] font-semibold tracking-tight text-gray-900">
+              <p className="mt-2 text-[26px] font-semibold tracking-tight text-white">
                 Rp{charge.amount_idr.toLocaleString('id-ID')}
               </p>
             )}
-            <p className="mt-2 text-[15px] text-gray-600">
+            <p className="mt-2 text-[15px] text-white/70">
               {charge.va_number
                 ? 'Transfer the exact amount to the account below.'
                 : 'Scan the code with your payment app to complete the purchase.'}
@@ -1533,40 +1520,40 @@ export function CheckoutForm({
             {charge.deeplink_url && (
               <a
                 href={charge.deeplink_url}
-                className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#4a90e2] px-6 py-3 text-[14px] font-medium text-white transition-colors hover:bg-[#3f7fc9] sm:hidden"
+                className="mt-6 inline-flex items-center justify-center rounded-lg bg-[#5b4de0] px-6 py-3 text-[14px] font-medium text-white transition-colors hover:bg-[#4a3ed0] sm:hidden"
               >
                 Open {channelLabel.replace(' (E-Wallet)', '')}
               </a>
             )}
 
             {charge.va_number && (
-              <div className="mt-6 w-full max-w-sm rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+              <div className="mt-6 w-full max-w-sm rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left">
                 {charge.biller_code ? (
                   <>
                     {/* Mandiri bill payment: pay via "Multipayment" with the
                         company code, then the bill key. */}
-                    <p className="text-[12px] uppercase tracking-[0.1em] text-gray-500">
+                    <p className="text-[12px] uppercase tracking-[0.1em] text-white/50">
                       Mandiri bill payment &middot; company code
                     </p>
-                    <p className="mt-1 font-mono text-[20px] tracking-wide text-gray-900">
+                    <p className="mt-1 font-mono text-[20px] tracking-wide text-white">
                       {charge.biller_code}
                     </p>
-                    <p className="mt-3 text-[12px] uppercase tracking-[0.1em] text-gray-500">
+                    <p className="mt-3 text-[12px] uppercase tracking-[0.1em] text-white/50">
                       Bill key
                     </p>
                   </>
                 ) : (
-                  <p className="text-[12px] uppercase tracking-[0.1em] text-gray-500">
+                  <p className="text-[12px] uppercase tracking-[0.1em] text-white/50">
                     {(charge.va_bank || 'bank').toUpperCase()} virtual account
                   </p>
                 )}
-                <p className="mt-1 font-mono text-[20px] tracking-wide text-gray-900">
+                <p className="mt-1 font-mono text-[20px] tracking-wide text-white">
                   {charge.va_number}
                 </p>
               </div>
             )}
 
-            <p className="mt-6 text-[13px] text-gray-500">
+            <p className="mt-6 text-[13px] text-white/50">
               This page updates as soon as your payment is confirmed. It is safe
               to close it &mdash; your purchase is recorded either way.
             </p>
@@ -1581,7 +1568,7 @@ export function CheckoutForm({
                 setCharge(null);
                 window.location.search = 'pay=snap';
               }}
-              className="mt-3 text-[13px] text-gray-500 underline underline-offset-2 hover:text-gray-700"
+              className="mt-3 text-[13px] text-white/50 underline underline-offset-2 hover:text-white/80"
             >
               Having trouble? Pay another way
             </button>
@@ -1608,11 +1595,11 @@ export function CheckoutForm({
             <h1 className="mt-6 text-2xl font-semibold">
               {isFree ? 'Activated' : 'Payment successful'}
             </h1>
-            <p className="mt-2 text-sm text-gray-500 max-w-xs">
+            <p className="mt-2 text-sm text-white/50 max-w-xs">
               {isFree ? `${productName} · free with your promo code` : `${productName} · ${priceLabel} via ${channelLabel}`}
             </p>
             {currentUser?.email && (
-              <p className="mt-1 text-xs text-gray-400">Signed in as {currentUser.email}</p>
+              <p className="mt-1 text-xs text-white/35">Signed in as {currentUser.email}</p>
             )}
             <button
               type="button"

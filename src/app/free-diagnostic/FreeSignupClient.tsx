@@ -9,18 +9,16 @@
  * creates (or signs in to) the account and hands the visitor to
  * /dashboard/diagnostics. Already signed in → straight to the dashboard.
  *
- * Laid out like the checkout (white form left, grainy-gradient summary
- * right) but in its own Indigo + Orchid + Peach palette instead of the
- * checkout's silver-blue-orange.
+ * Dark UI: the form on near-black on the left, a baked floral panel
+ * (scripts/hero-renders/floral/bake-signin.cjs) with the account summary on
+ * the right. Indigo + orchid + peach, the page's own palette.
  */
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { isAuthenticated, login, signup } from '@/lib/auth';
 import { trackEvent } from '@/lib/analytics';
 import { useLanguage } from '@/components/context/LanguageContext';
-import { GrainGradient, INDIGO_ORCHID_PEACH, INDIGO_ORCHID_PEACH_HEADER } from '@/components/ui/GrainGradient';
-import { GradientWordmark } from '@/components/ui/GradientWordmark';
-import { SpotlightButton } from '@/components/ui/SpotlightButton';
+import { RollButton } from '@/components/ui/RollButton';
 import { PasswordInput } from '@/components/ui/PasswordInput';
 import TurnstileWidget from '@/components/payment/TurnstileWidget';
 
@@ -131,9 +129,10 @@ type Errors = Partial<Record<'company' | 'email' | 'password' | 'confirm', Field
 };
 
 const inputClass =
-  'w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-[15px] text-[#1a1a1a] placeholder:text-gray-400 focus:outline-none focus:border-[#3a3aa8] focus:ring-1 focus:ring-[#3a3aa8] transition aria-[invalid=true]:border-red-400';
-const labelClass = 'block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5';
-const fieldError = 'mt-1.5 block text-xs text-red-600';
+  'w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-[15px] text-white placeholder:text-white/30 transition focus:border-[#8b7cf6] focus:bg-white/[0.06] focus:outline-none focus:ring-1 focus:ring-[#8b7cf6] aria-[invalid=true]:border-red-400/70';
+const labelClass = 'mb-1.5 block text-xs font-medium uppercase tracking-[0.08em] text-white/50';
+const fieldError = 'mt-1.5 block text-xs text-red-300';
+const WORDMARK_MASK = 'url(/aivory-wordmark.svg) center / contain no-repeat';
 
 export default function FreeSignupClient() {
   const { language, setLanguage } = useLanguage();
@@ -221,14 +220,19 @@ export default function FreeSignupClient() {
   const formError = errors.form ? (typeof errors.form === 'string' ? t[errors.form] : errors.form.raw) : null;
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans">
-      <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
+    <div className="min-h-screen bg-[#07080c] font-sans text-white">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-12">
         {/* ---- Form ---- */}
-        <div className="lg:col-span-8 bg-white lg:border-r border-gray-200">
-          <div className="relative isolate w-full bg-white min-h-screen p-6 sm:p-8 lg:p-12 text-[#1a1a1a] flex flex-col">
-            <div className="flex justify-between items-center mb-12">
-              <a href="/" aria-label="Aivory home">
-                <GradientWordmark palette={INDIGO_ORCHID_PEACH_HEADER} />
+        <div className="bg-[#07080c] lg:col-span-7 xl:col-span-8">
+          <div className="relative isolate flex min-h-screen w-full flex-col p-6 sm:p-8 lg:p-12">
+            <div className="mb-12 flex items-center justify-between">
+              <a href="/" aria-label="Aivory home" className="block">
+                <div
+                  role="img"
+                  aria-label="Aivory"
+                  className="aspect-[205/30] h-6 bg-white"
+                  style={{ WebkitMask: WORDMARK_MASK, mask: WORDMARK_MASK }}
+                />
               </a>
               <div className="relative">
                 <button
@@ -236,22 +240,15 @@ export default function FreeSignupClient() {
                   onClick={() => setLangOpen((v) => !v)}
                   aria-haspopup="listbox"
                   aria-expanded={langOpen}
-                  className="block overflow-hidden rounded-md shadow-sm"
+                  className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-sm font-medium text-white/85 transition hover:bg-white/10"
                 >
-                  <GrainGradient
-                    palette={INDIGO_ORCHID_PEACH_HEADER}
-                    contours={false}
-                    blur={12}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white"
-                  >
-                    {lang === 'id' ? 'Bahasa Indonesia' : 'English'}
-                    <svg className="w-4 h-4 text-white/85" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </GrainGradient>
+                  {lang === 'id' ? 'Bahasa Indonesia' : 'English'}
+                  <svg className="h-4 w-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
                 {langOpen && (
-                  <div role="listbox" className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded-md shadow-lg z-10 overflow-hidden">
+                  <div role="listbox" className="absolute right-0 z-10 mt-2 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#101218] shadow-[0_18px_40px_-12px_rgba(0,0,0,0.8)]">
                     {(['en', 'id'] as const).map((lng) => (
                       <button
                         key={lng}
@@ -262,8 +259,8 @@ export default function FreeSignupClient() {
                           setLanguage(lng);
                           setLangOpen(false);
                         }}
-                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                          lang === lng ? 'font-semibold text-[#3a3aa8]' : 'text-gray-700'
+                        className={`block w-full px-4 py-2.5 text-left text-sm transition hover:bg-white/[0.06] ${
+                          lang === lng ? 'font-semibold text-[#b9b0ff]' : 'text-white/70'
                         }`}
                       >
                         {lng === 'en' ? 'English' : 'Bahasa Indonesia'}
@@ -274,21 +271,21 @@ export default function FreeSignupClient() {
               </div>
             </div>
 
-            <div className="flex-grow flex flex-col items-center justify-center max-w-lg mx-auto w-full">
+            <div className="mx-auto flex w-full max-w-md flex-grow flex-col items-center justify-center">
               {redirecting ? (
-                <p className="text-gray-500" role="status">
+                <p className="text-white/60" role="status">
                   {t.redirecting}
                 </p>
               ) : (
                 <div className="w-full">
-                  <h1 className="text-2xl font-semibold mb-1 text-center">
+                  <h1 className="mb-1.5 text-center text-[28px] font-medium tracking-[-0.02em]">
                     {mode === 'signup' ? t.signupTitle : t.signinTitle}
                   </h1>
-                  <p className="text-sm text-gray-500 mb-8 text-center">
-                    {t.subtitle} · <span className="font-semibold text-[#1a1a1a]">{t.subtitleStrong}</span>
+                  <p className="mb-8 text-center text-sm text-white/50">
+                    {t.subtitle} · <span className="font-medium text-white/85">{t.subtitleStrong}</span>
                   </p>
 
-                  <div className="flex mb-6 border border-gray-200 rounded-full p-1 bg-gray-50" role="tablist">
+                  <div className="mb-6 flex rounded-full border border-white/10 bg-white/[0.04] p-1" role="tablist">
                     {(['signup', 'signin'] as const).map((m) => (
                       <button
                         key={m}
@@ -296,8 +293,8 @@ export default function FreeSignupClient() {
                         role="tab"
                         aria-selected={mode === m}
                         onClick={() => switchMode(m)}
-                        className={`flex-1 py-2 text-sm font-medium rounded-full transition-colors ${
-                          mode === m ? 'bg-white shadow-sm text-[#1a1a1a]' : 'text-gray-500'
+                        className={`flex-1 rounded-full py-2 text-sm font-medium transition-colors ${
+                          mode === m ? 'bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'text-white/45 hover:text-white/75'
                         }`}
                       >
                         {m === 'signup' ? t.signupTab : t.signinTab}
@@ -382,6 +379,7 @@ export default function FreeSignupClient() {
                         <TurnstileWidget
                           siteKey={TURNSTILE_SITE_KEY}
                           action={TURNSTILE_ACTION}
+                          theme="dark"
                           onToken={setTurnstileToken}
                           onExpire={() => setTurnstileToken(null)}
                           resetSignal={turnstileReset}
@@ -390,32 +388,32 @@ export default function FreeSignupClient() {
                     )}
 
                     {formError && (
-                      <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg" role="alert">
+                      <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-200" role="alert">
                         {formError}
                       </p>
                     )}
 
                     <div className="mt-2 w-full">
-                      <SpotlightButton type="submit" disabled={busy} className="w-full" roundedClass="rounded-lg">
+                      <RollButton type="submit" disabled={busy} tone="light" className="py-3.5 text-[15px]">
                         {busy ? t.wait : mode === 'signup' ? t.submitSignup : t.submitSignin}
-                      </SpotlightButton>
+                      </RollButton>
                     </div>
                   </form>
 
                   {mode === 'signup' ? (
-                    <p className="mt-4 text-center text-xs text-gray-400">
+                    <p className="mt-5 text-center text-xs text-white/40">
                       {t.legal}{' '}
-                      <a href="/terms" className="underline underline-offset-2 hover:text-gray-600">
+                      <a href="/terms" className="underline underline-offset-2 transition hover:text-white/75">
                         {t.terms}
                       </a>{' '}
                       {t.and}{' '}
-                      <a href="/privacy" className="underline underline-offset-2 hover:text-gray-600">
+                      <a href="/privacy" className="underline underline-offset-2 transition hover:text-white/75">
                         {t.privacy}
                       </a>
                     </p>
                   ) : (
-                    <p className="mt-4 text-center text-xs text-gray-400">
-                      <a href="/forgot-password" className="underline underline-offset-2 hover:text-gray-600">
+                    <p className="mt-5 text-center text-xs text-white/40">
+                      <a href="/forgot-password" className="underline underline-offset-2 transition hover:text-white/75">
                         {t.forgot}
                       </a>
                     </p>
@@ -426,38 +424,60 @@ export default function FreeSignupClient() {
           </div>
         </div>
 
-        {/* ---- Summary ---- */}
-        <div className="lg:col-span-4 bg-[#2a2a86]">
-          <GrainGradient palette={INDIGO_ORCHID_PEACH} className="w-full h-full lg:min-h-screen p-8 lg:p-12 text-white">
-            <h2 className="text-2xl font-semibold mb-2">{t.panelTitle}</h2>
-            <p className="text-sm font-semibold text-white/80 mb-8">{t.panelNote}</p>
+        {/* ---- Summary: baked floral art, copy on top ---- */}
+        <div className="relative isolate flex min-h-[560px] flex-col overflow-hidden bg-[#05060d] lg:col-span-5 lg:min-h-screen xl:col-span-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/landing/signin/signin-floral-v3.webp"
+            alt=""
+            aria-hidden="true"
+            width={800}
+            height={1280}
+            decoding="async"
+            draggable={false}
+            className="absolute inset-0 -z-10 h-full w-full select-none object-cover object-bottom"
+          />
+          {/* Keeps the copy readable where the ASCII noise and the first petals reach it. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 -z-10"
+            style={{ background: 'linear-gradient(180deg,rgba(5,6,13,.94) 0%,rgba(5,6,13,.88) 32%,rgba(5,6,13,.4) 50%,rgba(5,6,13,0) 66%)' }}
+          />
+          <div className="p-8 pb-6 lg:p-12 lg:pb-6">
+            <h2 className="mb-2 text-2xl font-medium tracking-[-0.02em]">{t.panelTitle}</h2>
+            <p className="mb-8 text-sm text-white/70">{t.panelNote}</p>
 
-            <div className="flex justify-between items-start mb-2 pt-8 border-t border-white/15">
+            <div className="mb-2 flex items-start justify-between border-t border-white/15 pt-8">
               <div className="pr-4">
-                <span className="font-medium block">{t.itemName}</span>
-                <span className="text-xs font-semibold uppercase tracking-wide text-white/75">{t.itemKind}</span>
+                <span className="block font-medium">{t.itemName}</span>
+                <span className="text-xs font-medium uppercase tracking-[0.08em] text-white/60">{t.itemKind}</span>
               </div>
-              <span className="font-semibold whitespace-nowrap">{t.itemPrice}</span>
+              <span className="whitespace-nowrap font-medium">{t.itemPrice}</span>
             </div>
 
-            <p className="text-sm text-white/70 leading-relaxed mb-4">{t.itemDescription}</p>
-            <ul className="space-y-1.5 mb-8">
+            <p className="mb-4 text-sm leading-relaxed text-white/70">{t.itemDescription}</p>
+            <ul className="space-y-1.5">
               {t.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-white/85">
-                  <svg className="w-4 h-4 mt-0.5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#b9b0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   {f}
                 </li>
               ))}
             </ul>
+          </div>
 
-            <div className="flex justify-between items-center pt-6 border-t border-white/20">
-              <span className="font-semibold text-white/90">{t.total}</span>
-              <span className="text-xl font-bold whitespace-nowrap">{t.totalValue}</span>
+          {/* The total sits in glass over the bloom. */}
+          <div className="px-6 pb-6 lg:px-8 lg:pb-8">
+            <div className="rounded-2xl border border-white/15 bg-black/30 p-5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-white/90">{t.total}</span>
+                <span className="whitespace-nowrap text-xl font-semibold">{t.totalValue}</span>
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-white/70">{t.after}</p>
             </div>
-            <p className="mt-3 text-xs text-white/85 leading-relaxed">{t.after}</p>
-          </GrainGradient>
+          </div>
         </div>
       </div>
     </div>

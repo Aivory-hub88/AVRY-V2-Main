@@ -41,7 +41,7 @@ export default function CheckoutClient() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-gray-400">
+      <div className="min-h-screen bg-[#07080c] flex items-center justify-center text-white/40">
         Loading…
       </div>
     );
@@ -49,15 +49,15 @@ export default function CheckoutClient() {
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-center px-6">
-        <h1 className="text-2xl font-semibold text-[#1a1a1a] mb-2">Product not found</h1>
-        <p className="text-gray-500 mb-8">
+      <div className="min-h-screen bg-[#07080c] flex flex-col items-center justify-center text-center px-6">
+        <h1 className="text-2xl font-medium text-white mb-2">Product not found</h1>
+        <p className="text-white/50 mb-8">
           We couldn&apos;t find a plan matching &ldquo;{productId}&rdquo;.
         </p>
         <button
           type="button"
           onClick={() => router.push('/pricing')}
-          className="py-3 px-6 text-sm font-semibold bg-[#0d0d0d] text-white hover:bg-[#1a1a1a] rounded-lg transition"
+          className="py-3 px-6 text-sm font-semibold bg-[#f4f4f4] text-[#0f1115] hover:bg-white rounded-xl transition"
         >
           Back to Pricing
         </button>
@@ -66,9 +66,9 @@ export default function CheckoutClient() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans">
+    <div className="min-h-screen bg-[#07080c] text-white font-sans">
       <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen">
-        <div className="lg:col-span-8 bg-white lg:border-r border-gray-200">
+        <div className="lg:col-span-7 xl:col-span-8 bg-[#07080c]">
           <CheckoutForm
             productId={product.id}
             productName={product.name}
@@ -78,7 +78,7 @@ export default function CheckoutClient() {
             onComplete={() => {}}
           />
         </div>
-        <div className="lg:col-span-4 bg-[#0d2a63]">
+        <div className="lg:col-span-5 xl:col-span-4 bg-[#05060d]">
           <OrderSummary
             productId={product.id}
             productName={product.name}

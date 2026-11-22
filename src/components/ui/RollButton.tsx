@@ -11,13 +11,15 @@ import type { ReactNode } from 'react';
  * Timing, measured from a reference build: in 550ms with an expo-out curve, out
  * 600ms ease-in-out. The two are deliberately not mirror images.
  */
-export type RollTone = 'ink' | 'brand';
+export type RollTone = 'ink' | 'brand' | 'light';
 
 const TONES: Record<RollTone, { rest: string; fill: string; label: string; roll: string }> = {
   // Quiet default: near-black pill that floods Aivory blue.
   ink: { rest: 'bg-[#0f1115] text-white', fill: 'bg-[#1d4a9a]', label: 'text-white', roll: 'text-white' },
   // The featured plan: Aivory blue pill that floods the warm orange from the brand palette.
   brand: { rest: 'bg-[#1d4a9a] text-white', fill: 'bg-[#e46a24]', label: 'text-white', roll: 'text-white' },
+  // For dark pages: a white pill that floods Aivory indigo.
+  light: { rest: 'bg-[#f4f4f4] text-[#0f1115]', fill: 'bg-[#3a3aa8]', label: 'text-[#0f1115]', roll: 'text-white' },
 };
 
 const EASE_IN = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
@@ -29,19 +31,24 @@ export function RollButton({
   onClick,
   tone = 'ink',
   className = '',
+  type = 'button',
+  disabled = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
+  type?: 'button' | 'submit';
+  disabled?: boolean;
   tone?: RollTone;
   className?: string;
 }) {
   const t = TONES[tone];
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
+      disabled={disabled}
       data-cta-cursor
-      className={`group relative isolate w-full overflow-hidden rounded-full px-6 py-3 text-center text-[14px] font-medium outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#1d4a9a] active:scale-[0.985] transition-transform duration-150 ${t.rest} ${className}`}
+      className={`group relative isolate w-full overflow-hidden rounded-full px-6 py-3 text-center text-[14px] font-medium outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-[#1d4a9a] active:scale-[0.985] transition-transform duration-150 disabled:cursor-wait disabled:opacity-60 ${t.rest} ${className}`}
     >
       <span
         aria-hidden="true"

@@ -5,7 +5,6 @@ import { useLanguage } from '@/components/context/LanguageContext';
 import { formatCheckoutPrice, type CheckoutCurrency } from '@/lib/checkout-format';
 import { getServiceInfo } from '@/lib/checkout-catalog';
 import { validatePromoCode, type PromoQuote } from '@/lib/payment';
-import { GrainGradient } from '@/components/ui/GrainGradient';
 
 export interface OrderSummaryProps {
   productId: string;
@@ -79,8 +78,26 @@ export function OrderSummary({
       : language === 'id' ? '/bulan' : '/month';
 
   return (
-    <GrainGradient className="w-full min-h-screen p-8 lg:p-12 text-white">
-      <h2 className="text-2xl font-semibold mb-2">Order Summary</h2>
+    <div className="relative isolate flex min-h-[560px] w-full flex-col overflow-hidden bg-[#05060d] text-white lg:min-h-screen">
+      {/* Baked floral art (scripts/hero-renders/floral/bake-signin.cjs, PAL=checkout seed 77). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/landing/checkout/checkout-floral-v4.webp"
+        alt=""
+        aria-hidden="true"
+        width={800}
+        height={1280}
+        decoding="async"
+        draggable={false}
+        className="absolute inset-0 -z-10 h-full w-full select-none object-cover object-bottom"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10"
+        style={{ background: 'linear-gradient(180deg,rgba(5,6,13,.94) 0%,rgba(5,6,13,.88) 40%,rgba(5,6,13,.45) 58%,rgba(5,6,13,0) 72%)' }}
+      />
+      <div className="p-8 pb-6 lg:p-12 lg:pb-6">
+      <h2 className="mb-2 text-2xl font-medium tracking-[-0.02em]">Order Summary</h2>
       <p className="text-sm font-semibold text-white/80 mb-8">Invoice #: {invoiceNumber}</p>
 
       <div className="flex items-center gap-2 text-sm font-semibold text-white/90 mb-8 pb-8 border-b border-white/15">
@@ -136,8 +153,13 @@ export function OrderSummary({
         </>
       )}
 
+
+      </div>
+
+      <div className="px-6 pb-6 lg:px-8 lg:pb-8">
+        <div className="rounded-2xl border border-white/15 bg-black/30 p-5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.7)] backdrop-blur-xl">
       {onPromoChange && (
-        <div className="mb-6">
+        <div className="mb-4">
           {promo ? (
             <div className="flex items-center justify-between rounded-lg border border-white/25 bg-white/10 px-3 py-2.5 text-sm backdrop-blur-md">
               <span className="text-white">
@@ -195,7 +217,7 @@ export function OrderSummary({
         </div>
       )}
 
-      <div className="flex justify-between items-center pt-6 border-t border-white/20">
+      <div className="flex justify-between items-center">
         <span className="font-semibold text-white/90">Total Amount Due</span>
         <span className="text-xl font-bold whitespace-nowrap">
           {totalLabel}
@@ -212,6 +234,8 @@ export function OrderSummary({
             : 'Billed monthly. You can cancel anytime from your dashboard.'}
         </p>
       )}
-    </GrainGradient>
+        </div>
+      </div>
+    </div>
   );
 }
