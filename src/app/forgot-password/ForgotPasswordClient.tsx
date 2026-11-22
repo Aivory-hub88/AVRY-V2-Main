@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { requestPasswordReset } from "@/lib/auth";
+import { RollButton } from "@/components/ui/RollButton";
 
 /**
  * Forgot-password page.
@@ -75,7 +76,7 @@ export default function ForgotPasswordClient() {
           >
             Reset your password
           </h2>
-          <p className="text-[#b2cca2] text-sm font-light">
+          <p className="text-white/55 text-sm font-light">
             We&apos;ll email you a link to choose a new one.
           </p>
         </div>
@@ -91,7 +92,7 @@ export default function ForgotPasswordClient() {
             </p>
             <a
               href="/login"
-              className="block text-center text-[13px] text-[#b2cca2] hover:text-white transition-colors"
+              className="block text-center text-[13px] text-[#b9b0ff] hover:text-white transition-colors"
             >
               &larr; Back to sign in
             </a>
@@ -112,7 +113,7 @@ export default function ForgotPasswordClient() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
                 autoComplete="email"
-                className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm"
+                className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm"
               />
             </div>
 
@@ -122,13 +123,11 @@ export default function ForgotPasswordClient() {
               </p>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 bg-[#a3aa96] hover:bg-[#8f9681] text-[#494949] font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-            >
-              {isLoading ? "Sending..." : "Send reset link"}
-            </button>
+            <div className="mt-2">
+              <RollButton type="submit" disabled={isLoading} tone="light" className="py-3 text-sm">
+                {isLoading ? "Sending..." : "Send reset link"}
+              </RollButton>
+            </div>
 
             <a
               href="/login"

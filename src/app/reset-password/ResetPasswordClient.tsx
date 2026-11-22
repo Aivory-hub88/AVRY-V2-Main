@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { checkResetToken, resetPassword } from "@/lib/auth";
+import { RollButton } from "@/components/ui/RollButton";
 
 const INPUT_CLASS =
-  "w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm";
+  "w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm";
 
 function ResetPasswordInner() {
   const router = useRouter();
@@ -90,7 +91,7 @@ function ResetPasswordInner() {
             Choose a new password
           </h2>
           {accountEmail && (
-            <p className="text-[#b2cca2] text-sm font-light">For {accountEmail}</p>
+            <p className="text-white/55 text-sm font-light">For {accountEmail}</p>
           )}
         </div>
 
@@ -106,7 +107,7 @@ function ResetPasswordInner() {
             </p>
             <a
               href="/forgot-password"
-              className="block text-center text-[13px] text-[#b2cca2] hover:text-white transition-colors"
+              className="block text-center text-[13px] text-[#b9b0ff] hover:text-white transition-colors"
             >
               Request a new link
             </a>
@@ -115,7 +116,7 @@ function ResetPasswordInner() {
 
         {linkValid === true && done && (
           <div className="space-y-6">
-            <p className="text-[13px] leading-relaxed text-[#b2cca2] bg-[#b2cca2]/10 border border-[#b2cca2]/25 rounded-lg px-4 py-4">
+            <p className="text-[13px] leading-relaxed text-[#cfc9ff] bg-[#8b7cf6]/10 border border-[#8b7cf6]/25 rounded-lg px-4 py-4">
               Password updated. You&apos;ve been signed out everywhere — taking
               you to the sign-in page…
             </p>
@@ -135,7 +136,7 @@ function ResetPasswordInner() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[12px] text-[#b2cca2] hover:text-white transition-colors"
+                  className="text-[12px] text-[#b9b0ff] hover:text-white transition-colors"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -175,13 +176,11 @@ function ResetPasswordInner() {
               </p>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 bg-[#a3aa96] hover:bg-[#8f9681] text-[#494949] font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-            >
-              {isLoading ? "Saving..." : "Set new password"}
-            </button>
+            <div className="mt-2">
+              <RollButton type="submit" disabled={isLoading} tone="light" className="py-3 text-sm">
+                {isLoading ? "Saving..." : "Set new password"}
+              </RollButton>
+            </div>
           </form>
         )}
       </div>
@@ -195,7 +194,7 @@ export default function ResetPasswordClient() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-          <div className="text-[#b2cca2] text-xl animate-pulse">Loading...</div>
+          <div className="text-white/50 text-xl animate-pulse">Loading...</div>
         </div>
       }
     >

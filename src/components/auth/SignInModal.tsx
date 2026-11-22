@@ -127,7 +127,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
           <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
             Welcome back
           </h2>
-          <p className="text-[#b2cca2] text-sm font-light">
+          <p className="text-white/55 text-sm font-light">
             Sign in to your Aivory workspace
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               onChange={handleChange}
               placeholder="name@company.com"
               required
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm"
             />
           </div>
 
@@ -155,7 +155,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               <label htmlFor="password" className="block text-[13px] font-medium text-white/85">
                 Password
               </label>
-              <a href="#" className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
+              <a href="#" className="text-[12px] text-[#b9b0ff] hover:text-white transition-colors">
                 Forgot password?
               </a>
             </div>
@@ -167,7 +167,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               onChange={handleChange}
               placeholder="••••••••"
               required
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm tracking-widest"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm tracking-widest"
             />
           </div>
 
@@ -190,7 +190,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">
             New to Aivory?{' '}
-            <a href="/free-diagnostic" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
+            <a href="/free-diagnostic" className="text-white hover:text-[#b9b0ff] transition-colors font-medium">
               Create a free account &rarr;
             </a>
           </p>

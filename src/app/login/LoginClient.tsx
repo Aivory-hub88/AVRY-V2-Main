@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { isAuthenticated, login as authLogin, PaymentRequiredError } from "@/lib/auth";
+import { RollButton } from "@/components/ui/RollButton";
 
 /**
  * Login Page Component
@@ -84,7 +85,7 @@ export default function LoginClient() {
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#050505]">
-        <div className="text-[#b2cca2] text-xl animate-pulse">Loading...</div>
+        <div className="text-white/50 text-xl animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -115,7 +116,7 @@ export default function LoginClient() {
           <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight" style={{ fontFamily: "var(--font-manrope), 'Manrope', sans-serif" }}>
             Welcome back
           </h2>
-          <p className="text-[#b2cca2] text-sm font-light">
+          <p className="text-white/55 text-sm font-light">
             Sign in to your Aivory workspace
           </p>
         </div>
@@ -132,7 +133,7 @@ export default function LoginClient() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="name@company.com"
               autoComplete="email"
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm"
             />
           </div>
 
@@ -141,7 +142,7 @@ export default function LoginClient() {
               <label htmlFor="login-password" className="block text-[13px] font-medium text-white/85">
                 Password
               </label>
-              <a href="/forgot-password" className="text-[12px] text-[#b2cca2] hover:text-white transition-colors">
+              <a href="/forgot-password" className="text-[12px] text-[#b9b0ff] hover:text-white transition-colors">
                 Forgot password?
               </a>
             </div>
@@ -152,7 +153,7 @@ export default function LoginClient() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#c4c9b8] focus:ring-1 focus:ring-[#c4c9b8] transition-all text-sm tracking-widest"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm tracking-widest"
             />
           </div>
 
@@ -162,25 +163,17 @@ export default function LoginClient() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-3 px-4 bg-[#a3aa96] hover:bg-[#8f9681] text-[#494949] font-medium rounded-lg transition-colors text-sm flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-          >
-            {isLoading ? "Signing in..." : "Sign In"}
-            {!isLoading && (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            )}
-          </button>
+          <div className="mt-2">
+            <RollButton type="submit" disabled={isLoading} tone="light" className="py-3 text-sm">
+              {isLoading ? "Signing in..." : "Sign In"}
+            </RollButton>
+          </div>
         </form>
 
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">
             New to Aivory?{" "}
-            <a href="/free-diagnostic" className="text-white hover:text-[#b2cca2] transition-colors font-medium">
+            <a href="/free-diagnostic" className="text-white hover:text-[#b9b0ff] transition-colors font-medium">
               Create a free account &rarr;
             </a>
           </p>
