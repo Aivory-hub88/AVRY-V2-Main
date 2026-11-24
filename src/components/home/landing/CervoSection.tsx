@@ -110,9 +110,9 @@ export default function CervoSection() {
           <i className={`${s.fbGlow} ${s.g3}`} />
           <GrainBanner
             palette={PALETTES.ember}
-            lockup="/landing/brand/cervo-lockup.webp"
+            lockup="/landing/brand/cervo-lockup.svg"
             lockupWidth={38.5}
-            lockupRatio={923 / 118}
+            lockupRatio={664 / 78}
             copy={<>A team of AI agents,<br />each with its own brain,<br />memory and computer</>}
           />
           <img className={s.fbPeople} src="/landing/cervo-team.webp?v=3" alt="" width={1600} height={739} />
