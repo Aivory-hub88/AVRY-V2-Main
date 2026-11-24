@@ -772,8 +772,8 @@ async function recordAction(ctx, actionType, payload) {
 // calls outside this process and keeps using (and charging for) Aivory's key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BYOK_PROVIDERS = ['openrouter', 'anthropic', 'openai']; // preference order
-const BYOK_TTL_MS = 60 * 1000;
+// Short, so flipping the switch in Settings takes effect within seconds.
+const BYOK_TTL_MS = 15 * 1000;
 const _byokCache = new Map(); // user_id -> { at, byok }
 
 // Direct providers speak the OpenAI chat-completions dialect, but not
@@ -799,18 +799,21 @@ async function resolveByok(userId, internalKey) {
   if (cached && Date.now() - cached.at < BYOK_TTL_MS) return cached.byok;
   let byok = null;
   try {
-    for (const provider of BYOK_PROVIDERS) {
-      const res = await fetch(
-        `${BACKEND_URL()}/api/v1/byok-keys/internal/${encodeURIComponent(userId)}/${provider}`,
-        { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(5000) }
-      );
-      if (res.status === 404) continue;
-      if (!res.ok) {
-        console.error(`[telegram-agent] byok lookup returned ${res.status} (using Aivory key)`);
-        return null; // transient: don't cache, retry next turn
-      }
+    // One call: the backend applies the user's switch and primary provider, and
+    // answers 404 for "no usable key" (which is also what an older backend
+    // says, so a rollout in the wrong order fails safe: Aivory's key, charged).
+    const res = await fetch(
+      `${BACKEND_URL()}/api/v1/byok-keys/internal/${encodeURIComponent(userId)}`,
+      { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(5000) }
+    );
+    if (res.ok) {
       const data = await res.json();
-      if (data && data.api_key) { byok = { provider, apiKey: data.api_key }; break; }
+      if (data && data.api_key && BYOK_TARGETS[data.provider]) {
+        byok = { provider: data.provider, apiKey: data.api_key };
+      }
+    } else if (res.status !== 404) {
+      console.error(`[telegram-agent] byok lookup returned ${res.status} (using Aivory key)`);
+      return null; // transient: don't cache, retry next turn
     }
   } catch (err) {
     console.error('[telegram-agent] byok lookup failed (using Aivory key):', err.message);
@@ -818,6 +821,18 @@ async function resolveByok(userId, internalKey) {
   }
   _byokCache.set(userId, { at: Date.now(), byok });
   return byok;
+}
+
+/**
+ * The OpenRouter key to hand Cerveau for this turn, or null. Only an OpenRouter
+ * BYOK key can run there (Cerveau's models are OpenRouter slugs), and only once
+ * the daemon honours `X-Provider-Key` — until CERVEAU_BYOK=1 is set after that
+ * daemon is deployed, an older one would ignore the header and run the turn on
+ * Aivory's key while we'd skipped charging for it.
+ */
+function cerveauByokKey(ctx) {
+  if (process.env.CERVEAU_BYOK !== '1') return null;
+  return ctx && ctx.byok && ctx.byok.provider === 'openrouter' ? ctx.byok.apiKey : null;
 }
 
 /** Where and how this turn's chat-completion call goes. */
@@ -1032,6 +1047,7 @@ async function cerveauHeaders(ctx, secret) {
     'X-Tenant-Id': ctx.user_id,
     'X-Agent-Type': ctx.agent_type,
     'X-Session-Id': ctx.session_id,
+    ...(cerveauByokKey(ctx) ? { 'X-Provider-Key': cerveauByokKey(ctx) } : {}),
     ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
     // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
     ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
@@ -1303,7 +1319,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       let runOutcome = null;
       let runFailureReason = null;
       if (engine === 'cerveau') {
-        if (ctx.byok) {
+        if (ctx.byok && !cerveauByokKey(ctx)) {
           ctx.byok = null;
           const credit = await checkCredits(ctx);
           if (!credit.allowed) return res.json({ reply: credit.reply });
@@ -1318,12 +1334,12 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // same chat-channel cleanup the legacy path gets from a prompt rule.
         if (wantsStream && channel === 'console' && !ctx.room_turn && !ctx.turn_origin) {
           if (await streamCerveau(ctx, userText, res)) {
-            await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
+            if (!ctx.byok) await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
           }
           return;
         }
         ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
-        await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
+        if (!ctx.byok) await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
       } else {
         if (!orKey && !ctx.byok) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
@@ -1484,6 +1500,8 @@ module.exports._internals = {
   callLLM,
   resolveByok,
   llmTarget,
+  cerveauByokKey,
+  cerveauHeaders,
   SECURITY_RULES,
   AGENT_PROMPTS,
   commonRules,
