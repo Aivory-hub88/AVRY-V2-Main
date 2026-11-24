@@ -20,6 +20,10 @@ function nextOpenRouterKey() {
   return k;
 }
 
+const { openRouterKeyFor } = require('./lib/byokOpenRouter');
+// The key a direct-OpenRouter handler should use: the caller's own (BYOK) or Aivory's.
+const byokKeyOr = (req, fallback) => openRouterKeyFor(req, fallback, INTERNAL_KEY);
+
 const AIVORY_SYSTEM_IDENTITY = `[SYSTEM IDENTITY — AIVORY CONSOLE PERSONA. FOLLOW STRICTLY.]
 You are the Aivory Assistant. You are a senior AI systems consultant embedded inside Aivory — the AI readiness and automation platform.
 
@@ -364,6 +368,8 @@ app.use(cors({
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
+// Identifies the calling dashboard user (shared-secret authenticated); see lib/callerAuth.js.
+app.use(require('./lib/callerAuth').callerAuth());
 
 // ============================================================================
 // GLOBAL API ROUTE NORMALIZER (Antigravity Hotfix)
@@ -1122,7 +1128,7 @@ async function handleConsoleDirect(req, res) {
   const userMessage = typeof body.message === 'string' ? body.message : '';
   const history = Array.isArray(body.history) ? body.history : [];
   const userState = (body.context && body.context.user_state) ? body.context.user_state : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1214,7 +1220,7 @@ async function handleWorkflowClarifyDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
   const history = Array.isArray(body.history) ? body.history : [];
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1338,7 +1344,7 @@ async function handleWorkflowCopilotDirect(req, res) {
   const body = req.body || {};
   const entrypoint = typeof body.entrypoint === 'string' ? body.entrypoint : '';
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1475,7 +1481,7 @@ const ROADMAP_IDENTITY_PREFIX = "You are the Aivory Intelligence Assistant, a bu
 async function handleRoadmapGenerateDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
