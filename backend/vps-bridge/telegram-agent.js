@@ -765,11 +765,79 @@ async function recordAction(ctx, actionType, payload) {
   return data.action_id;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BYOK — the operator's own provider key (avry-backend /api/v1/byok-keys).
+// A turn that runs on it is billed by their provider, so it is neither gated
+// nor charged in Aivory credits. Legacy engine only: Cerveau runs its own LLM
+// calls outside this process and keeps using (and charging for) Aivory's key.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BYOK_PROVIDERS = ['openrouter', 'anthropic', 'openai']; // preference order
+const BYOK_TTL_MS = 60 * 1000;
+const _byokCache = new Map(); // user_id -> { at, byok }
+
+// Direct providers speak the OpenAI chat-completions dialect, but not
+// OpenRouter's model slugs, so each gets its own default model.
+const BYOK_TARGETS = {
+  openrouter: { url: 'https://openrouter.ai/api/v1/chat/completions', model: () => AGENT_MODEL(), usage: true },
+  anthropic: {
+    url: 'https://api.anthropic.com/v1/chat/completions',
+    model: () => process.env.BYOK_ANTHROPIC_MODEL || 'claude-haiku-5-5',
+    usage: false,
+  },
+  openai: {
+    url: 'https://api.openai.com/v1/chat/completions',
+    model: () => process.env.BYOK_OPENAI_MODEL || 'gpt-4.1-mini',
+    usage: false,
+  },
+};
+
+/** { provider, apiKey } for the user's first active BYOK key, else null. Never throws. */
+async function resolveByok(userId, internalKey) {
+  if (!userId || userId === 'unknown') return null;
+  const cached = _byokCache.get(userId);
+  if (cached && Date.now() - cached.at < BYOK_TTL_MS) return cached.byok;
+  let byok = null;
+  try {
+    for (const provider of BYOK_PROVIDERS) {
+      const res = await fetch(
+        `${BACKEND_URL()}/api/v1/byok-keys/internal/${encodeURIComponent(userId)}/${provider}`,
+        { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(5000) }
+      );
+      if (res.status === 404) continue;
+      if (!res.ok) {
+        console.error(`[telegram-agent] byok lookup returned ${res.status} (using Aivory key)`);
+        return null; // transient: don't cache, retry next turn
+      }
+      const data = await res.json();
+      if (data && data.api_key) { byok = { provider, apiKey: data.api_key }; break; }
+    }
+  } catch (err) {
+    console.error('[telegram-agent] byok lookup failed (using Aivory key):', err.message);
+    return null;
+  }
+  _byokCache.set(userId, { at: Date.now(), byok });
+  return byok;
+}
+
+/** Where and how this turn's chat-completion call goes. */
+function llmTarget(ctx, orKey) {
+  if (ctx && ctx.byok) {
+    const t = BYOK_TARGETS[ctx.byok.provider];
+    return { url: t.url, key: ctx.byok.apiKey, model: t.model(), usage: t.usage };
+  }
+  return { url: BYOK_TARGETS.openrouter.url, key: orKey, model: AGENT_MODEL(), usage: true };
+}
+
 async function webSearch(query, orKey, ctx) {
+  if (ctx && ctx.byok && ctx.byok.provider !== 'openrouter') {
+    throw new Error('web search needs an OpenRouter key; your ' + ctx.byok.provider + ' key cannot run it');
+  }
+  const key = ctx && ctx.byok ? ctx.byok.apiKey : orKey;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${orKey}`,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://aivory.id',
       'X-Title': 'Aivory Agent Search',
@@ -867,21 +935,23 @@ async function executeTool(name, args, ctx) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function callLLM(messages, tools, orKey, toolChoice, ctx) {
+  const target = llmTarget(ctx, orKey);
   const body = {
-    model: AGENT_MODEL(),
+    model: target.model,
     messages,
     stream: false,
-    // Billed cost in the response, so the turn is charged what it cost.
-    usage: { include: true },
   };
+  // Billed cost in the response, so the turn is charged what it cost
+  // (OpenRouter-only field; BYOK turns aren't charged anyway).
+  if (target.usage) body.usage = { include: true };
   if (tools && tools.length) {
     body.tools = tools;
     if (toolChoice) body.tool_choice = toolChoice;
   }
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await fetch(target.url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${orKey}`,
+      Authorization: `Bearer ${target.key}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://aivory.id',
       'X-Title': 'Aivory Telegram Agent',
@@ -1205,9 +1275,15 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       // Credit gate first: when the operator's quota is spent, reply without
       // ever reaching the LLM so usage cost stays hard-capped per tier. This
       // must stay ahead of the engine branch below — both paths spend credit.
-      const credit = await checkCredits(ctx);
-      if (!credit.allowed) {
-        return res.json({ reply: credit.reply });
+      // A BYOK operator's legacy turns run on their own provider key, so the
+      // gate is skipped for them — but only once the engine is known to be
+      // legacy (below): Cerveau turns still spend Aivory's key.
+      ctx.byok = await resolveByok(ctx.user_id, internalKey);
+      if (!ctx.byok) {
+        const credit = await checkCredits(ctx);
+        if (!credit.allowed) {
+          return res.json({ reply: credit.reply });
+        }
       }
 
       // Sequential (not Promise.all'd with buildToolset, unlike before Phase
@@ -1227,6 +1303,11 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       let runOutcome = null;
       let runFailureReason = null;
       if (engine === 'cerveau') {
+        if (ctx.byok) {
+          ctx.byok = null;
+          const credit = await checkCredits(ctx);
+          if (!credit.allowed) return res.json({ reply: credit.reply });
+        }
         console.log('[telegram-agent] routing to cerveau', {
           user_id: ctx.user_id, agent_type: agentType, session_id: historyKey,
         });
@@ -1244,7 +1325,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
         await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
       } else {
-        if (!orKey) {
+        if (!orKey && !ctx.byok) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
         }
         const history = histories.get(historyKey) || [];
@@ -1255,7 +1336,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         const systemPrompt =
           AGENT_PROMPTS[agentType] + SECURITY_RULES + operatorConfigBlock(profile) + commonRules(channel) + tierHint;
         reply = await runAgentLoop({ systemPrompt, history, userText, tools, ctx });
-        await settleUsage(ctx, 'agent_message');
+        if (!ctx.byok) await settleUsage(ctx, 'agent_message');
         histories.set(
           historyKey,
           [...history, { role: 'user', content: userText }, { role: 'assistant', content: reply }].slice(-HISTORY_MAX)
@@ -1401,6 +1482,8 @@ module.exports._internals = {
   recordUsage,
   creditsForUsage,
   callLLM,
+  resolveByok,
+  llmTarget,
   SECURITY_RULES,
   AGENT_PROMPTS,
   commonRules,
