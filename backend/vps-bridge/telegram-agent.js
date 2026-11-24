@@ -772,8 +772,8 @@ async function recordAction(ctx, actionType, payload) {
 // calls outside this process and keeps using (and charging for) Aivory's key.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BYOK_PROVIDERS = ['openrouter', 'anthropic', 'openai']; // preference order
-const BYOK_TTL_MS = 60 * 1000;
+// Short, so flipping the switch in Settings takes effect within seconds.
+const BYOK_TTL_MS = 15 * 1000;
 const _byokCache = new Map(); // user_id -> { at, byok }
 
 // Direct providers speak the OpenAI chat-completions dialect, but not
@@ -799,18 +799,21 @@ async function resolveByok(userId, internalKey) {
   if (cached && Date.now() - cached.at < BYOK_TTL_MS) return cached.byok;
   let byok = null;
   try {
-    for (const provider of BYOK_PROVIDERS) {
-      const res = await fetch(
-        `${BACKEND_URL()}/api/v1/byok-keys/internal/${encodeURIComponent(userId)}/${provider}`,
-        { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(5000) }
-      );
-      if (res.status === 404) continue;
-      if (!res.ok) {
-        console.error(`[telegram-agent] byok lookup returned ${res.status} (using Aivory key)`);
-        return null; // transient: don't cache, retry next turn
-      }
+    // One call: the backend applies the user's switch and primary provider, and
+    // answers 404 for "no usable key" (which is also what an older backend
+    // says, so a rollout in the wrong order fails safe: Aivory's key, charged).
+    const res = await fetch(
+      `${BACKEND_URL()}/api/v1/byok-keys/internal/${encodeURIComponent(userId)}`,
+      { headers: { 'X-Internal-Token': internalKey }, signal: AbortSignal.timeout(5000) }
+    );
+    if (res.ok) {
       const data = await res.json();
-      if (data && data.api_key) { byok = { provider, apiKey: data.api_key }; break; }
+      if (data && data.api_key && BYOK_TARGETS[data.provider]) {
+        byok = { provider: data.provider, apiKey: data.api_key };
+      }
+    } else if (res.status !== 404) {
+      console.error(`[telegram-agent] byok lookup returned ${res.status} (using Aivory key)`);
+      return null; // transient: don't cache, retry next turn
     }
   } catch (err) {
     console.error('[telegram-agent] byok lookup failed (using Aivory key):', err.message);
