@@ -32,6 +32,7 @@
 
 const AGENT_MODEL = () => process.env.TELEGRAM_AGENT_MODEL || 'deepseek/deepseek-v4-flash';
 const SEARCH_MODEL = () => process.env.TELEGRAM_SEARCH_MODEL || 'perplexity/sonar';
+const { guardedPostJson } = require('./lib/guardedHttps');
 const BACKEND_URL = () => (process.env.BACKEND_INTERNAL_URL || 'http://localhost:8081').replace(/\/$/, '');
 const N8N_URL = () => (process.env.N8N_BASE_URL || 'http://localhost:5678').replace(/\/$/, '');
 const CERVEAU_WEBHOOK_URL = () => process.env.CERVEAU_WEBHOOK_URL || 'http://127.0.0.1:3105/webhook';
@@ -808,7 +809,12 @@ async function resolveByok(userId, internalKey) {
     );
     if (res.ok) {
       const data = await res.json();
-      if (data && data.api_key && BYOK_TARGETS[data.provider]) {
+      if (data && data.api_key && data.provider === 'openai_compatible') {
+        // The user's own endpoint: useless without both its URL and its model.
+        if (data.base_url && data.model) {
+          byok = { provider: data.provider, apiKey: data.api_key, baseUrl: data.base_url, model: data.model };
+        }
+      } else if (data && data.api_key && BYOK_TARGETS[data.provider]) {
         byok = { provider: data.provider, apiKey: data.api_key };
       }
     } else if (res.status !== 404) {
@@ -837,6 +843,17 @@ function cerveauByokKey(ctx) {
 
 /** Where and how this turn's chat-completion call goes. */
 function llmTarget(ctx, orKey) {
+  if (ctx && ctx.byok && ctx.byok.provider === 'openai_compatible') {
+    // A tenant-typed URL: callLLM sends it through the SSRF guard, not plain fetch.
+    return {
+      url: `${String(ctx.byok.baseUrl).replace(/\/+$/, '')}/chat/completions`,
+      key: ctx.byok.apiKey,
+      model: ctx.byok.model,
+      usage: false,
+      guarded: true,
+      label: 'Custom endpoint',
+    };
+  }
   if (ctx && ctx.byok) {
     const t = BYOK_TARGETS[ctx.byok.provider];
     return { url: t.url, key: ctx.byok.apiKey, model: t.model(), usage: t.usage };
@@ -963,20 +980,32 @@ async function callLLM(messages, tools, orKey, toolChoice, ctx) {
     body.tools = tools;
     if (toolChoice) body.tool_choice = toolChoice;
   }
-  const res = await fetch(target.url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${target.key}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://aivory.id',
-      'X-Title': 'Aivory Telegram Agent',
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(45000),
-  });
+  const headers = {
+    Authorization: `Bearer ${target.key}`,
+    'Content-Type': 'application/json',
+    'HTTP-Referer': 'https://aivory.id',
+    'X-Title': 'Aivory Telegram Agent',
+  };
+  let res;
+  if (target.guarded) {
+    let out;
+    try {
+      out = await guardedPostJson(target.url, headers, JSON.stringify(body), { timeoutMs: 45000 });
+    } catch (err) {
+      throw new Error(`${target.label}: ${err.message}`);
+    }
+    res = { ok: out.status >= 200 && out.status < 300, status: out.status, text: async () => out.body, json: async () => JSON.parse(out.body) };
+  } else {
+    res = await fetch(target.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45000),
+    });
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 200)}`);
+    throw new Error(`${target.label || 'OpenRouter'} ${res.status}: ${errText.slice(0, 200)}`);
   }
   const data = await res.json();
   recordUsage(ctx, data);
