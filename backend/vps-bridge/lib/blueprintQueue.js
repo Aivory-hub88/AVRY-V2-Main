@@ -163,8 +163,8 @@ function isUsableBlueprint(content) {
  * (measured: 14.5s vs 128.6s+ on the same prompt); {exclude:true} does NOT —
  * it merely hides the reasoning while still paying for it.
  */
-async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model = BLUEPRINT_MODEL, tier = 'unnamed' }) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model = BLUEPRINT_MODEL, tier = 'unnamed', apiKey }) {
+  const OPENROUTER_API_KEY = apiKey || process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
 
   const body = {
@@ -280,7 +280,7 @@ async function callModel({ lastUserMessage, reasoningEnabled, timeoutMs, model =
  * (like job #21) is diagnosable from logs alone — which tier(s) were tried,
  * which timed out vs. errored vs. returned garbage.
  */
-async function runBlueprintGeneration({ messages }) {
+async function runBlueprintGeneration({ messages }, { apiKey } = {}) {
   if (!Array.isArray(messages)) throw new Error('messages array required');
   const lastUserMessage = [...messages].reverse().find(
     (m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()
@@ -290,7 +290,7 @@ async function runBlueprintGeneration({ messages }) {
 
   // Tier 1: fast, no-reasoning, primary model.
   try {
-    const fast = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fast' });
+    const fast = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fast', apiKey });
     if (isUsableBlueprint(fast)) return { content: fast, tier: 'fast' };
     console.warn('[blueprint-worker] tier=fast result not a usable blueprint — escalating to tier=fallback');
   } catch (err) {
@@ -304,7 +304,7 @@ async function runBlueprintGeneration({ messages }) {
   // triggers tier 3 / final failure.
   let fallbackErr = null;
   try {
-    const fallback = await callModel({ lastUserMessage: userContent, reasoningEnabled: true, timeoutMs: BLUEPRINT_FALLBACK_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fallback' });
+    const fallback = await callModel({ lastUserMessage: userContent, reasoningEnabled: true, timeoutMs: BLUEPRINT_FALLBACK_TIMEOUT_MS, model: BLUEPRINT_MODEL, tier: 'fallback', apiKey });
     if (fallback.length >= MIN_BLUEPRINT_CHARS) {
       if (!isUsableBlueprint(fallback)) {
         console.warn('[blueprint-worker] tier=fallback result not structurally clean — returning it anyway for Next.js-layer normalization');
@@ -322,7 +322,7 @@ async function runBlueprintGeneration({ messages }) {
   for (const failoverModel of BLUEPRINT_FAILOVER_MODELS) {
     const tierLabel = `failover:${failoverModel}`;
     try {
-      const failover = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_FAILOVER_TIMEOUT_MS, model: failoverModel, tier: tierLabel });
+      const failover = await callModel({ lastUserMessage: userContent, reasoningEnabled: false, timeoutMs: BLUEPRINT_FAILOVER_TIMEOUT_MS, model: failoverModel, tier: tierLabel, apiKey });
       if (failover.length >= MIN_BLUEPRINT_CHARS) {
         if (!isUsableBlueprint(failover)) {
           console.warn(`[blueprint-worker] tier=${tierLabel} result not structurally clean — returning it anyway for Next.js-layer normalization`);

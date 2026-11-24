@@ -20,6 +20,18 @@ function nextOpenRouterKey() {
   return k;
 }
 
+const { openRouterKeyFor, userOpenRouterKey } = require('./lib/byokOpenRouter');
+const { stripForwardHeaders } = require('./lib/forwardHeaders');
+
+// For requests relayed to the Zeroclaw daemons: the caller's own OpenRouter key as
+// X-Provider-Key, only when the dashboard proved who the caller is and BYOK is on.
+async function providerKeyHeaders(req) {
+  const key = req && req.callerUserId ? await userOpenRouterKey(req.callerUserId, INTERNAL_KEY) : null;
+  return key ? { 'X-Provider-Key': key } : {};
+}
+// The key a direct-OpenRouter handler should use: the caller's own (BYOK) or Aivory's.
+const byokKeyOr = (req, fallback) => openRouterKeyFor(req, fallback, INTERNAL_KEY);
+
 const AIVORY_SYSTEM_IDENTITY = `[SYSTEM IDENTITY — AIVORY CONSOLE PERSONA. FOLLOW STRICTLY.]
 You are the Aivory Assistant. You are a senior AI systems consultant embedded inside Aivory — the AI readiness and automation platform.
 
@@ -364,6 +376,8 @@ app.use(cors({
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
+// Identifies the calling dashboard user (shared-secret authenticated); see lib/callerAuth.js.
+app.use(require('./lib/callerAuth').callerAuth());
 
 // ============================================================================
 // GLOBAL API ROUTE NORMALIZER (Antigravity Hotfix)
@@ -396,7 +410,7 @@ app.all(['/api/v1/auth/*', '/auth/*'], (req, res) => {
     ? JSON.stringify(req.body)
     : '';
     
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
   
   const options = {
     hostname: targetUrl.hostname,
@@ -903,12 +917,28 @@ function buildZeroclawWebhookBody(body) {
   return body;
 }
 
-function handleStreamRequest(req, res) {
+// The wrappers are async, and Express 4 doesn't catch a rejected promise: an
+// uncaught one would take the whole bridge down, so every failure is answered here.
+function failRelay(res, err) {
+  console.error('[relay] failed:', err && err.message);
+  if (res.headersSent) return res.end();
+  return res.status(502).json({ error: true, message: 'Upstream relay failed' });
+}
+
+async function handleStreamRequest(req, res) {
+  try {
+    return proxyStreamRequest(req, res, await providerKeyHeaders(req));
+  } catch (err) {
+    return failRelay(res, err);
+  }
+}
+
+function proxyStreamRequest(req, res, extraHeaders) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
     ? JSON.stringify(buildZeroclawWebhookBody(req.body))
     : '';
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
   
   const options = {
     hostname: targetUrl.hostname,
@@ -917,6 +947,7 @@ function handleStreamRequest(req, res) {
     method: 'POST',
     headers: {
       ...forwardHeaders,
+      ...extraHeaders,
       'X-Internal-Key': INTERNAL_KEY,
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(outboundBody),
@@ -1122,7 +1153,7 @@ async function handleConsoleDirect(req, res) {
   const userMessage = typeof body.message === 'string' ? body.message : '';
   const history = Array.isArray(body.history) ? body.history : [];
   const userState = (body.context && body.context.user_state) ? body.context.user_state : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1214,7 +1245,7 @@ async function handleWorkflowClarifyDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
   const history = Array.isArray(body.history) ? body.history : [];
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1338,7 +1369,7 @@ async function handleWorkflowCopilotDirect(req, res) {
   const body = req.body || {};
   const entrypoint = typeof body.entrypoint === 'string' ? body.entrypoint : '';
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1475,7 +1506,7 @@ const ROADMAP_IDENTITY_PREFIX = "You are the Aivory Intelligence Assistant, a bu
 async function handleRoadmapGenerateDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1636,7 +1667,7 @@ app.post('/blueprint/generate/async', async (req, res) => {
     // so the Next.js poll route can apply its post-processing (ROI override,
     // text-fallback parsing) without the client needing to resend it on every
     // poll — see lib/blueprintGeneration.ts on the frontend.
-    const job = await blueprintQueue.add('generate', { messages, diagnostic }, {
+    const job = await blueprintQueue.add('generate', { messages, diagnostic, callerUserId: req.callerUserId }, {
       // OpenRouter can transiently reset/timeout a long blueprint completion;
       // do not turn one provider/network blip into a permanent user failure.
       attempts: 2,
@@ -1687,7 +1718,7 @@ app.post('/roadmap/generate/async', async (req, res) => {
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: true, message: 'messages array required' });
     }
-    const job = await roadmapQueue.add('generate', { messages, context }, {
+    const job = await roadmapQueue.add('generate', { messages, context, callerUserId: req.callerUserId }, {
       attempts: 2,
       backoff: { type: 'exponential', delay: 5000 },
       removeOnComplete: { age: 3600 },
@@ -1727,12 +1758,20 @@ app.get('/roadmap/result/:jobId', async (req, res) => {
 // Response shape: { workflow: { workflowName, steps, ... }, message?: string }
 // ============================================================================
 
-function handleWorkflowRequest(req, res, fallbackName) {
+async function handleWorkflowRequest(req, res, fallbackName) {
+  try {
+    return proxyWorkflowRequest(req, res, fallbackName, await providerKeyHeaders(req));
+  } catch (err) {
+    return failRelay(res, err);
+  }
+}
+
+function proxyWorkflowRequest(req, res, fallbackName, extraHeaders) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
     ? JSON.stringify(buildZeroclawWebhookBody(req.body))
     : '';
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
 
   const options = {
     hostname: targetUrl.hostname,
@@ -1741,6 +1780,7 @@ function handleWorkflowRequest(req, res, fallbackName) {
     method: 'POST',
     headers: {
       ...forwardHeaders,
+      ...extraHeaders,
       'X-Internal-Key': INTERNAL_KEY,
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(outboundBody),
@@ -2133,7 +2173,7 @@ app.post('/diagnostics/run/async', async (req, res) => {
     if (mode !== 'deep') return res.status(422).json({ error: true, message: 'Invalid mode: expected "deep"' });
     const payload = phases || diagnostic_payload;
     if (!payload) return res.status(400).json({ error: true, message: 'Missing required field: phases' });
-    const job = await diagnosticQueue.add('deep', { payload }, {
+    const job = await diagnosticQueue.add('deep', { payload, callerUserId: req.callerUserId }, {
       // Was attempts:1 (no retry at all) — a transient provider blip on this
       // path used to be a permanent user-facing failure with no automatic
       // recovery, unlike blueprint generation which already retries once.

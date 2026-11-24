@@ -20,11 +20,17 @@ const concurrency = parseInt(process.env.DIAGNOSTIC_WORKER_CONCURRENCY || '5', 1
 const blueprintConcurrency = parseInt(process.env.BLUEPRINT_WORKER_CONCURRENCY || '3', 10);
 const roadmapConcurrency = parseInt(process.env.ROADMAP_WORKER_CONCURRENCY || '3', 10);
 
+const { userOpenRouterKey } = require('./lib/byokOpenRouter');
+// A job names the user it was submitted for (only when the dashboard proved it);
+// their own OpenRouter key, if BYOK is on, is fetched here per run and never put in Redis.
+const INTERNAL_KEY = process.env.INTERNAL_TOKEN || 'aivory-internal-2026';
+const keyForJob = (job) => (job.data && job.data.callerUserId ? userOpenRouterKey(job.data.callerUserId, INTERNAL_KEY) : null);
+
 const worker = new Worker(
   QUEUE_NAME,
   async (job) => {
     console.log(`[diag-worker] processing job ${job.id}`);
-    return await runDeepDiagnostic(job.data.payload);
+    return await runDeepDiagnostic(job.data.payload, { apiKey: await keyForJob(job) });
   },
   { connection: new IORedis(redisOptions), concurrency }
 );
@@ -40,7 +46,7 @@ const blueprintWorker = new Worker(
   BLUEPRINT_QUEUE_NAME,
   async (job) => {
     console.log(`[blueprint-worker] processing job ${job.id}`);
-    return await runBlueprintGeneration(job.data);
+    return await runBlueprintGeneration(job.data, { apiKey: await keyForJob(job) });
   },
   { connection: new IORedis(redisOptions), concurrency: blueprintConcurrency }
 );
@@ -56,7 +62,7 @@ const roadmapWorker = new Worker(
   ROADMAP_QUEUE_NAME,
   async (job) => {
     console.log(`[roadmap-worker] processing job ${job.id}`);
-    return await runRoadmapGeneration(job.data);
+    return await runRoadmapGeneration(job.data, { apiKey: await keyForJob(job) });
   },
   { connection: new IORedis(redisOptions), concurrency: roadmapConcurrency }
 );
