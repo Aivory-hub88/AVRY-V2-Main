@@ -1,11 +1,13 @@
 'use client';
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { createPasskeyAfterLogin, login } from '@/lib/auth';
 import SignInModal from './SignInModal';
 
 vi.mock('@/lib/auth', () => ({
   login: vi.fn(),
+  createPasskeyAfterLogin: vi.fn(),
   loginWithPasskey: vi.fn(),
   passkeysSupported: () => true,
   PasskeyCancelledError: class PasskeyCancelledError extends Error {},
@@ -93,5 +95,41 @@ describe('SignInModal passkey sign-in', () => {
     // The button itself is never hidden by the hint.
     expect(screen.getByRole('button', { name: /sign in with a passkey/i })).toBeInTheDocument();
     localStorage.removeItem('passkey_hint');
+  });
+});
+
+describe('SignInModal create-a-passkey option', () => {
+  const fill = () => {
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { name: 'email', value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { name: 'password', value: 'hunter2hunter2' } });
+  };
+
+  it('offers to create a passkey on this device, unchecked by default', () => {
+    render(<SignInModal isOpen onClose={() => {}} />);
+    const box = screen.getByRole('checkbox', { name: /create a passkey on this device/i });
+    expect(box).not.toBeChecked();
+  });
+
+  it('creates the passkey right after the password login when ticked', async () => {
+    vi.mocked(login).mockResolvedValue({} as never);
+    vi.mocked(createPasskeyAfterLogin).mockClear();
+    render(<SignInModal isOpen onClose={() => {}} />);
+    fill();
+    fireEvent.click(screen.getByRole('checkbox', { name: /create a passkey on this device/i }));
+    fireEvent.submit(screen.getByRole('button', { name: /sign in$/i }).closest('form')!);
+    await waitFor(() => expect(createPasskeyAfterLogin).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(login).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(createPasskeyAfterLogin).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not touch passkeys on a plain password login', async () => {
+    vi.mocked(login).mockResolvedValue({} as never);
+    vi.mocked(createPasskeyAfterLogin).mockClear();
+    render(<SignInModal isOpen onClose={() => {}} />);
+    fill();
+    fireEvent.submit(screen.getByRole('button', { name: /sign in$/i }).closest('form')!);
+    await waitFor(() => expect(login).toHaveBeenCalled());
+    expect(createPasskeyAfterLogin).not.toHaveBeenCalled();
   });
 });

@@ -3,9 +3,10 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { isAuthenticated, login as authLogin, PaymentRequiredError } from "@/lib/auth";
+import { createPasskeyAfterLogin, isAuthenticated, login as authLogin, PaymentRequiredError } from "@/lib/auth";
 import { RollButton } from "@/components/ui/RollButton";
 import { PasskeyButton } from "@/components/auth/PasskeyButton";
+import { CreatePasskeyOption } from "@/components/auth/CreatePasskeyOption";
 
 /**
  * Login Page Component
@@ -35,6 +36,7 @@ export default function LoginClient() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [createPasskey, setCreatePasskey] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Redirect if already authenticated
@@ -69,6 +71,7 @@ export default function LoginClient() {
     setIsLoading(true);
     try {
       await authLogin(email, password);
+      if (createPasskey) await createPasskeyAfterLogin();
       goNext(router);
     } catch (err) {
       if (err instanceof PaymentRequiredError) {
@@ -157,6 +160,8 @@ export default function LoginClient() {
               className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm tracking-widest"
             />
           </div>
+
+          <CreatePasskeyOption checked={createPasskey} onChange={setCreatePasskey} disabled={isLoading} />
 
           {error && (
             <p className="text-red-400 text-sm text-center" role="alert">

@@ -76,7 +76,7 @@ export function PasskeyButton({ onSignedIn, onError, onPaymentRequired, disabled
       </button>
       {!hinted && (
         <p className="mt-3 text-center text-[12px] leading-relaxed text-white/45">
-          No passkey yet? Sign in with your password, then add one in Settings &gt; Account.
+          No passkey yet? Tick &ldquo;Create a passkey on this device&rdquo; above and sign in with your password.
         </p>
       )}
     </div>

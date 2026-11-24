@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { login } from '@/lib/auth';
+import { createPasskeyAfterLogin, login } from '@/lib/auth';
 import { SpotlightButton } from '@/components/ui/SpotlightButton';
+import { CreatePasskeyOption } from './CreatePasskeyOption';
 import { PasskeyButton } from './PasskeyButton';
 
 interface SignInModalProps {
@@ -18,6 +19,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [createPasskey, setCreatePasskey] = useState(false);
   const [error, setError] = useState('');
   const [mounted, setMounted] = useState(false);
 
@@ -59,6 +61,7 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
     setIsLoading(true);
     try {
       await login(formData.email, formData.password);
+      if (createPasskey) await createPasskeyAfterLogin();
       onClose();
       window.location.href = '/';
     } catch (err) {
@@ -171,6 +174,8 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
               className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-lg text-white placeholder-white/20 focus:outline-none focus:border-[#8b7cf6] focus:ring-1 focus:ring-[#8b7cf6] transition-all text-sm tracking-widest"
             />
           </div>
+
+          <CreatePasskeyOption checked={createPasskey} onChange={setCreatePasskey} disabled={isLoading} />
 
           {error && (
             <p className="text-red-400 text-sm text-center" role="alert">{error}</p>

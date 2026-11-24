@@ -13,6 +13,7 @@
  */
 
 import { getServiceUrl } from "./services";
+import { setPasskeyHint } from "./passkeyHint";
 
 const STORAGE_KEY = "aivory_auth";
 
@@ -380,6 +381,66 @@ export async function loginWithPasskey(): Promise<User> {
   if (!res.ok) await throwAuthError(res, "Passkey sign-in failed");
 
   return persistAuthResponse(await res.json(), "");
+}
+
+/** A short, human label for the passkey list, e.g. "Mac · Chrome". */
+export function passkeyDeviceLabel(): string {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+  const os = /iPhone|iPad/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "This device";
+  const browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "";
+  return browser ? `${os} · ${browser}` : os;
+}
+
+/**
+ * Create a passkey for the account that is signed in right now. Needs a
+ * session, so it runs after a password login: that login is what proves the
+ * account is yours.
+ */
+export async function registerPasskey(name: string): Promise<void> {
+  const token = getToken();
+  if (!token) throw new Error("Sign in first");
+  const backendUrl = getServiceUrl("backend");
+  const { startRegistration } = await import("@simplewebauthn/browser");
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+  const optRes = await fetch(`${backendUrl}/api/v1/auth/passkey/register/options`, { method: "POST", headers });
+  if (!optRes.ok) await throwAuthError(optRes, "Could not start passkey setup");
+  const { options, challenge_token } = await optRes.json();
+
+  let credential;
+  try {
+    credential = await startRegistration({ optionsJSON: options });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError")) {
+      throw new PasskeyCancelledError();
+    }
+    if (err instanceof Error && err.name === "InvalidStateError") {
+      throw new Error("This device already has a passkey for your account");
+    }
+    throw new Error("Could not create a passkey on this device");
+  }
+
+  const res = await fetch(`${backendUrl}/api/v1/auth/passkey/register/verify`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ challenge_token, credential, name }),
+  });
+  if (!res.ok) await throwAuthError(res, "Passkey could not be verified");
+  setPasskeyHint();
+}
+
+/**
+ * The "Create a passkey on this device" checkbox at login: runs right after a
+ * successful password login. Best effort: the user is already signed in, so a
+ * dismissed prompt or a failure must not block the redirect (they can add it
+ * later in Settings > Account).
+ */
+export async function createPasskeyAfterLogin(): Promise<void> {
+  try {
+    await registerPasskey(passkeyDeviceLabel());
+  } catch {
+    /* signed in either way */
+  }
 }
 
 /**
