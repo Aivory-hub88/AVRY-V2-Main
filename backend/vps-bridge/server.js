@@ -29,6 +29,14 @@ async function providerKeyHeaders(req) {
   const key = req && req.callerUserId ? await userOpenRouterKey(req.callerUserId, INTERNAL_KEY) : null;
   return key ? { 'X-Provider-Key': key } : {};
 }
+
+// The relays are async, and Express 4 doesn't catch a rejected promise: an
+// uncaught one would take the whole bridge down, so every failure is answered here.
+function failRelay(res, err) {
+  console.error('[relay] failed:', err && err.message);
+  if (res.headersSent) return res.end();
+  return res.status(502).json({ error: true, message: 'Upstream relay failed' });
+}
 // The key a direct-OpenRouter handler should use: the caller's own (BYOK) or Aivory's.
 const byokKeyOr = (req, fallback) => openRouterKeyFor(req, fallback, INTERNAL_KEY);
 
@@ -917,14 +925,78 @@ function buildZeroclawWebhookBody(body) {
   return body;
 }
 
-// The wrappers are async, and Express 4 doesn't catch a rejected promise: an
-// uncaught one would take the whole bridge down, so every failure is answered here.
-function failRelay(res, err) {
-  console.error('[relay] failed:', err && err.message);
-  if (res.headersSent) return res.end();
-  return res.status(502).json({ error: true, message: 'Upstream relay failed' });
+
+// ── Mention-style delegation split ─────────────────────────────────────
+// The caller agent pastes each delegate result inside its original
+// `[Agent 'alias']` wrapper (see Delegation Rendering contract in the agent
+// identities). Split those blocks out so the UI can render each specialist
+// as their own speaker bubble (@mention style) instead of quoted narration.
+const DELEGATE_SPEAKERS = {
+  autonomous: 'Geno',
+  customer_service: 'Teo',
+  leads_qualifier: 'Lex',
+  finance_invoice_ops: 'Finn',
+  office_assistant: 'Ofira',
+  chief_of_staff: 'Aira',
+};
+function splitDelegateBlocks(fullText) {
+  const out = { main: fullText, delegations: [] };
+  if (typeof fullText !== 'string' || fullText.indexOf("[Agent '") === -1) return out;
+  const re = /\[Agent '([\w-]+)'[^\]]*\]\s*\n?([\s\S]*?)(?=\n?\[Agent '|$)/g;
+  let m;
+  let lastIndex = 0;
+  const mainParts = [];
+  while ((m = re.exec(fullText)) !== null) {
+    mainParts.push(fullText.slice(lastIndex, m.index));
+    lastIndex = m.index + m[0].length;
+    const alias = m[1];
+    const text = (m[2] || '').trim();
+    if (text) {
+      out.delegations.push({
+        agent_type: alias,
+        name: DELEGATE_SPEAKERS[alias] || alias,
+        text,
+      });
+    }
+  }
+  mainParts.push(fullText.slice(lastIndex));
+  out.main = mainParts.join('').replace(/\n{3,}/g, '\n\n').trim();
+  return out;
 }
 
+function sseHeaders(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('X-Accel-Buffering', 'no');
+}
+
+function zeroclawRequestOptions(pathname, outboundBody, forwardHeaders) {
+  const targetUrl = new URL(pathname, ZEROCLAW_URL);
+  return {
+    targetUrl,
+    options: {
+      hostname: targetUrl.hostname,
+      port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
+      path: targetUrl.pathname,
+      method: 'POST',
+      headers: {
+        ...forwardHeaders,
+        'X-Internal-Key': INTERNAL_KEY,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(outboundBody),
+        'host': targetUrl.host
+      }
+    }
+  };
+}
+
+// Live SSE path: POST Cerveau /webhook/stream and forward `chunk` frames as
+// they arrive (TTFT = first model tokens, not the whole turn). Falls back to
+// the buffered /webhook handler below when the stream endpoint is unavailable
+// (non-200) or errors before the first frame — never leave the caller hanging.
 async function handleStreamRequest(req, res) {
   try {
     return proxyStreamRequest(req, res, await providerKeyHeaders(req));
@@ -933,7 +1005,122 @@ async function handleStreamRequest(req, res) {
   }
 }
 
-function proxyStreamRequest(req, res, extraHeaders) {
+function proxyStreamRequest(req, res, extraHeaders = {}) {
+  const outboundBody = req.body && Object.keys(req.body).length > 0
+    ? JSON.stringify(buildZeroclawWebhookBody(req.body))
+    : '';
+  // Our shared secret and any client-supplied key are dropped; the only X-Provider-Key
+  // that reaches the daemon is the one added here for an authenticated caller.
+  const forwardHeaders = { ...stripForwardHeaders(req.headers), ...extraHeaders };
+  const { targetUrl, options } = zeroclawRequestOptions('/webhook/stream', outboundBody, forwardHeaders);
+  const transport = targetUrl.protocol === 'https:' ? https : http;
+
+  const proxyReq = transport.request(options, (proxyRes) => {
+    // `settled` guards the `req.on('close')` destroy below: Node fires
+    // `close` on the *request* stream as soon as its body is consumed (not
+    // only on client abort), so an unguarded destroy() kills an already
+    // finished upstream request and logs a bogus ECONNRESET per call.
+    let settled = false;
+    const settle = () => { settled = true; };
+    req.on('close', () => {
+      if (!settled && !res.writableEnded) { try { proxyReq.destroy(); } catch (e) {} }
+    });
+    if (proxyRes.statusCode !== 200) {
+      // Old binary without /webhook/stream, or an early rejection — drain and
+      // serve the classic buffered shape so the caller sees no difference.
+      proxyRes.resume();
+      settle();
+      return handleStreamRequestBuffered(req, res, extraHeaders);
+    }
+    sseHeaders(res);
+
+    let buffer = '';
+    let fullText = '';
+    let gotFrame = false;
+    const heartbeat = setInterval(() => {
+      // SSE comment: keeps dashboard idle-timeout (120s) and any proxy fed
+      // during long silent tool stretches; ignored by the event parser.
+      try { res.write(':\n\n'); } catch (e) { /* client gone */ }
+    }, 15000);
+    const done = () => { clearInterval(heartbeat); };
+
+    proxyRes.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        let data;
+        try { data = JSON.parse(line.slice(6)); } catch (e) { continue; }
+        if (data.type === 'chunk' && typeof data.content === 'string') {
+          gotFrame = true;
+          fullText += data.content;
+          res.write(`data: ${JSON.stringify({ type: 'chunk', content: data.content })}\n\n`);
+        } else if (data.type === 'done') {
+          gotFrame = true;
+          try {
+            const split = splitDelegateBlocks(fullText);
+            if (split.delegations.length > 0) {
+              for (const d of split.delegations) {
+                res.write(`data: ${JSON.stringify({ type: 'delegation', agent_type: d.agent_type, name: d.name, text: d.text })}\n\n`);
+              }
+              res.write(`data: ${JSON.stringify({ type: 'replace', content: split.main })}\n\n`);
+            }
+          } catch (e) {
+            console.error('[delegation split] error:', e.message);
+          }
+          res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+          done();
+          settle();
+          res.end();
+        } else if (data.type === 'error') {
+          gotFrame = true;
+          const msg = typeof data.message === 'string' ? data.message : 'Zeroclaw error';
+          res.write(`data: ${JSON.stringify({ type: 'error', error: msg })}\n\n`);
+          done();
+          settle();
+          res.end();
+        }
+      }
+    });
+
+    proxyRes.on('end', () => {
+      done();
+      settle();
+      if (!gotFrame) {
+        // 200 with zero frames (shouldn't happen) — safest is the buffered
+        // shape, but headers are already sent as SSE, so just close cleanly.
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+      }
+      if (!res.writableEnded) res.end();
+    });
+
+    proxyRes.on('error', (err) => {
+      console.error('[webhook/stream] upstream error:', err.message);
+      done();
+      settle();
+      if (!gotFrame && !res.headersSent) return handleStreamRequestBuffered(req, res, extraHeaders);
+      if (!res.writableEnded) {
+        try { res.write(`data: ${JSON.stringify({ type: 'error', error: 'Stream interrupted' })}\n\n`); } catch (e) {}
+        res.end();
+      }
+    });
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('[webhook/stream] request error:', err.message);
+    if (!res.headersSent) return handleStreamRequestBuffered(req, res, extraHeaders);
+    if (!res.writableEnded) res.end();
+  });
+
+  if (outboundBody) proxyReq.write(outboundBody);
+  proxyReq.end();
+}
+
+// Buffered fallback: POST Cerveau /webhook, wait for the whole turn, emit as
+// one chunk + done. Pre-stream-era behavior, kept for old binaries and for
+// callers that need a single complete body (e.g. blueprint JSON extraction).
+function handleStreamRequestBuffered(req, res, extraHeaders = {}) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
     ? JSON.stringify(buildZeroclawWebhookBody(req.body))
@@ -969,6 +1156,7 @@ function proxyStreamRequest(req, res, extraHeaders) {
     let buffer = '';
     let rawResponse = '';
     let wroteChunk = false;
+    let fullText = '';
     
     proxyRes.on('data', (chunk) => {
       const text = chunk.toString();
@@ -988,6 +1176,7 @@ function proxyStreamRequest(req, res, extraHeaders) {
             if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
               const content = data.choices[0].delta.content;
               
+              fullText = content;
               // Emit proper SSE format for Next.js
               res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
               wroteChunk = true;
@@ -1017,6 +1206,7 @@ function proxyStreamRequest(req, res, extraHeaders) {
           }
 
           if (content) {
+            fullText = content;
             res.write(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`);
             wroteChunk = true;
           } else if (data.error) {
@@ -1028,6 +1218,20 @@ function proxyStreamRequest(req, res, extraHeaders) {
         }
       }
 
+      // Mention-style split: emit one `delegation` event per [Agent] block
+      // plus a `replace` event with the stripped main text, then done.
+      try {
+        const full = fullText;
+        const split = splitDelegateBlocks(full);
+        if (split.delegations.length > 0) {
+          for (const d of split.delegations) {
+            res.write(`data: ${JSON.stringify({ type: 'delegation', agent_type: d.agent_type, name: d.name, text: d.text })}\n\n`);
+          }
+          res.write(`data: ${JSON.stringify({ type: 'replace', content: split.main })}\n\n`);
+        }
+      } catch (e) {
+        console.error('[delegation split] error:', e.message);
+      }
       // Send done event
       res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
       res.end();
@@ -1040,7 +1244,7 @@ function proxyStreamRequest(req, res, extraHeaders) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.setHeader('Access-Control-Allow-Allow-Origin', CORS_ORIGIN);
+      res.setHeader('Access-Control-Allow-Origin', CORS_ORIGIN);
     }
     res.write(`data: ${JSON.stringify({ type: 'error', error: 'Proxy error' })}\n\n`);
     res.end();
@@ -1151,13 +1355,16 @@ const WORKFLOW_DIRECT_PERSONA = "[You are the Aivory Workflow Copilot, the autom
 async function handleConsoleDirect(req, res) {
   const body = req.body || {};
   const userMessage = typeof body.message === 'string' ? body.message : '';
-  const history = Array.isArray(body.history) ? body.history : [];
+  // /aria/stream nests history inside context — accept both shapes
+  const history = Array.isArray(body.history) ? body.history
+    : Array.isArray(body.context && body.context.history) ? body.context.history : [];
   const userState = (body.context && body.context.user_state) ? body.context.user_state : '';
   const apiKey = await byokKeyOr(req, process.env.OPENROUTER_API_KEY);
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
 
   if (!apiKey) {
     res.write('data: ' + JSON.stringify({ type: 'error', error: 'AI engine not configured' }) + '\n\n');
@@ -1214,12 +1421,14 @@ async function handleConsoleDirect(req, res) {
         try {
           const j = JSON.parse(data);
           const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-          if (delta) { accumulated += delta; }
+          // Stream each delta immediately instead of buffering — TTFT = first token
+          if (delta) { accumulated += delta; res.write('data: ' + JSON.stringify({ type: 'chunk', content: delta }) + '\n\n'); }
         } catch (e) { /* skip keepalive / non-JSON */ }
       }
     }
-    const finalText = accumulated || 'I did not catch that just now - could you try again?';
-    res.write('data: ' + JSON.stringify({ type: 'chunk', content: finalText }) + '\n\n');
+    if (!accumulated) {
+      res.write('data: ' + JSON.stringify({ type: 'chunk', content: 'I did not catch that just now - could you try again?' }) + '\n\n');
+    }
     res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
     res.end();
   } catch (err) {
@@ -1250,6 +1459,7 @@ async function handleWorkflowClarifyDirect(req, res) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
 
   if (!apiKey) {
     res.write('data: ' + JSON.stringify({ type: 'error', error: 'AI engine not configured' }) + '\n\n');
@@ -1303,7 +1513,7 @@ async function handleWorkflowClarifyDirect(req, res) {
         try {
           const j = JSON.parse(data);
           const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-          if (delta) { accumulated += delta; }
+          if (delta) { accumulated += delta; res.write('data: ' + JSON.stringify({ type: 'chunk', content: delta }) + '\n\n'); }
         } catch (e) { /* skip keepalive / non-JSON */ }
       }
     }
@@ -1314,9 +1524,8 @@ async function handleWorkflowClarifyDirect(req, res) {
       // recurrence shows up in `pm2 logs vps-bridge` instead of silently
       // degrading to the fallback text below.
       console.warn('[handleWorkflowClarifyDirect] empty completion for message:', userMessage.slice(0, 100));
+      res.write('data: ' + JSON.stringify({ type: 'chunk', content: 'I did not catch that - could you try again?' }) + '\n\n');
     }
-    const finalText = accumulated || 'I did not catch that - could you try again?';
-    res.write('data: ' + JSON.stringify({ type: 'chunk', content: finalText }) + '\n\n');
     res.write('data: ' + JSON.stringify({ type: 'done' }) + '\n\n');
     res.end();
   } catch (err) {
@@ -1647,6 +1856,10 @@ function handleConsoleRouter(req, res) {
 }
 
 app.post('/console/stream', handleConsoleRouter);
+// Floating assistant (Next.js /api/aira/stream) posts { message, context: { history } }
+// — same fast direct path as console, not Zeroclaw. Mounted here because the
+// thin proxy previously had no /aria/stream route at all (404).
+app.post('/aria/stream', handleConsoleRouter);
 app.post('/aivory-assistant/stream', handleStreamRequest);
 app.post('/blueprint/generate', handleStreamRequest);
 
@@ -2078,7 +2291,7 @@ app.post('/diagnostics/run', async (req, res) => {
         'X-Title': 'Aivory'
       },
       body: JSON.stringify({
-        model: process.env.DIAGNOSTIC_MODEL || 'deepseek/deepseek-v4.1-flash',
+        model: process.env.DIAGNOSTIC_MODEL || 'qwen/qwen3-235b-a22b',
         messages: [
           { role: 'system', content: DIAGNOSTIC_SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify(payload, null, 2) }
@@ -2293,7 +2506,7 @@ warmPingConsoleModel();
 // (360/day ≈ under $0.0001/day); qwen failovers 32 pings/day/model. Well
 // under $0.01/month combined. Model defaults mirror lib/blueprintQueue.js.
 const BLUEPRINT_MODEL_DEFAULT = process.env.BLUEPRINT_MODEL || 'deepseek/deepseek-v4-flash-0731';
-const BLUEPRINT_FAILOVER_DEFAULTS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3.7-flash,qwen/qwen3-coder-flash')
+const BLUEPRINT_FAILOVER_DEFAULTS = (process.env.BLUEPRINT_FAILOVER_MODELS || process.env.BLUEPRINT_FAILOVER_MODEL || 'qwen/qwen3-235b-a22b,qwen/qwen3.6-plus')
   .split(',').map((s) => s.trim()).filter(Boolean);
 const BLUEPRINT_WARM_INTERVAL_MS = 4 * 60 * 1000;
 const FAILOVER_WARM_INTERVAL_MS = 45 * 60 * 1000;
