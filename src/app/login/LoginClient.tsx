@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { isAuthenticated, login as authLogin, PaymentRequiredError } from "@/lib/auth";
 import { RollButton } from "@/components/ui/RollButton";
+import { PasskeyButton } from "@/components/auth/PasskeyButton";
 
 /**
  * Login Page Component
@@ -169,6 +170,15 @@ export default function LoginClient() {
             </RollButton>
           </div>
         </form>
+
+        <PasskeyButton
+          disabled={isLoading}
+          onError={setError}
+          onPaymentRequired={(deadline) =>
+            router.push(`/complete-payment?deadline=${encodeURIComponent(deadline)}`)
+          }
+          onSignedIn={() => goNext(router)}
+        />
 
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">

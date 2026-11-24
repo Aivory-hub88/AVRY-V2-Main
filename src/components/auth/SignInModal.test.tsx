@@ -6,6 +6,12 @@ import SignInModal from './SignInModal';
 
 vi.mock('@/lib/auth', () => ({
   login: vi.fn(),
+  loginWithPasskey: vi.fn(),
+  passkeysSupported: () => true,
+  PasskeyCancelledError: class PasskeyCancelledError extends Error {},
+  PaymentRequiredError: class PaymentRequiredError extends Error {
+    deadlineAt = '';
+  },
 }));
 
 vi.mock('next/image', () => ({
@@ -66,5 +72,12 @@ describe('SignInModal overlay', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     (document.body.querySelector('.signin-modal-backdrop') as HTMLElement).click();
     expect(onClose).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('SignInModal passkey sign-in', () => {
+  it('offers a passkey button next to the password form', () => {
+    render(<SignInModal isOpen onClose={() => {}} />);
+    expect(screen.getByRole('button', { name: /sign in with a passkey/i })).toBeInTheDocument();
   });
 });

@@ -289,30 +289,24 @@ export class PaymentRequiredError extends Error {
   }
 }
 
-export async function login(email: string, password: string): Promise<User> {
-  const backendUrl = getServiceUrl("backend");
-  const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const detail = err.detail;
-    if (res.status === 402 && detail && typeof detail === "object" && detail.error === "payment_required") {
-      throw new PaymentRequiredError(detail.deadline_at);
-    }
-    throw new Error(typeof detail === "string" ? detail : "Login failed");
+/** Turn a failed auth response into the error the login UI understands. */
+async function throwAuthError(res: Response, fallback: string): Promise<never> {
+  const err = await res.json().catch(() => ({}));
+  const detail = err.detail;
+  if (res.status === 402 && detail && typeof detail === "object" && detail.error === "payment_required") {
+    throw new PaymentRequiredError(detail.deadline_at);
   }
+  throw new Error(typeof detail === "string" ? detail : fallback);
+}
 
-  const data = await res.json();
+/** Persist the backend's AuthResponse (password and passkey login share it). */
+function persistAuthResponse(data: any, fallbackEmail: string): User {
   const session: PersistedSession = {
     access_token: data.tokens?.access_token,
     refresh_token: data.tokens?.refresh_token,
     user: {
       id: data.user?.user_id || "",
-      email: data.user?.email || email,
+      email: data.user?.email || fallbackEmail,
       created_at: data.user?.created_at,
       user_metadata: {
         account_type: data.user?.account_type || "free",
@@ -328,6 +322,64 @@ export async function login(email: string, password: string): Promise<User> {
     window.dispatchEvent(new Event("authManager:login"));
   }
   return mapUser(session.user!, session.access_token);
+}
+
+export async function login(email: string, password: string): Promise<User> {
+  const backendUrl = getServiceUrl("backend");
+  const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!res.ok) await throwAuthError(res, "Login failed");
+
+  return persistAuthResponse(await res.json(), email);
+}
+
+/** True when the browser can do WebAuthn passkeys at all. */
+export function passkeysSupported(): boolean {
+  return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
+}
+
+/** Thrown when the user dismisses the passkey prompt; not an error to show. */
+export class PasskeyCancelledError extends Error {
+  constructor() {
+    super("passkey_cancelled");
+  }
+}
+
+/**
+ * Sign in with a passkey. No email needed: the device offers the passkeys it
+ * holds for this site. Same session result as login().
+ */
+export async function loginWithPasskey(): Promise<User> {
+  const backendUrl = getServiceUrl("backend");
+  const { startAuthentication } = await import("@simplewebauthn/browser");
+
+  const optRes = await fetch(`${backendUrl}/api/v1/auth/passkey/login/options`, { method: "POST" });
+  if (!optRes.ok) await throwAuthError(optRes, "Passkey sign-in is unavailable right now");
+  const { options, challenge_token } = await optRes.json();
+
+  let credential;
+  try {
+    credential = await startAuthentication({ optionsJSON: options });
+  } catch (err) {
+    // NotAllowedError: dismissed, timed out, or no passkey on this device.
+    if (err instanceof Error && (err.name === "NotAllowedError" || err.name === "AbortError")) {
+      throw new PasskeyCancelledError();
+    }
+    throw new Error("Passkey sign-in failed");
+  }
+
+  const res = await fetch(`${backendUrl}/api/v1/auth/passkey/login/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge_token, credential }),
+  });
+  if (!res.ok) await throwAuthError(res, "Passkey sign-in failed");
+
+  return persistAuthResponse(await res.json(), "");
 }
 
 /**

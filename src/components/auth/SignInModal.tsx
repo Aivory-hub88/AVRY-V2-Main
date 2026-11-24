@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { login } from '@/lib/auth';
 import { SpotlightButton } from '@/components/ui/SpotlightButton';
+import { PasskeyButton } from './PasskeyButton';
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -186,6 +187,19 @@ export default function SignInModal({ isOpen, onClose }: SignInModalProps) {
             {isLoading ? 'Signing in...' : 'Sign In'}
           </SpotlightButton>
         </form>
+
+        <PasskeyButton
+          disabled={isLoading}
+          onError={setError}
+          onPaymentRequired={(deadline) => {
+            onClose();
+            window.location.href = `/complete-payment?deadline=${encodeURIComponent(deadline)}`;
+          }}
+          onSignedIn={() => {
+            onClose();
+            window.location.href = '/';
+          }}
+        />
 
         <div className="mt-8 text-center">
           <p className="text-[13px] text-white/60">
