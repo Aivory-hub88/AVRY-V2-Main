@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { _internals } = require('./telegram-agent');
 
-const { callLLM, resolveByok, llmTarget } = _internals;
+const { callLLM, resolveByok, llmTarget, cerveauByokKey, cerveauHeaders } = _internals;
 
 test('without BYOK the turn goes to OpenRouter on the Aivory key', () => {
   const t = llmTarget({}, 'aivory-key');
@@ -41,4 +41,23 @@ test('resolveByok picks the first provider with a key, caches, and fails soft', 
   t.mock.restoreAll();
   t.mock.method(globalThis, 'fetch', async () => { throw new Error('down'); });
   assert.equal(await resolveByok('user-2', 'tok'), null);
+});
+
+test('Cerveau only gets the key for an OpenRouter BYOK turn, and only once CERVEAU_BYOK=1', async (t) => {
+  const ctx = (provider) => ({
+    user_id: 'u1', agent_type: 'autonomous', session_id: 's', active_agents: ['autonomous'],
+    byok: { provider, apiKey: 'sk-or-v1-userkey0123456789abcdef' },
+  });
+  const prev = process.env.CERVEAU_BYOK;
+  t.after(() => { if (prev === undefined) delete process.env.CERVEAU_BYOK; else process.env.CERVEAU_BYOK = prev; });
+
+  delete process.env.CERVEAU_BYOK;
+  assert.equal(cerveauByokKey(ctx('openrouter')), null, 'flag off: key withheld, turn stays charged');
+  assert.equal((await cerveauHeaders(ctx('openrouter'), 'secret'))['X-Provider-Key'], undefined);
+
+  process.env.CERVEAU_BYOK = '1';
+  assert.equal(cerveauByokKey(ctx('openrouter')), 'sk-or-v1-userkey0123456789abcdef');
+  assert.equal((await cerveauHeaders(ctx('openrouter'), 'secret'))['X-Provider-Key'], 'sk-or-v1-userkey0123456789abcdef');
+  assert.equal(cerveauByokKey(ctx('anthropic')), null, 'Cerveau runs OpenRouter models only');
+  assert.equal(cerveauByokKey({ user_id: 'u1' }), null);
 });

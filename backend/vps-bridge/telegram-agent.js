@@ -820,6 +820,18 @@ async function resolveByok(userId, internalKey) {
   return byok;
 }
 
+/**
+ * The OpenRouter key to hand Cerveau for this turn, or null. Only an OpenRouter
+ * BYOK key can run there (Cerveau's models are OpenRouter slugs), and only once
+ * the daemon honours `X-Provider-Key` — until CERVEAU_BYOK=1 is set after that
+ * daemon is deployed, an older one would ignore the header and run the turn on
+ * Aivory's key while we'd skipped charging for it.
+ */
+function cerveauByokKey(ctx) {
+  if (process.env.CERVEAU_BYOK !== '1') return null;
+  return ctx && ctx.byok && ctx.byok.provider === 'openrouter' ? ctx.byok.apiKey : null;
+}
+
 /** Where and how this turn's chat-completion call goes. */
 function llmTarget(ctx, orKey) {
   if (ctx && ctx.byok) {
@@ -1032,6 +1044,7 @@ async function cerveauHeaders(ctx, secret) {
     'X-Tenant-Id': ctx.user_id,
     'X-Agent-Type': ctx.agent_type,
     'X-Session-Id': ctx.session_id,
+    ...(cerveauByokKey(ctx) ? { 'X-Provider-Key': cerveauByokKey(ctx) } : {}),
     ...(activeAgents ? { 'X-Active-Agents': activeAgents } : {}),
     // ADR-021: a Team Space room turn, so Cerveau offers the team tools.
     ...(ctx.room_turn ? { 'X-Room-Channel': 'discussion' } : {}),
@@ -1303,7 +1316,7 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
       let runOutcome = null;
       let runFailureReason = null;
       if (engine === 'cerveau') {
-        if (ctx.byok) {
+        if (ctx.byok && !cerveauByokKey(ctx)) {
           ctx.byok = null;
           const credit = await checkCredits(ctx);
           if (!credit.allowed) return res.json({ reply: credit.reply });
@@ -1318,12 +1331,12 @@ module.exports = function createTelegramAgentHandler({ internalKey, nextOpenRout
         // same chat-channel cleanup the legacy path gets from a prompt rule.
         if (wantsStream && channel === 'console' && !ctx.room_turn && !ctx.turn_origin) {
           if (await streamCerveau(ctx, userText, res)) {
-            await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
+            if (!ctx.byok) await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
           }
           return;
         }
         ({ reply, pendingApproval, teamActions, runOutcome, runFailureReason } = await callCerveau(ctx, userText));
-        await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
+        if (!ctx.byok) await settleCredits(ctx, CERVEAU_TURN_CREDITS(), 'agent_message', { engine: 'cerveau', flat_rate: true });
       } else {
         if (!orKey && !ctx.byok) {
           return res.status(500).json({ error: true, message: 'OpenRouter API key not configured' });
@@ -1484,6 +1497,8 @@ module.exports._internals = {
   callLLM,
   resolveByok,
   llmTarget,
+  cerveauByokKey,
+  cerveauHeaders,
   SECURITY_RULES,
   AGENT_PROMPTS,
   commonRules,
