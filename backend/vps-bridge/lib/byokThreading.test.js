@@ -45,6 +45,9 @@ test('server.js: both Zeroclaw relays add the authenticated caller\'s key, and e
   assert.match(server, /proxyStreamRequest\(req, res, await providerKeyHeaders\(req\)\)/);
   assert.match(server, /proxyWorkflowRequest\(req, res, fallbackName, await providerKeyHeaders\(req\)\)/);
   assert.equal((server.match(/\.\.\.extraHeaders,/g) || []).length, 2, 'the extra headers are spread into both relays');
-  assert.equal((server.match(/stripForwardHeaders\(req\.headers\)/g) || []).length, 3, 'the catch-all relay filters too');
+  // The invariant that matters: no relay may forward the raw request headers (our shared
+  // secret and a client-supplied key would ride along), however many relays there are.
+  assert.ok(!/\.\.\.forwardHeaders \} = req\.headers/.test(server), 'a relay still forwards raw headers');
+  assert.ok((server.match(/stripForwardHeaders\(req\.headers\)/g) || []).length >= 3, 'every relay, incl. the catch-all, filters');
   assert.ok(!/'x-aivory-caller'\s*:/.test(server.split('proxyStreamRequest')[1] || ''), 'the shared secret is never set on a relayed request');
 });
