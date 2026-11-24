@@ -82,8 +82,8 @@ function isUsableRoadmap(content) {
  * active and surfaces TTFT; see blueprintQueue.js callModel for the full
  * rationale on stream:true and reasoning:{enabled:false}).
  */
-async function callModel({ userContent, reasoningEnabled, timeoutMs, model = ROADMAP_MODEL, tier = 'unnamed' }) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+async function callModel({ userContent, reasoningEnabled, timeoutMs, model = ROADMAP_MODEL, tier = 'unnamed', apiKey }) {
+  const OPENROUTER_API_KEY = apiKey || process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
 
   const body = {
@@ -168,7 +168,7 @@ async function callModel({ userContent, reasoningEnabled, timeoutMs, model = ROA
  * failover) when the failover tier alone resolves in ~40s. Going fast →
  * failover directly cuts the worst case roughly in half.
  */
-async function runRoadmapGeneration({ messages }) {
+async function runRoadmapGeneration({ messages }, { apiKey } = {}) {
   if (!Array.isArray(messages)) throw new Error('messages array required');
   const lastUserMessage = [...messages].reverse().find(
     (m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.trim()
@@ -179,7 +179,7 @@ async function runRoadmapGeneration({ messages }) {
   // Tier 1: fast, no-reasoning, primary model.
   let fastErr = null;
   try {
-    const fast = await callModel({ userContent, reasoningEnabled: false, timeoutMs: ROADMAP_TIMEOUT_MS, tier: 'fast' });
+    const fast = await callModel({ userContent, reasoningEnabled: false, timeoutMs: ROADMAP_TIMEOUT_MS, tier: 'fast', apiKey });
     if (isUsableRoadmap(fast)) return { content: fast, tier: 'fast' };
     fastErr = new Error(`Roadmap generation not structurally usable: ${fast.length} chars`);
   } catch (err) {
@@ -191,7 +191,7 @@ async function runRoadmapGeneration({ messages }) {
   for (const failoverModel of ROADMAP_FAILOVER_MODELS) {
     const tierLabel = `failover:${failoverModel}`;
     try {
-      const failover = await callModel({ userContent, reasoningEnabled: false, timeoutMs: ROADMAP_FAILOVER_TIMEOUT_MS, model: failoverModel, tier: tierLabel });
+      const failover = await callModel({ userContent, reasoningEnabled: false, timeoutMs: ROADMAP_FAILOVER_TIMEOUT_MS, model: failoverModel, tier: tierLabel, apiKey });
       if (failover.length >= MIN_ROADMAP_CHARS) {
         if (!isUsableRoadmap(failover)) {
           console.warn(`[roadmap-worker] tier=${tierLabel} result not structurally clean — returning it anyway for Next.js-layer normalization`);

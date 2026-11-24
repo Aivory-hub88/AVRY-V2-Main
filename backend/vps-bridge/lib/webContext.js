@@ -313,8 +313,8 @@ function parseJsonLoose(s) {
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-async function defaultCallExtractor(system, user, timeoutMs) {
-  const key = process.env.OPENROUTER_API_KEY;
+async function defaultCallExtractor(system, user, timeoutMs, apiKey) {
+  const key = apiKey || process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error('OPENROUTER_API_KEY not set');
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -409,7 +409,7 @@ function formatProfileForPrompt(ctx) {
   ].join('\n');
 }
 
-module.exports = {
+module.exports = { defaultCallExtractor,
   ENUMS, DEFAULTS,
   normalizeUrl, isPrivateIp, assertPublicHost, registrableDomain, isSocialHost,
   sanitizeText, pickLinks, scrapeWebsite, validateProfile, extractWebProfile,

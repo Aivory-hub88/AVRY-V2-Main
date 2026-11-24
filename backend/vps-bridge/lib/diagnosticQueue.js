@@ -12,7 +12,7 @@
 const { Queue } = require('bullmq');
 const IORedis = require('ioredis');
 const { v4: uuidv4 } = require('uuid');
-const { buildWebContext, createRedisCache } = require('./webContext');
+const { buildWebContext, createRedisCache, defaultCallExtractor } = require('./webContext');
 
 const QUEUE_NAME = 'diagnostics';
 
@@ -125,8 +125,8 @@ function isUsableDiagnosticResult(result) {
  * the connection active so an idle-response stall surfaces as TTFT in the
  * logs instead of a silent black box.
  */
-async function callModel({ model, userContent, reasoningEnabled, timeoutMs, tier }) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+async function callModel({ model, userContent, reasoningEnabled, timeoutMs, tier, apiKey }) {
+  const OPENROUTER_API_KEY = apiKey || process.env.OPENROUTER_API_KEY;
   if (!OPENROUTER_API_KEY) throw new Error('OpenRouter API key not configured');
 
   const body = {
@@ -286,12 +286,20 @@ function takeDocumentText(payload) {
   return { documentText, rest };
 }
 
-async function runDeepDiagnostic(payload) {
+// `apiKey` is the calling user's own OpenRouter key (BYOK), resolved by the worker per run; never stored in the job.
+async function runDeepDiagnostic(payload, { apiKey } = {}) {
   const { documentText, rest: afterDoc } = takeDocumentText(payload);
   const { websiteUrl, rest } = takeWebsiteUrl(afterDoc);
   const { phases, reportContext } = splitReportContext(rest);
   // Best-effort and never throws (ADR-022). 'disabled' unless WEB_CONTEXT_ENABLED=true.
-  const web = await buildWebContext(websiteUrl, { documentText }, { cache: webContextCache });
+  const web = await buildWebContext(
+    websiteUrl,
+    { documentText },
+    {
+      cache: webContextCache,
+      ...(apiKey ? { callExtractor: (system, user, timeoutMs) => defaultCallExtractor(system, user, timeoutMs, apiKey) } : {}),
+    }
+  );
   const body = reportContext ? { phases, report_context: reportContext } : { phases };
   if (web.profile) body.website_context = { confidence: web.web_context, ...web.profile };
   const userContent = JSON.stringify(reportContext || web.profile ? body : phases, null, 2);
@@ -319,7 +327,7 @@ async function runDeepDiagnostic(payload) {
 
   // Tier 1: fast primary model.
   try {
-    const fast = await callModel({ model: DIAGNOSTIC_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_TIMEOUT_MS, tier: 'fast' });
+    const fast = await callModel({ model: DIAGNOSTIC_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_TIMEOUT_MS, tier: 'fast', apiKey });
     const result = extractJson(fast);
     if (isUsableDiagnosticResult(result)) return finish(result);
     console.warn('[diag-worker] tier=fast result unusable — escalating to tier=fallback');
@@ -328,7 +336,7 @@ async function runDeepDiagnostic(payload) {
   }
 
   // Tier 2: a DIFFERENT model, so a retired/down primary can't sink both.
-  const content = await callModel({ model: DIAGNOSTIC_FALLBACK_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_FALLBACK_TIMEOUT_MS, tier: 'fallback' });
+  const content = await callModel({ model: DIAGNOSTIC_FALLBACK_MODEL, userContent, reasoningEnabled: false, timeoutMs: DIAGNOSTIC_FALLBACK_TIMEOUT_MS, tier: 'fallback', apiKey });
   const result = extractJson(content);
   if (!isUsableDiagnosticResult(result)) {
     throw new Error('Diagnostic generation returned an incomplete/malformed assessment (missing score, maturity_level, or any findings)');

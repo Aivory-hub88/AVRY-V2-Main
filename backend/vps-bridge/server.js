@@ -1642,7 +1642,7 @@ app.post('/blueprint/generate/async', async (req, res) => {
     // so the Next.js poll route can apply its post-processing (ROI override,
     // text-fallback parsing) without the client needing to resend it on every
     // poll — see lib/blueprintGeneration.ts on the frontend.
-    const job = await blueprintQueue.add('generate', { messages, diagnostic }, {
+    const job = await blueprintQueue.add('generate', { messages, diagnostic, callerUserId: req.callerUserId }, {
       // OpenRouter can transiently reset/timeout a long blueprint completion;
       // do not turn one provider/network blip into a permanent user failure.
       attempts: 2,
@@ -1693,7 +1693,7 @@ app.post('/roadmap/generate/async', async (req, res) => {
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: true, message: 'messages array required' });
     }
-    const job = await roadmapQueue.add('generate', { messages, context }, {
+    const job = await roadmapQueue.add('generate', { messages, context, callerUserId: req.callerUserId }, {
       attempts: 2,
       backoff: { type: 'exponential', delay: 5000 },
       removeOnComplete: { age: 3600 },
@@ -2139,7 +2139,7 @@ app.post('/diagnostics/run/async', async (req, res) => {
     if (mode !== 'deep') return res.status(422).json({ error: true, message: 'Invalid mode: expected "deep"' });
     const payload = phases || diagnostic_payload;
     if (!payload) return res.status(400).json({ error: true, message: 'Missing required field: phases' });
-    const job = await diagnosticQueue.add('deep', { payload }, {
+    const job = await diagnosticQueue.add('deep', { payload, callerUserId: req.callerUserId }, {
       // Was attempts:1 (no retry at all) — a transient provider blip on this
       // path used to be a permanent user-facing failure with no automatic
       // recovery, unlike blueprint generation which already retries once.
