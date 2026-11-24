@@ -80,4 +80,18 @@ describe('SignInModal passkey sign-in', () => {
     render(<SignInModal isOpen onClose={() => {}} />);
     expect(screen.getByRole('button', { name: /sign in with a passkey/i })).toBeInTheDocument();
   });
+
+  it('tells a first-time user how to get a passkey, and stops once this browser has one', () => {
+    localStorage.removeItem('passkey_hint');
+    const { unmount } = render(<SignInModal isOpen onClose={() => {}} />);
+    expect(screen.getByText(/no passkey yet\?/i)).toBeInTheDocument();
+    unmount();
+
+    localStorage.setItem('passkey_hint', '1');
+    render(<SignInModal isOpen onClose={() => {}} />);
+    expect(screen.queryByText(/no passkey yet\?/i)).toBeNull();
+    // The button itself is never hidden by the hint.
+    expect(screen.getByRole('button', { name: /sign in with a passkey/i })).toBeInTheDocument();
+    localStorage.removeItem('passkey_hint');
+  });
 });

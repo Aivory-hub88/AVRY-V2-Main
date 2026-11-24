@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { hasPasskeyHint, setPasskeyHint } from '@/lib/passkeyHint';
 import {
   loginWithPasskey,
   passkeysSupported,
@@ -25,9 +26,11 @@ interface PasskeyButtonProps {
 export function PasskeyButton({ onSignedIn, onError, onPaymentRequired, disabled }: PasskeyButtonProps) {
   const [supported, setSupported] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [hinted, setHinted] = useState(false);
 
   useEffect(() => {
     setSupported(passkeysSupported());
+    setHinted(hasPasskeyHint());
   }, []);
 
   if (!supported) return null;
@@ -36,6 +39,7 @@ export function PasskeyButton({ onSignedIn, onError, onPaymentRequired, disabled
     setBusy(true);
     try {
       await loginWithPasskey();
+      setPasskeyHint();
       onSignedIn();
     } catch (err) {
       if (err instanceof PasskeyCancelledError) return;
@@ -70,6 +74,11 @@ export function PasskeyButton({ onSignedIn, onError, onPaymentRequired, disabled
         </svg>
         {busy ? 'Waiting for your passkey...' : 'Sign in with a passkey'}
       </button>
+      {!hinted && (
+        <p className="mt-3 text-center text-[12px] leading-relaxed text-white/45">
+          No passkey yet? Sign in with your password, then add one in Settings &gt; Account.
+        </p>
+      )}
     </div>
   );
 }
