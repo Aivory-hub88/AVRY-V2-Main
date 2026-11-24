@@ -7,6 +7,10 @@
  */
 
 require('dotenv').config();
+// Secrets only the bridge itself needs (BRIDGE_CALLER_TOKEN) live in .env.caller, not .env: the
+// zeroclaw daemon's unit loads .env as its EnvironmentFile, and that token must never reach it.
+// dotenv does not override variables that are already set.
+require('dotenv').config({ path: require('path').join(__dirname, '.env.caller') });
 
 
 // --- OpenRouter API key round-robin (KEY_1/_2/_3, fallback to single KEY) ---
