@@ -39,3 +39,12 @@ test('a job carries only the user id, never a key', () => {
   }
   assert.match(read('../worker.js'), /userOpenRouterKey\(job\.data\.callerUserId/);
 });
+
+test('server.js: both Zeroclaw relays add the authenticated caller\'s key, and every relay filters headers', () => {
+  const server = read('../server.js');
+  assert.match(server, /proxyStreamRequest\(req, res, await providerKeyHeaders\(req\)\)/);
+  assert.match(server, /proxyWorkflowRequest\(req, res, fallbackName, await providerKeyHeaders\(req\)\)/);
+  assert.equal((server.match(/\.\.\.extraHeaders,/g) || []).length, 2, 'the extra headers are spread into both relays');
+  assert.equal((server.match(/stripForwardHeaders\(req\.headers\)/g) || []).length, 3, 'the catch-all relay filters too');
+  assert.ok(!/'x-aivory-caller'\s*:/.test(server.split('proxyStreamRequest')[1] || ''), 'the shared secret is never set on a relayed request');
+});

@@ -20,7 +20,15 @@ function nextOpenRouterKey() {
   return k;
 }
 
-const { openRouterKeyFor } = require('./lib/byokOpenRouter');
+const { openRouterKeyFor, userOpenRouterKey } = require('./lib/byokOpenRouter');
+const { stripForwardHeaders } = require('./lib/forwardHeaders');
+
+// For requests relayed to the Zeroclaw daemons: the caller's own OpenRouter key as
+// X-Provider-Key, only when the dashboard proved who the caller is and BYOK is on.
+async function providerKeyHeaders(req) {
+  const key = req && req.callerUserId ? await userOpenRouterKey(req.callerUserId, INTERNAL_KEY) : null;
+  return key ? { 'X-Provider-Key': key } : {};
+}
 // The key a direct-OpenRouter handler should use: the caller's own (BYOK) or Aivory's.
 const byokKeyOr = (req, fallback) => openRouterKeyFor(req, fallback, INTERNAL_KEY);
 
@@ -402,7 +410,7 @@ app.all(['/api/v1/auth/*', '/auth/*'], (req, res) => {
     ? JSON.stringify(req.body)
     : '';
     
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
   
   const options = {
     hostname: targetUrl.hostname,
@@ -909,12 +917,28 @@ function buildZeroclawWebhookBody(body) {
   return body;
 }
 
-function handleStreamRequest(req, res) {
+// The wrappers are async, and Express 4 doesn't catch a rejected promise: an
+// uncaught one would take the whole bridge down, so every failure is answered here.
+function failRelay(res, err) {
+  console.error('[relay] failed:', err && err.message);
+  if (res.headersSent) return res.end();
+  return res.status(502).json({ error: true, message: 'Upstream relay failed' });
+}
+
+async function handleStreamRequest(req, res) {
+  try {
+    return proxyStreamRequest(req, res, await providerKeyHeaders(req));
+  } catch (err) {
+    return failRelay(res, err);
+  }
+}
+
+function proxyStreamRequest(req, res, extraHeaders) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
     ? JSON.stringify(buildZeroclawWebhookBody(req.body))
     : '';
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
   
   const options = {
     hostname: targetUrl.hostname,
@@ -923,6 +947,7 @@ function handleStreamRequest(req, res) {
     method: 'POST',
     headers: {
       ...forwardHeaders,
+      ...extraHeaders,
       'X-Internal-Key': INTERNAL_KEY,
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(outboundBody),
@@ -1733,12 +1758,20 @@ app.get('/roadmap/result/:jobId', async (req, res) => {
 // Response shape: { workflow: { workflowName, steps, ... }, message?: string }
 // ============================================================================
 
-function handleWorkflowRequest(req, res, fallbackName) {
+async function handleWorkflowRequest(req, res, fallbackName) {
+  try {
+    return proxyWorkflowRequest(req, res, fallbackName, await providerKeyHeaders(req));
+  } catch (err) {
+    return failRelay(res, err);
+  }
+}
+
+function proxyWorkflowRequest(req, res, fallbackName, extraHeaders) {
   const targetUrl = new URL('/webhook', ZEROCLAW_URL);
   const outboundBody = req.body && Object.keys(req.body).length > 0
     ? JSON.stringify(buildZeroclawWebhookBody(req.body))
     : '';
-  const { host, 'content-length': _contentLength, ...forwardHeaders } = req.headers;
+  const forwardHeaders = stripForwardHeaders(req.headers);
 
   const options = {
     hostname: targetUrl.hostname,
@@ -1747,6 +1780,7 @@ function handleWorkflowRequest(req, res, fallbackName) {
     method: 'POST',
     headers: {
       ...forwardHeaders,
+      ...extraHeaders,
       'X-Internal-Key': INTERNAL_KEY,
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(outboundBody),
