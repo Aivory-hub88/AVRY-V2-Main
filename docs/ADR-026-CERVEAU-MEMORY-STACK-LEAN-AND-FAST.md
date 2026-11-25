@@ -14,9 +14,10 @@
 2. **Ekor lambat (p90 4,2 s, maks 25 s) belum terjelaskan sepenuhnya, tetapi petunjuknya kuat dan bukan embedding.** Pada burst 5-6 turn serentak (mis. 2026-11-17 07:53 UTC) tahap recall memori selesai **berurutan dengan jeda 1,6-10 s**, padahal graf selesai < 0,7 s dan embedding terbukti tidak antre. Penyebab (starvasi worker tokio di 4 vCPU, antrean pool r2d2, atau yang lain) harus dibuktikan dengan instrumentasi (§5, fase F0), bukan ditebak.
 3. **Beberapa knob config yang tampak aktif ternyata tidak melakukan apa-apa** (verifikasi di kode, §4): `retrieval_stages = ["cache","fts","vector"]`, `fts_early_return_score`, dan `embedding_cache_size` pada backend Postgres. Cache recall juga tidak dipakai jalur tenant (`recall_for_agents`). Jadi "FTS dulu, vektor hanya bila perlu" dan "cache embedding" **tidak bisa** dicapai lewat config; butuh Rust.
 4. **Jangan ganti stack, jangan tambah komponen.** Korpus produksi kecil (1.613 baris, 9,4 MB, 87 agent). Tidak ada bukti bahwa Mem0/Zep/Letta/graf temporal akan memberi manfaat nyata di skala ini; semuanya menambah panggilan LLM saat tulis atau komponen baru. Rekomendasi: **ukur dulu (F0), buang yang nol nilainya, percepat yang pasti (cache embedding query, timeout, paralel), baru putuskan soal graf (F3).**
-5. **Pertanyaan "perlu dua sumber (Postgres + cognee)?" dijawab lewat eval ablasi offline (§7)**, bukan opini. Sampai ada data, graf dibiarkan dan hanya diberi anggaran waktu yang lebih ketat.
+5. **Cognee harus jadi stabil dulu, baru lebih canggih (§14).** Hang berulang (3-11 Okt, 17 Nov x3, 22 Nov) dilacak ke self-deadlock di `DatasetRunGuard::acquire` (fork `cognee-rs`, commit `4a60eff`, sudah di-deploy 22 Nov 17:21 CST; 0 hang sejak, tetapi baru 3 hari). Sisa masalah: 7,5% recall graf timeout dan kualitas graf. Cognee **sudah** Postgres untuk vektor dan graf (pgvector + pggraph); yang tersisa SQLite adalah relasional.
+6. **Pertanyaan "perlu dua sumber (Postgres + cognee)?" dijawab lewat eval ablasi offline (§7)**, bukan opini. Sampai ada data, graf dibiarkan dan hanya diberi anggaran waktu yang lebih ketat.
 
-Rekomendasi ranking (gain latensi / usaha / risiko) ada di §6; rencana fase dengan exit gate di §9.
+Poin 5 dan 6 menggantikan penomoran lama; rekomendasi ranking (gain latensi / usaha / risiko) ada di §6; rencana fase dengan exit gate di §9.
 
 ## 2. Pengukuran (sumber dan metode)
 
@@ -134,7 +135,7 @@ Implikasi untuk Cerveau: korpus per tenant kecil (ratusan baris), turn singkat. 
 ## 8. Lean: anggaran token dan dua sumber
 
 - Anggaran memori terukur ≈ ≤1.000 token dari ~11 ribu; rata-rata 3 entri; 17% turn tanpa injeksi. Ruang pemangkasan memori **kecil** (≈ ≤9% input); keuntungan terbesar ada di latensi, bukan token.
-- Dua sumber: graf cognee memakai sidecar Docker (`cognee/cognee`), proses `cognify` LLM tiap 90 dtk per (tenant, agent), dan 0,65 s per turn. Nilai marjinalnya **belum pernah diukur**. Eval ablasi (§9, F1) memutuskan: Postgres saja / graf saja / keduanya.
+- Dua sumber: graf cognee memakai sidecar `cognee-rs` (biner native `cerveau-server`, systemd `cognee-cerveau`, :3200), proses `cognify` LLM tiap 90 dtk per (tenant, agent), dan 0,65 s per turn. Nilai marjinalnya **belum pernah diukur**. Eval ablasi (§9, F1) memutuskan: Postgres saja / graf saja / keduanya.
 - Biaya per turn: embedding query ~1 panggilan kecil (harga: belum diverifikasi, orde sen/ribuan turn); `cognify` LLM adalah komponen biaya yang tidak terlihat di jalur turn dan harus dimasukkan ke ablasi.
 
 ## 9. Evaluasi dan rencana fase
@@ -193,6 +194,41 @@ Tidak ada bukti bahwa pada korpus 1,6k baris hal ini menambah nilai. Syarat masu
 - Query: `docker exec avry-postgres psql` dengan kredensial dibaca server-side dari config dalam skrip yang tidak mencetaknya; `BEGIN READ ONLY; EXPLAIN (ANALYZE, TIMING OFF) <query hybrid>; ROLLBACK;`.
 - Embedding: 12 panggilan urut + 4 putaran x 6 paralel ke endpoint embedding dengan kunci dari config (server-side).
 - **Insiden kecil selama riset:** satu dump struktur config mencetak string koneksi Postgres karena kunci bersarang (`storage.postgres.default.db_url`) lolos dari filter nama. Nilainya tidak dipakai di dokumen ini; **disarankan merotasi password DB `aivory`** karena sempat muncul di transkrip sesi riset.
+
+## 14. Jalur cognee: stabil dulu, canggih kemudian
+
+### 14.1 Bukti (read-only, 2026-11-25)
+
+| Hal | Temuan | Sumber |
+|---|---|---|
+| Stack cognee | `cerveau-server` (fork `cognee-rs`, branch `cerveau-main`) di systemd :3200; `VECTOR_DB_PROVIDER=pgvector`, `GRAPH_DATABASE_PROVIDER=postgres` ke DB `aivory` (schema `cognee,identity`); embedding 1536 dim via OpenRouter; LLM ekstraksi `deepseek-v4-flash`; `COGNEE_FORCE_BACKGROUND_COGNIFY`, batch 10, ingest gate mode `shadow` | `/etc/cognee-cerveau.env` (nilai rahasia diredaksi) |
+| Relasional | masih SQLite: thread `sqlx-sqlite-worker` pada snapshot hang, dan 190 MB di `~/.cognee-cerveau` (isi tidak diperiksa) | snapshot watchdog, `du` |
+| Akar hang | snapshot 22 Nov (gdb): 4 worker tokio semua terblokir di `Mutex::lock_contended` pada `Mutex<HashSet<Uuid>>`, dari `DatasetRunGuard::acquire -> then_some -> drop`. `then_some` membangun guard secara eager; saat dataset sedang berjalan guard dibuang saat `acquire` masih memegang mutex, `Drop` mengunci lagi: self-deadlock pada `std::Mutex`. Semua cognify berikutnya antre di belakangnya sampai server berhenti menjawab, sementara kernel tetap menerima koneksi (Recv-Q naik) | `/var/lib/aivory/cognee-watchdog/hang-20261122T164506.txt`; kode `crates/http-server/src/routers/cognify.rs`; fix `4a60eff` (merge `569240c`, 22 Nov 09:12 UTC) |
+| Cakupan bukti | hanya snapshot 22 Nov yang saya bedah; snapshot 17 Nov dan hang 3-11 Okt (sebab "unknown" di insiden) **belum diperiksa**, kemungkinan sama tetapi belum terbukti | - |
+| Setelah fix | `NRestarts=0`, aktif sejak 22 Nov 17:21 CST (3 hari), tanpa baris ERROR di journal sejak 1 Nov | `systemctl show`, `journalctl` |
+| Recall graf sebelum/sesudah fix | sebelum n=186: ok 78%, empty 10%, timeout 8%, http_error 3%; sesudah n=80: ok 81%, empty 10%, **timeout 7,5%**, http_error 1,3%; p50 663 -> 713 ms, p90 1,28 -> 1,46 s | trace `graph sidecar call` |
+| Kualitas graf | log WARNING `Skipping edge: target node ... not found in extracted nodes` (edge yatim dari ekstraksi LLM); 2 peringatan `tool-call request failed; falling back to legacy function/JSON mode` | journal cognee |
+| Ingest gate | mode `shadow`: yang saya lihat semua `would_drop=false`; log memuat `tenant=` kosong dan `dataset=cerveau_graph`: **perlu dipastikan isolasi per tenant** (belum diverifikasi) | journal cognee |
+| Komponen sisa | container Python `cognee/cognee:latest` (`:8000`) up 7 hari, peran saat ini tidak diverifikasi | `docker ps` |
+| Duplikasi kerja | satu query di-embed dua kali per turn: memori Cerveau (768 dim) dan cognee (1536 dim), keduanya ke OpenRouter | config kedua sisi |
+
+Koreksi atas jawaban saya sebelumnya: saran "taruh cognee-rs di atas Postgres" sebagian **sudah terlaksana** (ADR-007): vektor dan graf sudah di Postgres. Yang belum: relasional (SQLite) dan konsolidasi ke satu penyimpanan terdokumentasi.
+
+### 14.2 Rencana cognee (paralel dengan §9, tiap langkah bisa di-rollback sendiri)
+
+| Fase | Isi | Perlu | Exit gate terukur | Rollback |
+|---|---|---|---|---|
+| **C0** | Konfirmasi fix bertahan; periksa snapshot 17 Nov dan 3-11 Okt untuk tanda tangan yang sama; audit semua `std::sync::Mutex` di `http-server` (guard yang dipegang melewati `drop` atau `.await`); tambah uji lock-order | baca kode + PR kecil di fork | 14 hari tanpa hang dan `restarts` watchdog = 0; audit tercatat | tidak ada (baca) |
+| **C1** | Instrumentasi recall cognee per tahap (embed, pgvector, ekspansi graf, total) dan log `outcome` terperinci | Rust di fork, biner baru | 7 hari data; timeout 7,5% teratribusi ke satu tahap | biner lama |
+| **C2** | Satu embedding per turn: Cerveau menyelaraskan dimensi (768 via Matryoshka) dan meneruskan vektor query ke cognee, atau sebaliknya | perubahan API cognee + **re-embed vektor cognee** | timeout recall graf < 3%; satu panggilan embedding per turn | flag; vektor lama dipertahankan di kolom paralel |
+| **C3** | Relasional SQLite -> Postgres (SeaORM) | migrasi di fork | satu backup untuk semuanya; uji isolasi dan latensi tidak memburuk | pertahankan file SQLite lama |
+| **C4** | Kualitas graf: buang edge yatim, nilai ingest gate (shadow -> enforce hanya bila eval F1 mendukung), evaluasi model ekstraksi | config + eval | eval F1: arm dengan graf unggul >= 5 poin pada kategori relasional/ multi-sesi, atau graf dipensiunkan | gate kembali ke `shadow` |
+| **C5** | "Lebih canggih": fakta temporal (valid_at/invalid_at gaya Zep) **hanya bila** F1 menunjukkan kelemahan temporal/knowledge-update; kemampuan temporal cognee-rs belum diverifikasi | ADR lanjutan | ditentukan setelah F1 | - |
+
+SLO usulan untuk sidecar: tidak ada hang > 3 menit (watchdog sudah memulihkan), `recall_context` p90 < 1 s dan timeout < 3%, error HTTP < 1%.
+
+### 14.3 Risiko isolasi untuk jalur cognee
+Graf bersama di schema `cognee` memakai `tenant_id`/dataset; log menunjukkan `tenant=` kosong pada ingest gate. Sebelum C2/C3/C4: uji "wrong-tenant leak = 0" pada recall graf (dua tenant, entitas bernama sama), dan konfirmasi dataset benar-benar per tenant. Re-embed atau migrasi relasional harus dikerjakan per tenant dengan verifikasi jumlah baris.
 
 ## 13. Sumber
 
